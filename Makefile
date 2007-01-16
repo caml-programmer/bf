@@ -1,5 +1,5 @@
 include Makefile.config
-SOURCES   = system.ml config.ml eval.ml logger.ml params.ml rules.ml commands.ml
+SOURCES   = system.ml config.ml eval.ml logger.ml params.ml git.ml rules.ml commands.ml
 OBJECTS   = $(SOURCES:.ml=.cmo)
 XOBJECTS  = $(OBJECTS:.cmo=.cmx)
 ARCHIVE   = archive.cma

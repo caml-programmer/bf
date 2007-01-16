@@ -8,7 +8,7 @@ let eval_phrase s =
     ignore
       (Toploop.execute_phrase false Format.std_formatter 
 	(!Toploop.parse_toplevel_phrase (Lexing.from_string s)))
-  with exn -> raise (Eval_error (Printexn.to_string exn))
+  with exn -> raise (Eval_error (Printexc.to_string exn))
     
 let eval_value v =
   Obj.obj (Toploop.getvalue v)

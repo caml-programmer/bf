@@ -7,20 +7,20 @@ let path_list = ["/bin";"/sbin";"/usr/bin";"/usr/sbin"];;
 (* new *)
 
 let string_of_exn exn =
-  Printexn.to_string exn
+  Printexc.to_string exn
 
 let string_of_channel ch =
   let b = Buffer.create 32 in
   let rec read () =
     try
-      read (Buffer.add_string b (input_line s))
+      read (Buffer.add_string b (input_line ch))
     with End_of_file -> Buffer.contents b
   in read ()
 
 let list_of_channel ch =
   let rec read acc =
     try
-      read (acc @ [input_line s])
+      read (acc @ [input_line ch])
     with End_of_file -> acc
   in read []
 
@@ -47,6 +47,41 @@ let path_strip_directory file =
       String.sub file 0 (len - 1)
     else file
   else file
+
+let create_directory_r dir =
+  ignore(Sys.command (sprintf "mkdir -p %s" dir))
+
+let path_directory file =
+  Filename.dirname file
+
+let transfer_file src dst =
+  let a = open_in_bin src in
+  let b = open_out_bin dst in
+  try
+    while true do
+      output_char b (input_char a)
+    done
+  with End_of_file ->
+    close_in a; close_out b
+
+let is_directory s =
+  let st = Unix.stat s in
+  match st.Unix.st_kind with
+    | Unix.S_DIR -> true
+    | _ -> false
+
+let copy_file file dest =
+  let name = Filename.basename file in
+  if is_directory dest then
+    let dest_file = Filename.concat dest name in
+    transfer_file file dest_file
+  else
+    transfer_file file dest
+    
+let uname () =
+  let ch = Unix.open_process_in "uname" in
+  let name = input_line ch in
+  close_in ch; name
 
 (* old *)
 

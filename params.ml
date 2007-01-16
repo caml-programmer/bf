@@ -10,12 +10,12 @@ let read_params () =
       then Some "/etc/params" else None
   in match filename with
     | None -> params
-    | Some ->
+    | Some filename ->
 	let rex = Pcre.regexp "^([^\\s]+)\\s+(.*)$" in
 	let ch = open_in filename in
 	List.iter
 	  (fun s ->
-	    if Pcre.pmatch ~rex nv then
+	    if Pcre.pmatch ~rex s then
 	      let a =
 		Pcre.extract ~rex s
 	      in Hashtbl.replace params a.(1) a.(2))
@@ -27,13 +27,13 @@ let user_params =
   read_params ()
 ;;
 
-let set_param ~deafult s =
+let set_param ~default s =
   try
     Hashtbl.find user_params s
   with Not_found -> default
 ;;
 
-let top_dir = set_param ~default:Sys.getcwd "top-dir";;
+let top_dir = set_param ~default:(Sys.getcwd()) "top-dir";;
 let log_dir = set_param ~default:(top_dir ^ "/logs") "log-dir";;
 let git_url = set_param ~default:"git://localhost/" "git-url";;
 let prefix  = set_param ~default:"/opt/dozor" "prefix";;

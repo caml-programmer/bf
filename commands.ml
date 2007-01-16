@@ -1,6 +1,7 @@
 open Git
 open Params
 open Rules
+open Logger
 
 exception Checkout_done
 
@@ -35,14 +36,14 @@ let with_component_dir component thunk =
     end
 
 let non_empty_iter f = function
-    []   -> error "don't know wat to do"
+    []   -> log_error "don't know wat to do"
   | list -> List.iter f list
 
 let prepare_component component =
   with_component_dir component git_clean
 
 let prepare components =
-  non_emprt_iter prepare_component components
+  non_empty_iter prepare_component components
 
 let build_component component =
   with_component_dir component
@@ -60,7 +61,7 @@ let build_component component =
 	close_out ch)
 	  
 let build components =
-  non_emprt_iter build_component components
+  non_empty_iter build_component components
 
 let rebuild_component component =
   with_component_dir component
@@ -70,7 +71,7 @@ let rebuild_component component =
   build_component component
 	  
 let rebuild components =
-  non_emprt_iter rebuild_component components
+  non_empty_iter rebuild_component components
 
 let install_component component =
   with_component_dir component
