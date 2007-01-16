@@ -370,7 +370,14 @@ let rpmbuild
   define "rhsys" (string_of_platform platform);
   define "findreq" findreq;
   define "_unpackaged_files_terminate_build" "0";
-  log_command "rpmbuild" !args
+  (* log_command "rpmbuild" !args *)
+  let cmd = "rpmbuild" ^ (String.concat " " !args) in
+  log_message (sprintf "run: %s" cmd);
+  match Unix.system cmd with
+    | Unix.WEXITED 0 -> ()
+    | _ ->
+	log_error 
+	  (sprintf "Cannot build package: %s-%s-%s" pkgname version release)
 
 type content =
     [
@@ -519,3 +526,18 @@ let build_package args =
     |  s      -> log_error (sprintf "Unsupport platform (%s) by build package" s)
 
 
+(* Log wizor *)
+
+type log_status = {
+  mtime: float;
+  lname: string;
+}
+
+let log_wizor dir =
+  let read_logs () =
+    List.map
+      (fun dir ->
+	let st = Unix.stat dir in
+	{ mtime = st.Unix.st_mtime; lname = dir })
+    (System.list_of_directory dir)
+  in ()

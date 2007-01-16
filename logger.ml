@@ -95,7 +95,7 @@ let log_command prog args =
 	    with Not_found -> ()))
 	  (System.get_process_env ());
 	let cmd =
-	  Shell.cmd 
+	  Shell.cmd
 	    ~cmdname:program 
 	    ~environment
 	    program args

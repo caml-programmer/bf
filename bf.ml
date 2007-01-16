@@ -12,7 +12,7 @@ let usage () =
   print_endline "   or: bf (prepare|update|forward|[re]build|[re]install) <component> [branch <branch> | tag <tag>]";
   print_endline "   or: bf (prepare|update|forward|[re]build|[re]install) <composite>";
   print_endline "   or: bf pack <specdir> <version> <release>";
-  (* TODO: bf log - with auto select current log file? *)
+  print_endline "   or: bf log <logdir>";
   exit 1
 
 let make_component s =
@@ -64,6 +64,10 @@ let main () =
 	      let release = Sys.argv.(4) in
 	      Rules.build_package 
 		[specdir;version;release]
+	    else usage ()
+	| "log" ->
+	    if len = 2 then
+	      Rules.log_wizor Sys.argv.(2)
 	    else usage ()
 	| _ ->
 	    (match analyze_arguments () with
