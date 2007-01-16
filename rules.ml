@@ -421,18 +421,30 @@ let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
     while true do
       let raw = input_line ch in
       match parse_line raw with
-	| `File s -> 
-	    System.create_directory_r 
-	      (Filename.concat buildroot (Filename.dirname s));
-	    System.copy_file ("/" ^ s) (Filename.concat buildroot s)
+	| `File s ->
+	    let dname =
+	      Filename.concat buildroot (Filename.dirname s) in
+	    let src = "/" ^ s in
+	    let dst = Filename.concat buildroot s in
+	    log_message (sprintf "create-directory-r %s" dname);
+	    System.create_directory_r dname;
+	    log_message (sprintf "copy-file %s %s" src dst);
+	    System.copy_file src dst
 	| `Dir s ->
+	    let dname =
+	      Filename.concat buildroot (Filename.dirname s) in
+	    let src = "/" ^ s in
+	    let dst = Filename.concat buildroot s in
+	    log_message (sprintf "create-directory-r %s" dname);
+	    System.create_directory_r dname;
+	    log_message (sprintf "remove-directory %s" dst);
 	    remove_directory (Filename.concat buildroot s);
-	    System.create_directory_r 
-	      (Filename.concat buildroot (Filename.dirname s));
-	    System.copy_dir ("/" ^ s) (Filename.concat buildroot s);
-	| `Empty_dir s -> 
-	    System.create_directory_r 
-	      (Filename.concat buildroot s)
+	    log_message (sprintf "copy-directory %s %s" src dst);
+	    System.copy_dir src dst;
+	| `Empty_dir s ->
+	    let dst = Filename.concat buildroot s in
+	    log_message (sprintf "create-directory-r %s" dst);
+	    System.create_directory_r dst
 	| `None -> 
 	    log_message 
 	      (sprintf "copy_to_buildroot: skipped %s" raw)
