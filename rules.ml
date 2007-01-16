@@ -383,7 +383,7 @@ let copy_to_buildroot ?(builddir="builddir") ~top_dir files =
   let match_prefix p v =
     let pl = String.length p in
     let vl = String.length v in
-    pl >= vl && String.sub v 0 pl = p
+    vl >= pl && String.sub v 0 pl = p
   in
   let parse_line s =
     let make_path s =
