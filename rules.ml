@@ -471,9 +471,10 @@ let build_rh_package platform args =
 	    [spec;files;findreq;pack_version] ->
 	      let top_dir = Params.get_param "top-dir" in
 	      check_rh_build_env ();
+	      log_command "chmod" ["+x";findreq];
 	      copy_to_buildroot ~top_dir files;
 	      rpmbuild
-		~top_dir		
+		~top_dir
 		~platform ~version ~release
 		~spec ~files ~findreq ()
 	  | _-> assert false)
