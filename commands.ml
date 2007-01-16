@@ -432,6 +432,7 @@ Ocs_env.set_pf2 Scheme.env scm_create_symlink "create-symlink";;
 Ocs_env.set_pf2 Scheme.env scm_create_link "create-link";;
 Ocs_env.set_pf1 Scheme.env scm_is_directory "is-directory";;
 Ocs_env.set_pf2 Scheme.env scm_send_file_over_ssh "send-file-over-ssh";;
+Ocs_env.set_pfn Scheme.env scm_package_build_message "package-build-message";;
 Ocs_env.set_pf2 Scheme.env scm_send_message "send-message";;
 
 
