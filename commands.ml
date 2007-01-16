@@ -8,6 +8,12 @@ exception Checkout_done
 
 let with_component_dir component thunk =
   let curdir = Sys.getcwd () in
+
+  Params.update_param "component" component;  
+
+  log_message 
+    (Printf.sprintf "with_component_dir(%s)" (curdir ^ "/" ^ component));
+    
   if not (Sys.file_exists component) then
     begin
       git_clone ((Params.get_param "git_url") ^ "/" ^ component);

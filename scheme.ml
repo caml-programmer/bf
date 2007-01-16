@@ -17,9 +17,11 @@ let string_list_of_sval_array v =
   List.map string_of_sval (Array.to_list v)
 
 let eval_file file =
+  Printf.printf "eval_file %s\n" file;
   Ocs_prim.load_file env thread file
 
 let eval_code handler s =
+  Printf.printf "eval_code %s\n" s;
   Ocs_eval.eval thread handler
     (Ocs_compile.compile env (Ocs_read.read_from_string s))
 

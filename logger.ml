@@ -29,10 +29,12 @@ let log_message ?key ?logger message =
     match logger with
       | Some l -> l.start_time, l.port
       | None   -> timestamp, open_logfile ()
-  in output_string port
-       (match key with 
-	   None   -> (sprintf "%f %f %s\n"      starttime timestamp message)
-	 | Some k -> (sprintf "%f %f [%s] %s\n" starttime timestamp k message));
+  in 
+  let s =
+    match key with
+      | None   -> (sprintf "%f %f %s\n"      starttime timestamp message)
+      | Some k -> (sprintf "%f %f [%s] %s\n" starttime timestamp k message)
+  in output_string port s; output_string stdout s;
   match logger with
     | Some l ->	flush port
     | None   ->	close_out port

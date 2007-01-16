@@ -2,19 +2,16 @@ open Logger
 open System
 open Printf
 
-let read_rules () =
-  printf
-    "read rules from %s/.bf-rules\n" (Sys.getcwd());
-  System.read_file ~file:".bf-rules"
-
+let rules_file () =  
+  let file = (Sys.getcwd()) ^ "/.bf-rules" in
+  printf "load %s\n" file; file
+  
 let build_rules () =
-  let s = read_rules () in
-  Scheme.eval_file s;
+  Scheme.eval_file (rules_file ());
   Scheme.eval_code (fun _ -> ()) "(build)"
 
 let install_rules () =
-  let s = read_rules () in
-  Scheme.eval_file s;
+  Scheme.eval_file (rules_file ());
   Scheme.eval_code (fun _ -> ()) "(install)"  
   
 let make () =

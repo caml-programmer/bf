@@ -48,9 +48,8 @@ let get_param s =
 ;;
 
 let update_param name value =
-  let vbind =
-    Ocs_env.get_var Scheme.env (Ssymbol name) in
-  Ocs_env.bind_name Scheme.env (Sstring value) vbind;
+  Ocs_env.bind_name Scheme.env (Ssymbol name)
+    (Ocs_env.get_var Scheme.env (Ssymbol value));
   Hashtbl.replace user_params name value
 ;;
 
@@ -59,3 +58,4 @@ set_param ~default:((get_param "top-dir") ^ "/logs") "log-dir";;
 set_param ~default:"git://localhost/" "git-url";;
 set_param ~default:"/opt/dozor" "prefix";;
 set_param ~default:"/" "destdir";;
+set_param ~default:"bf" "component";;
