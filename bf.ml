@@ -58,10 +58,10 @@ let main () =
       let action = Sys.argv.(1) in
       match action with
 	| "pack" ->
-	    if len = 4 then
-	      let specdir = Sys.argv.(1) in
-	      let version = Sys.argv.(2) in
-	      let release = Sys.argv.(3) in
+	    if len = 5 then
+	      let specdir = Sys.argv.(2) in
+	      let version = Sys.argv.(3) in
+	      let release = Sys.argv.(4) in
 	      Rules.build_package 
 		[specdir;version;release]
 	    else usage ()
