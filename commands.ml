@@ -87,6 +87,10 @@ let prepare components =
 let update_component component = (* todo: more smart implementation *)
   with_component_dir ~strict:true component
     (fun () ->
+      List.iter 
+      (fun branch ->
+	git_pull ~refspec:branch (Filename.concat (Params.get_param "git-url") component.name))
+      (git_branch ());
       git_pull (Filename.concat (Params.get_param "git-url") component.name);
       git_track_new_branches ())
 
