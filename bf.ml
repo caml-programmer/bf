@@ -1,12 +1,10 @@
-(* Build farm for GIT-repository *)
+(* Buildfarm for GIT-repository *)
 
 let usage () =
   print_endline "Usage: bf (prepare|build|rebuild|install) components";
   exit 1
 
 let _ =
-  print_string "Run with ";
-  print_endline (Sys.getcwd ());
   let len = Array.length Sys.argv in
   if len > 1 then
     let components =

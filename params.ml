@@ -35,10 +35,13 @@ let set_param ~default s =
   let value =
     try
       Hashtbl.find user_params s
-    with Not_found -> default in
+    with Not_found -> default 
+  in
   
   Ocs_env.set_glob Scheme.env
-    (Ssymbol s) (Sstring value)
+    (Ssymbol s) (Sstring value);
+  
+  Hashtbl.replace user_params s value
 ;;
 
 let get_param s =

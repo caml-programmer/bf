@@ -3,20 +3,19 @@ open System
 open Printf
 
 let rules_file () =  
-  let file = (Sys.getcwd()) ^ "/.bf-rules" in
-  printf "load %s\n" file; file
+  Filename.concat (Sys.getcwd()) ".bf-rules"
   
 let build_rules () =
   Scheme.eval_file (rules_file ());
-  Scheme.eval_code (fun _ -> ()) "(build)"
+  Scheme.eval_code (fun _ -> ()) "(build ())"
 
 let install_rules () =
   Scheme.eval_file (rules_file ());
-  Scheme.eval_code (fun _ -> ()) "(install)"  
-  
-let make () =
-  log_command "make"
-
+  if Sys.file_exists ".bf-build" then
+    Scheme.eval_code (fun _ -> ()) "(install ())"
+  else
+    log_error "current component is not built"  
+      
 let install_file file dir =
   with_logger
     (fun logger ->
