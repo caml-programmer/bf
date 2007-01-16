@@ -309,3 +309,126 @@ let create_symlink src dst =
 
 let create_link src dst =
   Unix.link src dst
+
+(* Package *)
+
+type platform =
+  | Rhel3
+  | Rhel4
+  | Cent4
+  | Alt
+  | Solaris8
+  | Solaris9
+  | Solaris10
+
+type platform_mapping = 
+    (string * ((string * platform) list)) list
+
+let string_of_platform = function
+  | Rhel3     -> "rhel3"
+  | Rhel4     -> "rhel4"
+  | Cent4     -> "cent4"
+  | Alt       -> "alt"
+  | Solaris8  -> "sol8"
+  | Solaris9  -> "sol9"
+  | Solaris10 -> "sol10"
+
+let platform_mapping = [
+  "/etc/redhat-release",
+  [
+    "^Red Hat Enterprise.*?release 3",Rhel3;
+    "^Red Hat Enterprise.*?release 4",Rhel4;
+    "^CentOS.*?release 4",Cent4;
+    "^ALT Linux",Alt
+  ]
+]
+
+let check_rh_build_env () =
+  System.check_commands ["rpmbuild"]
+
+let rpmbuild
+  ?(top_label="jetprefix") ?(top_dir="/tmp/rpmbuild")
+  ?(nocopy="/") ?(buildroot=((Sys.getcwd ()) ^ "/buildroot"))
+  ?(format="%%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm")
+  ~platform ~version ~release ~spec ~files ~findreq () =
+  let args = ref [] in
+  let add s = args := !args @ [s] in
+  let define n v =
+    add (sprintf "--define '%s %s'" n v) in
+  add "-bb";
+  add ("--target=" ^ System.arch ());
+  add spec;
+  define "_rpmdir" (Sys.getcwd ());
+  define "fileslist" files;
+  define top_label top_dir;
+  define "nocopy" nocopy;
+  define "buildroot" buildroot;
+  define "_build_name_fmt" format;
+  define "pkgvers" version;
+  define "pkgrel" release;
+  define "rhsys" (string_of_platform platform);
+  define "filereq" findreq;
+  define "_unpackaged_files_terminate_build" "0";
+  log_command "rpmbuild" !args
+
+let copy_to_buildroot files = ()
+
+(**
+function bf_copy_to_buildroot() {
+    while read f; do
+	if [ "${f#%dir }" != "$f" ]; then
+	    f="${f#%dir }"
+	    [ "${f#%jetprefix}" != "$f" ] && f="$PREFIX${f#%jetprefix}"
+	    for i in $f; do
+		bf_log "mkdir -p 'buildroot/$i'"
+	    done
+	else
+	    [ "${f#%config(noreplace) }" != "$f" ] && f="${f#%config(noreplace) }"
+	    [ "${f#%jetprefix}" != "$f" ] && f="$PREFIX${f#%jetprefix}"	
+	    for i in $f; do
+		if [ "${f#%nocopy}" == "$f" ]; then
+		    dir=`dirname "buildroot/$i"`
+		    bf_log "mkdir -p '$dir'"
+		    yes | bf_log "cp -arf '$i' '$dir'" || bf_error
+		fi
+	    done
+	fi
+    done
+}
+*)
+
+let build_rh_package platform args =
+  match args with
+    | [spec;files;findreq;version;release] ->
+	check_rh_build_env ();
+	copy_to_buildroot files;
+	rpmbuild
+	  ~top_dir:(Params.get_param "top-dir")
+	  ~platform ~version ~release
+	  ~spec ~files ~findreq ()
+    | _ -> log_error "build_rh_package: wrong arguments"
+
+let build_linux_package args =
+  List.iter
+    (fun (f,m) ->
+      if Sys.file_exists f then
+	let s = System.read_file ~file:f in
+	let l = List.filter (fun (pat,_) -> Pcre.pmatch ~pat s) m in
+	match l with
+	  | (_,platform)::_ ->
+	      (match platform with
+		| Rhel3 -> build_rh_package platform args
+		| Rhel4 -> build_rh_package platform args
+		| Cent4 -> build_rh_package platform args
+		| Alt   -> build_rh_package platform args
+		| _     -> log_error "unknown or unsupported platform")
+	  | _ -> log_error "unknown or unsupported platform")
+    platform_mapping
+
+let build_sunos_package args = ()
+
+let build_package args =
+  match System.uname () with
+    | "linux" -> build_linux_package args
+    | "sunos" -> build_sunos_package args
+    |  s      -> log_error (sprintf "Unsupport platform (%s) by build package" s)

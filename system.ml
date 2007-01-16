@@ -116,6 +116,11 @@ let uname () =
   let name = String.lowercase (input_line ch) in
   close_in ch; name
 
+let arch () =
+  let ch = Unix.open_process_in "arch" in
+  let name = input_line ch in
+  close_in ch; name
+
 let list_of_directory dir =
   let dh = Unix.opendir dir in
   let acc = ref [] in
@@ -160,6 +165,26 @@ let with_extension ext f files =
       with Not_found -> ())
     files
 
+let is_executable file = (* warning: checked for current user only *)
+  try Unix.access file [Unix.X_OK]; true
+  with Unix.Unix_error(_,_,_) -> false
+
+let check_command cmd =
+  List.length 
+    (List.filter
+      (fun path ->
+	let abs = Filename.concat path cmd in
+	Sys.file_exists abs && is_executable abs)
+      path_list) > 0
+
+exception Required_command_is_not_found of string
+
+let check_commands list =
+  List.iter
+    (fun cmd ->
+      if not (check_command cmd) then
+	raise (Required_command_is_not_found cmd))
+    list
 
 (* old *)
 

@@ -33,6 +33,7 @@
     (mod-ssl)
     (mod-mzscheme)
     (samba)
+    (postgresql)
     (daemontools)
     (retranslator)
     (action-server)
@@ -42,7 +43,6 @@
     (skvt-base)
     (skvt-tools)
     (skvt-dozor)
-    (postgresql)
     (squid)
     (wizor2)))
 
