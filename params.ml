@@ -1,4 +1,8 @@
 open System
+open Ocs_env
+open Ocs_types
+
+exception Unknown_parameter of string
 
 let read_params () =
   let params = Hashtbl.create 32 in
@@ -28,20 +32,30 @@ let user_params =
 ;;
 
 let set_param ~default s =
-  try
-    Hashtbl.find user_params s
-  with Not_found -> default
+  let value =
+    try
+      Hashtbl.find user_params s
+    with Not_found -> default in
+  
+  Ocs_env.set_glob Scheme.env
+    (Ssymbol s) (Sstring value)
 ;;
 
 let get_param s =
   try 
-    Some (Hashtbl.find user_params s)
-  with Not_found -> None
+    Hashtbl.find user_params s
+  with Not_found -> raise (Unknown_parameter s)
 ;;
 
-let top_dir = set_param ~default:(Sys.getcwd()) "top-dir";;
-let log_dir = set_param ~default:(top_dir ^ "/logs") "log-dir";;
-let git_url = set_param ~default:"git://localhost/" "git-url";;
-let prefix  = set_param ~default:"/opt/dozor" "prefix";;
-let destdir = set_param ~default:"/" "destdir";;
-let component = ref "";;
+let update_param name value =
+  let vbind =
+    Ocs_env.get_var Scheme.env (Ssymbol name) in
+  Ocs_env.bind_name Scheme.env (Sstring value) vbind;
+  Hashtbl.replace user_params name value
+;;
+
+set_param ~default:(Sys.getcwd()) "top-dir";;
+set_param ~default:((get_param "top-dir") ^ "/logs") "log-dir";;
+set_param ~default:"git://localhost/" "git-url";;
+set_param ~default:"/opt/dozor" "prefix";;
+set_param ~default:"/" "destdir";;

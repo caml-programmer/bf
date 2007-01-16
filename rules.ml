@@ -1,24 +1,22 @@
-open Eval
 open Logger
 open System
 open Printf
 
 let read_rules () =
-  printf 
+  printf
     "read rules from %s/.bf-rules\n" (Sys.getcwd());
   System.read_file ~file:".bf-rules"
 
 let build_rules () =
   let s = read_rules () in
-  eval_reset ();
-  eval_phrase (s ^ "build ()")
+  Scheme.eval_file s;
+  Scheme.eval_code (fun _ -> ()) "(build)"
 
 let install_rules () =
   let s = read_rules () in
-  eval_reset ();
-  eval_phrase (s ^ "install ()")
-    
-
+  Scheme.eval_file s;
+  Scheme.eval_code (fun _ -> ()) "(install)"  
+  
 let make () =
   log_command "make"
 
@@ -26,7 +24,7 @@ let install_file file dir =
   with_logger
     (fun logger ->
       log_message ~logger ("installing " ^ file);
-      let dir = Filename.concat Params.destdir dir in
+      let dir = Filename.concat (Params.get_param "destdir") dir in
       if not (Sys.file_exists dir) then
 	begin
 	  log_message ~logger ("creating directory " ^ dir);
