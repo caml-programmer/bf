@@ -350,7 +350,7 @@ let rpmbuild
   ?(top_label="topdir") ?(top_dir="/tmp/rpmbuild")
   ?(nocopy="/") ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
   ?(format="%%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm")
-  ~platform ~version ~release ~spec ~files ~findreq () =
+  ~pkgname ~platform ~version ~release ~spec ~files ~findreq () =
   let args = ref [] in
   let add s = args := !args @ [s] in
   let define n v =
@@ -364,6 +364,7 @@ let rpmbuild
   define "nocopy" nocopy;
   define "buildroot" buildroot;
   define "_build_name_fmt" format;
+  define "pkgname" pkgname;
   define "pkgvers" version;
   define "pkgrel" release;
   define "rhsys" (string_of_platform platform);
@@ -475,6 +476,7 @@ let build_rh_package platform args =
 	      copy_to_buildroot ~top_dir files;
 	      rpmbuild
 		~top_dir
+		~pkgname:(Filename.basename specdir)
 		~platform ~version ~release
 		~spec ~files ~findreq ()
 	  | _-> assert false)
