@@ -78,6 +78,7 @@ let non_empty_iter f = function
 (* Projects support *)
 
 let prepare_component component =
+  Printf.printf "prepare-component %s %s\n" component.name (Sys.getcwd ());
   with_component_dir ~strict:false component git_clean
 
 let prepare components =
@@ -215,17 +216,24 @@ let scm_make_list f v =
 (* Scheme bindings *)
 
 let scm_prepare v =
-  prepare (Scheme.components_of_sval_array v); Snull
+  with_dir ".."
+    (fun () ->
+      prepare (Scheme.components_of_sval_array v)); Snull
 
 let scm_build v =
-  build (Scheme.components_of_sval_array v); Snull
+  with_dir ".."
+    (fun () ->
+      build (Scheme.components_of_sval_array v)); Snull
 
 let scm_rebuild v =
-  rebuild (Scheme.components_of_sval_array v); Snull
+  with_dir ".."
+    (fun () ->      
+      rebuild (Scheme.components_of_sval_array v)); Snull
 
 let scm_install v =
-  install (Scheme.components_of_sval_array v); Snull
-
+  with_dir ".."
+    (fun () ->
+      install (Scheme.components_of_sval_array v)); Snull
 
 let scm_simple_configure v =
   Rules.simple_configure (Scheme.string_list_of_sval_array v); Snull
@@ -347,6 +355,7 @@ Ocs_env.set_pfn Scheme.env scm_prepare "prepare";;
 Ocs_env.set_pfn Scheme.env scm_build   "build";;
 Ocs_env.set_pfn Scheme.env scm_rebuild "rebuild";;
 Ocs_env.set_pfn Scheme.env scm_install "install";;
+Ocs_env.set_pfn Scheme.env scm_install "install-components";;
 
 Ocs_env.set_pfn Scheme.env scm_simple_configure "simple-configure";;
 Ocs_env.set_pfn Scheme.env scm_simple_make "simple-make";;

@@ -11,6 +11,7 @@ let usage () =
   print_endline "Usage: bf (prepare|update|forward|[re]build|[re]install) <components>";
   print_endline "   or: bf (prepare|update|forward|[re]build|[re]install) <component> [branch <branch> | tag <tag>]";
   print_endline "   or: bf (prepare|update|forward|[re]build|[re]install) <composite>";
+  (* TODO: bf log - with auto select current log file? *)
   exit 1
 
 let make_component s =
