@@ -347,7 +347,7 @@ let check_rh_build_env () =
   System.check_commands ["rpmbuild"]
 
 let rpmbuild
-  ?(top_label="top-dir") ?(top_dir="/tmp/rpmbuild")
+  ?(top_label="topdir") ?(top_dir="/tmp/rpmbuild")
   ?(nocopy="/") ?(buildroot=((Sys.getcwd ()) ^ "/buildroot"))
   ?(format="%%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm")
   ~platform ~version ~release ~spec ~files ~findreq () =
@@ -389,16 +389,16 @@ let copy_to_buildroot ?(builddir="builddir") ~top_dir files =
     let make_path s =
       let m =
 	Pcre.replace ~pat:"%dir " ~templ:""
-	  (Pcre.replace ~pat:"%top-dir" ~templ:top_dir
+	  (Pcre.replace ~pat:"%topdir" ~templ:top_dir
 	    (Pcre.replace
-	      ~pat:"%config(noreplace) %top-dir"
+	      ~pat:"%config(noreplace) %topdir"
 	      ~templ:top_dir s))
       in log_message (sprintf "make-path %s -> %s" s m); m
     in
     let len = String.length s in
     if match_prefix "%dir " s then
       `Empty_dir (make_path s)
-    else if match_prefix "%config(noreplace) %top-dir" s then
+    else if match_prefix "%config(noreplace) %topdir" s then
       `File (make_path s)
     else if match_prefix "%nocopy" s || match_prefix "#" s then
       `None
