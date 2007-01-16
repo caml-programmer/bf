@@ -151,6 +151,15 @@ let install_component component =
 let install components =
   non_empty_iter install_component components
 
+let reinstall_component component =
+  let file = component.name ^ "/.bf-install" in
+  if Sys.file_exists file then
+    Sys.remove file;
+  install_component component
+
+let reinstall components =
+  non_empty_iter reinstall_component components
+
 let components_of_composite composite =
   let composite = Rules.load_composite composite in
   let rec iter acc = function
@@ -187,7 +196,21 @@ let rebuild_composite composite =
 let install_composite composite =
   log_message ("=> install-composite " ^ composite);
   install (components_of_composite composite)
+
+let reinstall_composite composite =
+  log_message ("=> reinstall-composite " ^ composite);
+  reinstall (components_of_composite composite)
 ;;
+
+(* Utils *)
+
+let scm_make_list f v =
+  let rec make acc = function
+    | []     -> acc
+    | hd::tl ->
+	make (Spair {car=(f hd); cdr=acc}) tl
+  in make Snull (List.rev v)
+  
 
 (* Scheme bindings *)
 
@@ -219,14 +242,50 @@ let scm_export v =
 let scm_ac_configure v =
   Rules.ac_configure (Scheme.make_params_of_sval v); Snull
     
-let scm_make v =
-  Rules.make (Scheme.make_params_of_sval v); Snull
+let scm_gnu_make v =
+  Rules.gnu_make (Scheme.make_params_of_sval v); Snull
 
 let scm_path_concat v =
   Sstring (Rules.path_concat (Scheme.string_list_of_sval_array v))
 
+let scm_string_concat v =
+  print_endline "scm-string-concat";
+  let r = Scheme.string_list_of_sval_array v in
+  print_endline "dddd";
+  let x = Sstring (Rules.string_concat r) in
+  print_endline "done"; x
 
+let scm_log_command v =
+  let l = Scheme.string_list_of_sval_array v in
+  Logger.log_command (List.hd l) (List.tl l); Snull
 
+let scm_install_file file dir =
+  Rules.install_file
+    (Scheme.string_of_sval file)
+    (Scheme.string_of_sval dir);
+  Snull
+
+let scm_read_directory dir =
+  scm_make_list
+    (fun s -> Sstring s)
+    (Rules.read_directory
+      (Scheme.string_of_sval dir))
+
+let scm_with_dir dir f =
+  Rules.with_dir
+    (Scheme.string_of_sval dir)
+    (Scheme.unit_handler_of_sval f)
+
+let scm_file_exists file =
+  if Sys.file_exists 
+    (Scheme.string_of_sval file)
+  then Strue
+  else Sfalse
+
+let scm_get_env name =
+  match Rules.get_env (Scheme.string_of_sval name) with
+    | Some v -> Sstring v
+    | None   -> Sfalse
 
 ;;
 
@@ -241,9 +300,18 @@ Ocs_env.set_pfn Scheme.env scm_simple_install "simple-install";;
 
 Ocs_env.set_pf1 Scheme.env scm_export "ml-export";;
 Ocs_env.set_pf1 Scheme.env scm_ac_configure "ml-ac-configure";;
-Ocs_env.set_pf1 Scheme.env scm_make "ml-make";;
+Ocs_env.set_pf1 Scheme.env scm_gnu_make "ml-gnu-make";;
 
+Ocs_env.set_pfn Scheme.env scm_log_command "log-command";;
 Ocs_env.set_pfn Scheme.env scm_path_concat "path-concat";;
+Ocs_env.set_pfn Scheme.env scm_string_concat "string-concat";;
+Ocs_env.set_pf2 Scheme.env scm_install_file "install-file";;
+Ocs_env.set_pf1 Scheme.env scm_read_directory "read-directory";;
+Ocs_env.set_pf2 Scheme.env scm_with_dir "with-dir";;
+Ocs_env.set_pf1 Scheme.env scm_file_exists "file-exists";;
+Ocs_env.set_pf1 Scheme.env scm_get_env "get-env";;
+
+
 
 
 

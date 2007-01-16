@@ -8,9 +8,9 @@ type analyze_result =
   | Is_composite of string
 
 let usage () =
-  print_endline "Usage: bf (prepare|update|forward|build|rebuild|install) <components>";
-  print_endline "   or: bf (prepare|update|forward|build|rebuild|install) <component> [branch <branch> | tag <tag>]";
-  print_endline "   or: bf (prepare|update|forward|build|rebuild|install) <composite>";
+  print_endline "Usage: bf (prepare|update|forward|[re]build|[re]install) <components>";
+  print_endline "   or: bf (prepare|update|forward|[re]build|[re]install) <component> [branch <branch> | tag <tag>]";
+  print_endline "   or: bf (prepare|update|forward|[re]build|[re]install) <composite>";
   exit 1
 
 let make_component s =
@@ -56,37 +56,54 @@ let main () =
       match analyze_arguments () with
 	| Is_components components ->
 	    (match action with
-	      | "prepare" -> Commands.prepare components
-	      | "build"   -> Commands.build   components
-	      | "rebuild" -> Commands.rebuild components
-	      | "install" -> Commands.install components
-	      | "update"  -> Commands.update  components
-	      | "forward" -> Commands.forward components
-	      | _         -> usage ())
+	      | "prepare"   -> Commands.prepare   components
+	      | "build"     -> Commands.build     components
+	      | "rebuild"   -> Commands.rebuild   components
+	      | "install"   -> Commands.install   components
+	      | "reinstall" -> Commands.reinstall components
+	      | "update"    -> Commands.update    components
+	      | "forward"   -> Commands.forward   components
+	      | _           -> usage ())
 	| Is_component_with_label component ->
 	    (match action with
-	      | "prepare" -> Commands.prepare [component]
-	      | "build"   -> Commands.build   [component]
-	      | "rebuild" -> Commands.rebuild [component]
-	      | "install" -> Commands.install [component]
-	      | "update"  -> Commands.update  [component]
-	      | "forward" -> Commands.forward [component]
-	      | _         -> usage ())
+	      | "prepare"   -> Commands.prepare   [component]
+	      | "build"     -> Commands.build     [component]
+	      | "rebuild"   -> Commands.rebuild   [component]
+	      | "install"   -> Commands.install   [component]
+	      | "reinstall" -> Commands.reinstall [component]
+	      | "update"    -> Commands.update    [component]
+	      | "forward"   -> Commands.forward   [component]
+	      | _           -> usage ())
 	| Is_composite composite ->
 	    Params.set_composite_mode ();
 	    (match action with
-	      | "prepare" -> Commands.prepare_composite composite
-	      | "build"   -> Commands.build_composite   composite
-	      | "rebuild" -> Commands.rebuild_composite composite
-	      | "install" -> Commands.install_composite composite
-	      | "update"  -> Commands.update_composite  composite
-	      | "forward" -> Commands.forward_composite composite
-	      | _         -> usage ())
+	      | "prepare"   -> Commands.prepare_composite   composite
+	      | "build"     -> Commands.build_composite     composite
+	      | "rebuild"   -> Commands.rebuild_composite   composite
+	      | "install"   -> Commands.install_composite   composite
+	      | "reinstall" -> Commands.reinstall_composite composite
+	      | "update"    -> Commands.update_composite    composite
+	      | "forward"   -> Commands.forward_composite   composite
+	      | _           -> usage ())
     else usage ()
+
+let teleport f =
+  (* todo: more advanced teleport *)
+  if Sys.file_exists ".bf-rules" then
+    begin
+      Sys.chdir "..";
+      Params.update_param "start-dir"
+	((Params.get_param "start-dir") ^ "/..");
+      Params.update_param "log-dir"
+	((Params.get_param "log-dir") ^ "/..");      
+      f ()
+    end
+  else
+    f ()
 
 let _ =
   let current = Sys.getcwd () in
-  try
+  try    
     main ()
   with exn ->
     Sys.chdir current; raise exn

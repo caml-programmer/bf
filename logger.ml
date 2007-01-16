@@ -38,8 +38,8 @@ let log_message ?key ?logger message =
       | None   -> (sprintf "%f %f> %s\n"      starttime timestamp message)
       | Some k -> (sprintf "%f %f> [%s] %s\n" starttime timestamp k message)
   in
-  output_string port s;
-  output_string stdout s;
+  output_string port s; flush port;
+  output_string stdout s; flush stdout;
   match logger with
     | Some l ->	flush port
     | None   ->	close_out port
@@ -92,13 +92,13 @@ let log_command prog args =
 	  Shell.cmd 
 	    ~cmdname:program 
 	    ~environment
-	    program args 
+	    program args
 	in
 	let cmd_s = program ^ " " ^ (String.concat " " args) in
 	log_message ~logger (sprintf "run: %s" cmd_s);
 	Shell.call
-	  ~stdout:(Shell.to_buffer out_buf)
-	  ~stderr:(Shell.to_buffer err_buf) [cmd];
+	  (* ~stdout:(Shell.to_buffer out_buf)*)
+	  (* ~stderr:(Shell.to_buffer err_buf)*) [cmd];
 	log_message ~logger (sprintf "success: %s" cmd_s)
 	with Shell.Subprocess_error errors ->
 	  List.iter
