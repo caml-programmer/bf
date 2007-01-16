@@ -387,10 +387,12 @@ let copy_to_buildroot ?(builddir="builddir") ~top_dir files =
   in
   let parse_line s =
     let make_path s =
-      Pcre.replace ~pat:"%top-dir" ~templ:top_dir
-	(Pcre.replace
-	  ~pat:"%config(noreplace) %top-dir"
-	  ~templ:top_dir s)
+      let m = 
+	Pcre.replace ~pat:"%top-dir" ~templ:top_dir
+	  (Pcre.replace
+	    ~pat:"%config(noreplace) %top-dir"
+	    ~templ:top_dir s)
+      in log_message (sprintf "make-path %s -> %s" s m); m
     in
     let len = String.length s in
     if match_prefix "%dir " s then
