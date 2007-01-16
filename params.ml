@@ -78,6 +78,7 @@ set_param ~default:"." "plugins-dir";;
 set_param ~default:"false" "composite-mode";;
 set_param ~default:(Sys.getcwd()) "start-dir";;
 set_param ~default:"low" "log-level";; (* low,high *)
+set_param ~default:"make-opts" "";;
 
 set_param ~default:"localhost" "smtp-server";;
 set_param ~default:"25" "smtp-port";;

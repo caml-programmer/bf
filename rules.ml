@@ -123,11 +123,17 @@ let install_rules () =
 
 (*** Component rules *)
 
+let split_by_space s =
+  Pcre.split ~pat:"\\s+" s
+
+let add_make_opts v =
+  (split_by_space (Params.get_param "make-opts")) @ v
+
 let simple_configure args =
   log_command "./configure" args
- 
-let simple_make args =
-  log_command "make" args
+    
+let simple_make args =  
+  log_command "make" (add_make_opts args)
 
 let simple_install args =
   log_command "make" ("install"::args)
@@ -156,7 +162,7 @@ let make args =
 	match value with
 	  | Some v -> prepare ((String.uppercase key^"="^v)::acc) tl
 	  | None   -> prepare (key::acc) tl
-  in log_command "make" (prepare [] args)
+  in log_command "make" (add_make_opts (prepare [] args))
 
 let ac_configure args =
   let have_spaces s =
