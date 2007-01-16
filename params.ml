@@ -65,4 +65,5 @@ set_param ~default:"bf" "component";;
 set_param ~default:"branch" "label-type";;
 set_param ~default:"master" "label";;
 set_param ~default:"../composite" "composite-dir";;
+set_param ~default:"../plugins" "plugins-dir";;
 

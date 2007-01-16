@@ -31,7 +31,7 @@ let git_branch () =
       let error = string_of_channel err in
       match Unix.close_process_full (ch,out,err) with
 	| Unix.WEXITED 0 -> acc
-	| _ -> log_error error; []
+	| _ -> log_error error
   in read []
   
 let git_clean () =

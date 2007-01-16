@@ -4,7 +4,7 @@ OBJECTS   = $(SOURCES:.ml=.cmo)
 XOBJECTS  = $(OBJECTS:.cmo=.cmx)
 ARCHIVE   = archive.cma
 XARCHIVE  = $(ARCHIVE:.cma=.cmxa)
-REQUIRES  = getopt pcre shell ocs
+REQUIRES  = pcre shell ocs
 
 all: $(ARCHIVE)
 	$(OCAMLC) -o bf -custom toplevellib.cma $(ARCHIVE) bf.ml -linkpkg

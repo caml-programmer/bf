@@ -78,17 +78,24 @@ let with_component_dir component thunk =
   let with_dir f =
     Sys.chdir component.name; f (); thunk (); Sys.chdir curdir in
 
+  let label_type = 
+    string_of_label_type component.label in
+  let label = 
+    string_of_label component.label in
+
   Params.update_param "component" component.name;
-  Params.update_param "component-label" (string_of_label component.label);
+  Params.update_param "label" label;
+  Params.update_param "label-type" label_type;
 
   log_message
-    (Printf.sprintf "with_component_dir(%s)" (curdir ^ "/" ^ component.name));
-                 
+    (Printf.sprintf "=> with-component-dir(%s %s [%s])"
+      (curdir ^ "/" ^ component.name) label_type label);
+  
   (* refactoring result *)
   
   match component_dir_analyze component.name with
     | Component_dir_conflicted ->
-	log_error (Printf.sprintf "component %s is conflicted" component.name)
+	log_error (Printf.sprintf "=> component %s is conflicted" component.name)
     | Component_dir_prepared ->
 	with_dir (fun () -> ())
     | Component_dir_need_checkout ->
@@ -202,11 +209,36 @@ let install_component component =
 	  let ch = open_out ".bf-install" in
 	  output_string ch (string_of_float (Unix.gettimeofday ()));
 	  output_string ch "\n";
-	  close_out ch 
+	  close_out ch
 	end)
 
 let install components =
   non_empty_iter install_component components
+
+let components_of_composite composite =
+  let composite = Rules.load_composite composite in
+  let rec iter acc = function
+    | Snull -> acc
+    | Spair v ->
+	(match v.cdr with
+	  | Snull -> acc
+	  | Spair v ->
+	      iter (acc @ [Scheme.component_of_sval v.car]) (Spair v)
+	  | _ -> log_error "invalid composition")
+    | _ -> log_error "invalid composition"
+  in iter [] composite
+
+let prepare_composite composite =
+  prepare (components_of_composite composite)
+  
+let build_composite composite =
+  build (components_of_composite composite)
+
+let rebuild_composite composite =
+  rebuild (components_of_composite composite)
+
+let install_composite composite =
+  install (components_of_composite composite)
 ;;
 
 (* Components support *)
@@ -254,4 +286,3 @@ Ocs_env.set_pfn Scheme.env scm_install "install";;
 Ocs_env.set_pfn Scheme.env scm_simple_configure "simple-configure";;
 Ocs_env.set_pfn Scheme.env scm_simple_make "simple-make";;
 Ocs_env.set_pfn Scheme.env scm_simple_install "simple-install";;
-

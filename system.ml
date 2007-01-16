@@ -92,6 +92,17 @@ let uname () =
   let name = String.lowercase (input_line ch) in
   close_in ch; name
 
+let list_of_directory dir =
+  let dh = Unix.opendir dir in
+  let acc = ref [] in
+  try
+    while true do
+      let s = Unix.readdir dh in
+      if s <> "." && s <> ".." then
+	acc := !acc @ [s];      
+    done; []
+  with End_of_file -> !acc
+
 (* old *)
 
 let with_prefix prefix list =
