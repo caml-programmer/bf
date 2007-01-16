@@ -262,7 +262,10 @@ let create_symlink src dst =
 	Unix.symlink src dst
       end
     else
-      raise (Cannot_create_symlink (src,dst))
+      if Sys.file_exists dst then
+	raise (Cannot_create_symlink (src,dst))
+      else
+	Unix.symlink src dst
 
 let create_link src dst =
   Unix.link src dst
