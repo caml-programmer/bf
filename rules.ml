@@ -354,7 +354,7 @@ let rpmbuild
   let args = ref [] in
   let add s = args := !args @ [s] in
   let define n v =
-    add (sprintf "--define '%s %s'" n v) in
+    add (sprintf "--define='%s %s'" n v) in
   add "-bb";
   add ("--target=" ^ System.arch ());
   add spec;
