@@ -359,7 +359,7 @@ let rpmbuild
   add ("--target=" ^ System.arch ());
   add spec;
   define "_rpmdir" (Sys.getcwd ());
-  define "fileslist" files;
+  define "fileslist" files; (* must be absolute *)
   define top_label top_dir;
   define "nocopy" nocopy;
   define "buildroot" buildroot;
@@ -367,7 +367,7 @@ let rpmbuild
   define "pkgvers" version;
   define "pkgrel" release;
   define "rhsys" (string_of_platform platform);
-  define "filereq" findreq;
+  define "findreq" findreq;
   define "_unpackaged_files_terminate_build" "0";
   log_command "rpmbuild" !args
 
@@ -440,7 +440,11 @@ let specdir_format_v1 specdir =
     flist
   then
     if check_version "1.0" (Filename.concat specdir "version") then
-      List.map (Filename.concat specdir) flist
+      List.map 
+	(if String.length specdir > 0 && specdir.[0] = '/' then
+	  Filename.concat specdir
+	else
+	  Filename.concat (Filename.concat (Sys.getcwd()) specdir)) flist
     else
       raise Invalid_specdir_format
   else raise Invalid_specdir_format
@@ -450,7 +454,7 @@ let build_rh_package platform args =
     | [specdir;version;release] ->
 	(match specdir_format_v1 specdir with
 	    [spec;files;findreq;pack_version] ->
-	      let top_dir = Params.get_param "top-dir" in
+	      let top_dir = Params.get_param "top-dir" in	      
 	      check_rh_build_env ();
 	      copy_to_buildroot ~top_dir files;
 	      rpmbuild
