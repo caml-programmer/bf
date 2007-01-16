@@ -379,7 +379,7 @@ type content =
     | `None
     ]
 
-let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "/buildroot")) ~top_dir files =
+let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot")) ~top_dir files =
   let match_prefix p v =
     let pl = String.length p in
     let vl = String.length v in
@@ -387,13 +387,20 @@ let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "/buildroot")
   in
   let parse_line s =
     let make_path s =
-      let m =
+      let n =
 	Pcre.replace ~pat:"%dir " ~templ:""
 	  (Pcre.replace ~pat:"%topdir" ~templ:top_dir
 	    (Pcre.replace
 	      ~pat:"%config(noreplace) %topdir"
 	      ~templ:top_dir s))
-      in log_message (sprintf "make-path %s -> %s" s m); m
+      in 
+      let m = 
+	let l = String.length n in
+	if l > 0 && n.[0] = '/' then
+	  String.sub n 1 (pred l)
+	else n
+      in 
+      log_message (sprintf "make-path %s -> %s" s m); m
     in
     let len = String.length s in
     if match_prefix "%dir " s then
@@ -419,6 +426,8 @@ let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "/buildroot")
 	    System.copy_file s (Filename.concat buildroot s)
 	| `Dir s ->
 	    remove_directory (Filename.concat buildroot s);
+	    System.create_directory_r 
+	      (Filename.concat buildroot (Filename.dirname s));
 	    System.copy_dir s (Filename.concat buildroot s);
 	| `Empty_dir s -> 
 	    System.create_directory_r 
