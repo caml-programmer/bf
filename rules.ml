@@ -347,7 +347,7 @@ let check_rh_build_env () =
   System.check_commands ["rpmbuild"]
 
 let rpmbuild
-  ?(top_label="jetprefix") ?(top_dir="/tmp/rpmbuild")
+  ?(top_label="top-dir") ?(top_dir="/tmp/rpmbuild")
   ?(nocopy="/") ?(buildroot=((Sys.getcwd ()) ^ "/buildroot"))
   ?(format="%%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm")
   ~platform ~version ~release ~spec ~files ~findreq () =
@@ -371,41 +371,90 @@ let rpmbuild
   define "_unpackaged_files_terminate_build" "0";
   log_command "rpmbuild" !args
 
-let copy_to_buildroot files = ()
+type content =
+    [
+    | `File of string
+    | `Dir of string
+    | `Empty_dir of string
+    | `None
+    ]
 
-(**
-function bf_copy_to_buildroot() {
-    while read f; do
-	if [ "${f#%dir }" != "$f" ]; then
-	    f="${f#%dir }"
-	    [ "${f#%jetprefix}" != "$f" ] && f="$PREFIX${f#%jetprefix}"
-	    for i in $f; do
-		bf_log "mkdir -p 'buildroot/$i'"
-	    done
-	else
-	    [ "${f#%config(noreplace) }" != "$f" ] && f="${f#%config(noreplace) }"
-	    [ "${f#%jetprefix}" != "$f" ] && f="$PREFIX${f#%jetprefix}"	
-	    for i in $f; do
-		if [ "${f#%nocopy}" == "$f" ]; then
-		    dir=`dirname "buildroot/$i"`
-		    bf_log "mkdir -p '$dir'"
-		    yes | bf_log "cp -arf '$i' '$dir'" || bf_error
-		fi
-	    done
-	fi
+let copy_to_buildroot ?(builddir="builddir") ~top_dir files =
+  let match_prefix p v =
+    let pl = String.length p in
+    let vl = String.length v in
+    pl >= vl && String.sub v 0 pl = p
+  in
+  let parse_line s =
+    let make_path s =
+      Pcre.replace ~pat:"%top-dir" ~templ:top_dir
+	(Pcre.replace
+	  ~pat:"%config(noreplace) %top-dir"
+	  ~templ:top_dir s)
+    in
+    let len = String.length s in
+    if match_prefix "%dir " s then
+      `Empty_dir (make_path s)
+    else if match_prefix "%config(noreplace) %top-dir" s then
+      `File (make_path s)
+    else if match_prefix "%nocopy" s || match_prefix "#" s then
+      `None
+    else
+      if s.[pred len] = '/' then
+	`Dir (make_path s)
+      else
+	`File (make_path s)
+  in
+  let prepare s =
+    System.create_directory_r s; s
+  in
+  let ch = open_in files in
+  try
+    while true do
+      let raw = input_line ch in
+      match parse_line raw with
+	| `File s      -> System.copy_file s (prepare (Filename.concat builddir s))
+	| `Dir s       -> System.copy_dir  s (prepare (Filename.concat builddir s))
+	| `Empty_dir s -> System.create_directory_r (Filename.concat builddir s)
+	| `None        -> log_message (sprintf "copy_to_buildroot: skipped %s" raw)
     done
-}
-*)
+  with End_of_file -> close_in ch
+
+exception Invalid_specdir_format
+
+let check_version v file =
+  let s = System.read_file file in
+  try
+    v = String.sub s 0 (String.index s '\n')
+  with Not_found -> v = s
+
+let specdir_format_v1 specdir =
+  let flist = ["rh.spec";"rh.files";"rh.req";"version"] in
+  if System.is_directory specdir &&
+    List.for_all
+    (fun s ->
+      Sys.file_exists (Filename.concat specdir s))
+    flist
+  then
+    if check_version "1.0" (Filename.concat specdir "version") then
+      List.map (Filename.concat specdir) flist
+    else
+      raise Invalid_specdir_format
+  else raise Invalid_specdir_format
 
 let build_rh_package platform args =
   match args with
-    | [spec;files;findreq;version;release] ->
-	check_rh_build_env ();
-	copy_to_buildroot files;
-	rpmbuild
-	  ~top_dir:(Params.get_param "top-dir")
-	  ~platform ~version ~release
-	  ~spec ~files ~findreq ()
+    | [specdir;version;release] ->
+	(match specdir_format_v1 specdir with
+	    [spec;files;findreq;pack_version] ->
+	      let top_dir = Params.get_param "top-dir" in
+	      check_rh_build_env ();
+	      copy_to_buildroot ~top_dir files;
+	      rpmbuild
+		~top_dir
+		~platform ~version ~release
+		~spec ~files ~findreq ()
+	  | _-> assert false)
     | _ -> log_error "build_rh_package: wrong arguments"
 
 let build_linux_package args =
@@ -430,5 +479,6 @@ let build_sunos_package args = ()
 let build_package args =
   match System.uname () with
     | "linux" -> build_linux_package args
-    | "sunos" -> build_sunos_package args
     |  s      -> log_error (sprintf "Unsupport platform (%s) by build package" s)
+
+

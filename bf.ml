@@ -11,6 +11,7 @@ let usage () =
   print_endline "Usage: bf (prepare|update|forward|[re]build|[re]install) <components>";
   print_endline "   or: bf (prepare|update|forward|[re]build|[re]install) <component> [branch <branch> | tag <tag>]";
   print_endline "   or: bf (prepare|update|forward|[re]build|[re]install) <composite>";
+  print_endline "   or: bf pack <specdir> <version> <release>";
   (* TODO: bf log - with auto select current log file? *)
   exit 1
 
@@ -52,42 +53,53 @@ let analyze_arguments () =
 	  (List.map make_component (List.tl (List.tl (Array.to_list Sys.argv))))
 
 let main () =
-    if Array.length Sys.argv > 1 then
+  let len = Array.length Sys.argv in
+    if len > 1 then
       let action = Sys.argv.(1) in
-      match analyze_arguments () with
-	| Is_components components ->
-	    (match action with
-	      | "prepare"   -> Commands.prepare   components
-	      | "build"     -> Commands.build     components
-	      | "rebuild"   -> Commands.rebuild   components
-	      | "install"   -> Commands.install   components
-	      | "reinstall" -> Commands.reinstall components
-	      | "update"    -> Commands.update    components
-	      | "forward"   -> Commands.forward   components
-	      | _           -> usage ())
-	| Is_component_with_label component ->
-	    (match action with
-	      | "prepare"   -> Commands.prepare   [component]
-	      | "build"     -> Commands.build     [component]
-	      | "rebuild"   -> Commands.rebuild   [component]
-	      | "install"   -> Commands.install   [component]
-	      | "reinstall" -> Commands.reinstall [component]
-	      | "update"    -> Commands.update    [component]
-	      | "forward"   -> Commands.forward   [component]
-	      | _           -> usage ())
-	| Is_composite composite ->
-	    Params.set_composite_mode ();
-	    (match action with
-	      | "prepare"   -> Commands.prepare_composite   composite
-	      | "build"     -> Commands.build_composite     composite
-	      | "rebuild"   -> Commands.rebuild_composite   composite
-	      | "install"   -> Commands.install_composite   composite
-	      | "reinstall" -> Commands.reinstall_composite composite
-	      | "update"    -> Commands.update_composite    composite
-	      | "forward"   -> Commands.forward_composite   composite
-	      | _           -> usage ())
+      match action with
+	| "pack" ->
+	    if len = 4 then
+	      let specdir = Sys.argv.(1) in
+	      let version = Sys.argv.(2) in
+	      let release = Sys.argv.(3) in
+	      Rules.build_package 
+		[specdir;version;release]
+	    else usage ()
+	| _ ->
+	    (match analyze_arguments () with
+	      | Is_components components ->
+		  (match action with
+		    | "prepare"   -> Commands.prepare   components
+		    | "build"     -> Commands.build     components
+		    | "rebuild"   -> Commands.rebuild   components
+		    | "install"   -> Commands.install   components
+		    | "reinstall" -> Commands.reinstall components
+		    | "update"    -> Commands.update    components
+		    | "forward"   -> Commands.forward   components
+		    | _           -> usage ())
+	      | Is_component_with_label component ->
+		  (match action with
+		    | "prepare"   -> Commands.prepare   [component]
+		    | "build"     -> Commands.build     [component]
+		    | "rebuild"   -> Commands.rebuild   [component]
+		    | "install"   -> Commands.install   [component]
+		    | "reinstall" -> Commands.reinstall [component]
+		    | "update"    -> Commands.update    [component]
+		    | "forward"   -> Commands.forward   [component]
+		    | _           -> usage ())
+	      | Is_composite composite ->
+		  Params.set_composite_mode ();
+		  (match action with
+		    | "prepare"   -> Commands.prepare_composite   composite
+		    | "build"     -> Commands.build_composite     composite
+		    | "rebuild"   -> Commands.rebuild_composite   composite
+		    | "install"   -> Commands.install_composite   composite
+		    | "reinstall" -> Commands.reinstall_composite composite
+		    | "update"    -> Commands.update_composite    composite
+		    | "forward"   -> Commands.forward_composite   composite
+		    | _           -> usage ()))
     else usage ()
-
+      
 let teleport f =
   (* todo: more advanced teleport *)
   if Sys.file_exists ".bf-rules" then

@@ -72,16 +72,6 @@ let create_directory_r dir =
 let path_directory file =
   Filename.dirname file
 
-let transfer_file src dst =
-  let a = open_in_bin src in
-  let b = open_out_bin dst in
-  try
-    while true do
-      output_char b (input_char a)
-    done
-  with End_of_file ->
-    close_in a; close_out b
-
 let check_file_type t s =
   try
     let st = Unix.stat s
@@ -98,10 +88,21 @@ let is_symlink   s =
   with _ -> false
 
 exception Cannot_remove_directory of string
+exception Cannot_copy_directory of string * string
 
 let remove_directory dir =
   let rc = Sys.command (sprintf "rm -rf %s" dir) in
   if rc <> 0 then raise (Cannot_remove_directory dir)
+
+let transfer_file src dst =
+  let a = open_in_bin src in
+  let b = open_out_bin dst in
+  try
+    while true do
+      output_char b (input_char a)
+    done
+  with End_of_file ->
+    close_in a; close_out b
 
 let copy_file file dest =
   let name = Filename.basename file in
@@ -110,7 +111,23 @@ let copy_file file dest =
     transfer_file file dest_file
   else
     transfer_file file dest
-    
+
+let transfer_dir src dst =
+  let rc = Sys.command (sprintf "cp -arf %s %s" src dst) in
+  if rc <> 0 then raise (Cannot_copy_directory (src,dst))
+
+let copy_dir dir dest =
+  (*** todo: for native transfer_dir
+    let name = Filename.basename dir in
+    if is_directory dest then
+    let dest_dir = Filename.concat dest name in
+    transfer_dir dir dest_dir
+    else
+    transfer_dir dir dest
+  *)
+  
+  transfer_dir dir dest
+  
 let uname () =
   let ch = Unix.open_process_in "uname" in
   let name = String.lowercase (input_line ch) in
