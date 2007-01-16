@@ -319,6 +319,9 @@ let scm_current_directory () =
 let scm_uname () =
   Sstring (List.hd (Rules.read_command "uname"))
 
+let scm_arch () =
+  Sstring (List.hd (Rules.read_command "arch"))
+
 let scm_remove_file v =
   List.iter (fun file ->
     if Sys.file_exists file then
@@ -394,6 +397,7 @@ Ocs_env.set_pf1 Scheme.env scm_read_command "read-command";;
 Ocs_env.set_pf0 Scheme.env scm_current_directory "current-directory";;
 
 Ocs_env.set_pf0 Scheme.env scm_uname "uname";;
+Ocs_env.set_pf0 Scheme.env scm_arch "arch";;
 Ocs_env.set_pfn Scheme.env scm_remove_file "remove-file";;
 Ocs_env.set_pf2 Scheme.env scm_move_file "move-file";;
 Ocs_env.set_pfn Scheme.env scm_make_directory "make-directory";;
