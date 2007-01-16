@@ -96,8 +96,11 @@ let export args =
   List.iter
     (fun (key,value) ->
       let key = String.uppercase key in
-      printf "export: %s=%s\n" key value;
-      Hashtbl.replace component_environment key value)
+      match value with
+	  Some v ->
+	    Hashtbl.replace component_environment key v
+	| None ->
+	    Hashtbl.replace component_environment key "")
     args;
   make_component_env ()
 
@@ -228,11 +231,24 @@ let move_file src dir =
   let dst = Filename.concat dir name in
   Sys.rename src dst
 
-let make_directory dir =
-  Unix.mkdir dir 0o755
+exception Cannot_create_directory of string
+
+let make_directory dirs =
+  List.iter
+    (fun dir ->
+      if not (Sys.file_exists dir) then
+	Unix.mkdir dir 0o755
+      else if System.is_directory dir then
+	log_message (sprintf "warning: directory (%s) already exists!" dir)
+      else
+	raise (Cannot_create_directory dir))
+    dirs
 
 let move_directory src dst =
-  log_command (sprintf "mv %s %s" src dst) []
+  log_command "mv" [src;dst]
+
+let remove_directory dir =
+  log_command "rm" ["-rf";dir]
   
 let create_symlink src dst =
   Unix.link src dst

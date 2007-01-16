@@ -237,7 +237,7 @@ let scm_simple_install v =
   Rules.simple_install (Scheme.string_list_of_sval_array v); Snull
 
 let scm_export v =
-  Rules.export (Scheme.env_list_of_sval v); Snull
+  Rules.export (Scheme.make_params_of_sval v); Snull
 
 let scm_ac_configure v =
   Rules.ac_configure (Scheme.make_params_of_sval v); Snull
@@ -290,7 +290,7 @@ let scm_file_exists file =
 let scm_get_env name =
   match Rules.get_env (Scheme.string_of_sval name) with
     | Some v -> Sstring v
-    | None   -> Sfalse
+    | None   -> Sstring ""
 
 let scm_read_command cmd =
   scm_make_list (fun s -> Sstring s)
@@ -307,7 +307,9 @@ let scm_uname () =
   Sstring (List.hd (Rules.read_command "uname"))
 
 let scm_remove_file v =
-  List.iter Sys.remove
+  List.iter (fun file ->
+    if Sys.file_exists file then
+      Sys.remove file)
     (Scheme.string_list_of_sval_array v);
   Snull
 
@@ -317,15 +319,20 @@ let scm_move_file file dir =
     (Scheme.string_of_sval dir);
   Snull
 
-let scm_make_directory dir =
+let scm_make_directory v =
   Rules.make_directory 
-    (Scheme.string_of_sval dir);
+    (Scheme.string_list_of_sval_array v);
   Snull
 
 let scm_move_directory src dst =
   Rules.move_directory
     (Scheme.string_of_sval src)
     (Scheme.string_of_sval dst);
+  Snull
+
+let scm_remove_directory dir =
+  Rules.remove_directory
+    (Scheme.string_of_sval dir);
   Snull
 
 let scm_create_symlink src dst =
@@ -365,8 +372,9 @@ Ocs_env.set_pf0 Scheme.env scm_current_directory "current-directory";;
 Ocs_env.set_pf0 Scheme.env scm_uname "uname";;
 Ocs_env.set_pfn Scheme.env scm_remove_file "remove-file";;
 Ocs_env.set_pf2 Scheme.env scm_move_file "move-file";;
-Ocs_env.set_pf1 Scheme.env scm_make_directory "make-directory";;
+Ocs_env.set_pfn Scheme.env scm_make_directory "make-directory";;
 Ocs_env.set_pf2 Scheme.env scm_move_directory "move-directory";;
+Ocs_env.set_pf1 Scheme.env scm_remove_directory "remove-directory";;
 Ocs_env.set_pf2 Scheme.env scm_create_symlink "create-symlink";;
 
 
