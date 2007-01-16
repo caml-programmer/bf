@@ -250,8 +250,19 @@ let move_directory src dst =
 let remove_directory dir =
   log_command "rm" ["-rf";dir]
   
+exception Cannot_create_symlink of (string * string)
+
 let create_symlink src dst =
-  Unix.symlink src dst
+  if System.is_symlink dst && Unix.readlink dst = src
+  then ()
+  else
+    if System.is_symlink dst then
+      begin
+	Unix.unlink dst;
+	Unix.symlink src dst
+      end
+    else
+      raise (Cannot_create_symlink (src,dst))
 
 let create_link src dst =
   Unix.link src dst
