@@ -101,10 +101,16 @@ let log_command prog args =
 	    program args
 	in
 	let cmd_s = program ^ " " ^ (String.concat " " args) in
+	let log_fd =
+	  match Params.get_param "log-level" with
+	    | "low"  -> Unix.descr_of_out_channel logger.port
+	    | "high" -> Unix.descr_of_out_channel stdout
+	    | _      -> Unix.descr_of_out_channel stdout
+	in
 	log_message ~logger (sprintf "run: %s" cmd_s);
 	Shell.call
-	  (* ~stdout:(Shell.to_buffer out_buf)*)
-	  (* ~stderr:(Shell.to_buffer err_buf)*) [cmd];
+	  ~stdout:(Shell.to_fd log_fd)
+	  ~stderr:(Shell.to_fd log_fd) [cmd];
 	log_message ~logger (sprintf "success: %s" cmd_s)
 	with Shell.Subprocess_error errors ->
 	  List.iter

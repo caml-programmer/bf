@@ -69,15 +69,13 @@ let used_composite_mode () =
 
 set_param ~default:(Sys.getcwd()) "top-dir";;
 set_param ~default:(Sys.getcwd()) "dev-dir";;
-set_param ~default:((get_param "top-dir") ^ "/logs") "log-dir";;
+set_param ~default:"logs" "log-dir";;
 set_param ~default:"git://localhost/" "git-url";;
-set_param ~default:"/opt/dozor" "prefix";;
-set_param ~default:"/" "destdir";;
 set_param ~default:"bf" "component";;
 set_param ~default:"branch" "label-type";;
 set_param ~default:"master" "label";;
-(* set_param ~default:"../composite" "composite-dir";; *)
-set_param ~default:"../plugins" "plugins-dir";;
+set_param ~default:"." "plugins-dir";;
 set_param ~default:"false" "composite-mode";;
 set_param ~default:(Sys.getcwd()) "start-dir";;
+set_param ~default:"low" "log-level";; (* low,high *)
 

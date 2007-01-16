@@ -28,12 +28,52 @@ let prepare_component_env () =
 
 (*** Rules execution *)
 
-exception Not_found_plugins_directory of string
-
 let rules_file () =
   Filename.concat (Sys.getcwd()) ".bf-rules"
 
 let load_plugins () =
+  print_string "load ac-configure...";
+  Scheme.eval_code (fun _ -> print_endline "ok") "
+(define-syntax ac-configure
+  (syntax-rules ()
+    ((_ (e1 e2) ...) (ml-ac-configure '((e1 e2) ...)))
+    ((_ (e1 e2))     (ml-ac-configure '((e1 e2))))
+    ((_ e1 e2)       (ml-ac-configure '((e1 e2))))
+    ((_ (e))         (ml-ac-configure '((e ()))))
+    ((_ e)           (ml-ac-configure '((e ()))))
+    ((_)             (ml-ac-configure '()))))
+";
+  print_string "load make...";
+  Scheme.eval_code (fun _ -> print_endline "ok") "
+(define-syntax make
+  (syntax-rules ()
+    ((_ (e) (e1 e2) ...) (ml-make '((e ()) (e1 e2) ...)))
+    ((_ (e1 e2) ...)     (ml-make '((e1 e2) ...)))
+    ((_ (e1 e2))         (ml-make '((e1 e2))))
+    ((_ e1 e2)           (ml-make '((e1 e2))))
+    ((_ (e))             (ml-make '((e ()))))
+    ((_ e)               (ml-make '((e ()))))
+    ((_)                 (ml-make '()))))";
+
+  print_string "load export...";
+  Scheme.eval_code (fun _ -> print_endline "ok") "
+(define-syntax export
+  (syntax-rules ()
+    ((_ (e1 e2) ...) (ml-export '((e1 e2) ...)))
+    ((_ (e1 e2))     (ml-export '((e1 e2))))
+    ((_ e1 e2)       (ml-export '((e1 e2))))
+    ((_ (e))         (ml-export '((e ()))))
+    ((_ e)           (ml-export '((e ()))))
+    ((_)             (ml-export '()))))";
+
+  print_string "load update-make-params...";
+  Scheme.eval_code (fun _ -> print_endline "ok") "
+(define-syntax update-make-params
+  (syntax-rules ()
+    ((_ (e) (e1 e2) ...) (ml-update-make-params '((e ()) (e1 e2) ...)))
+    ((_  e  (e1 e2) ...) (ml-update-make-params '((e ()) (e1 e2) ...)))))";
+
+  print_string "load user lib.scm...";
   let dir = Params.get_param "plugins-dir" in
   let plugdir =
     let start = Params.get_param "start-dir" in
@@ -43,10 +83,14 @@ let load_plugins () =
       Filename.concat start dir
   in
   if not (System.is_regular (Filename.concat plugdir "lib.scm")) then
-    raise (Not_found_plugins_directory dir);  
-  System.with_extension "scm"
-    Scheme.eval_file
-    (System.with_prefix plugdir (System.list_of_directory plugdir))    
+    print_endline "skip"
+  else    
+    begin
+      System.with_extension "scm"
+	Scheme.eval_file
+	(System.with_prefix plugdir (System.list_of_directory plugdir));
+      print_endline "ok";
+    end
 
 let load_composite file =
   let composite = ref None in
@@ -58,9 +102,7 @@ let load_composite file =
     | Some v -> v
   
 let build_rules () =
-  print_string "load plugins...";
   load_plugins ();
-  print_endline "ok";
   prepare_component_env ();
   print_string "load rules...";
   Scheme.eval_file (rules_file ());
@@ -68,9 +110,7 @@ let build_rules () =
   Scheme.eval_code (fun _ -> ()) "(build ())"
     
 let install_rules () =
-  print_string "load plugins...";
   load_plugins ();
-  print_endline "ok";
   prepare_component_env ();
   print_string "load rules...";
   Scheme.eval_file (rules_file ());
