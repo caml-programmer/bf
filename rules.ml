@@ -348,7 +348,7 @@ let check_rh_build_env () =
 
 let rpmbuild
   ?(top_label="topdir") ?(top_dir="/tmp/rpmbuild")
-  ?(nocopy="/") ?(buildroot=((Sys.getcwd ()) ^ "/buildroot"))
+  ?(nocopy="/") ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
   ?(format="%%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm")
   ~platform ~version ~release ~spec ~files ~findreq () =
   let args = ref [] in
@@ -379,7 +379,7 @@ type content =
     | `None
     ]
 
-let copy_to_buildroot ?(builddir="builddir") ~top_dir files =
+let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "/buildroot")) ~top_dir files =
   let match_prefix p v =
     let pl = String.length p in
     let vl = String.length v in
@@ -415,14 +415,14 @@ let copy_to_buildroot ?(builddir="builddir") ~top_dir files =
       match parse_line raw with
 	| `File s -> 
 	    System.create_directory_r 
-	      (Filename.concat builddir (Filename.dirname s));
-	    System.copy_file s (Filename.concat builddir s)
+	      (Filename.concat buildroot (Filename.dirname s));
+	    System.copy_file s (Filename.concat buildroot s)
 	| `Dir s ->
-	    remove_directory (Filename.concat builddir s);
-	    System.copy_dir s (Filename.concat builddir s);
+	    remove_directory (Filename.concat buildroot s);
+	    System.copy_dir s (Filename.concat buildroot s);
 	| `Empty_dir s -> 
 	    System.create_directory_r 
-	      (Filename.concat builddir s)
+	      (Filename.concat buildroot s)
 	| `None -> 
 	    log_message 
 	      (sprintf "copy_to_buildroot: skipped %s" raw)
@@ -460,11 +460,11 @@ let build_rh_package platform args =
     | [specdir;version;release] ->
 	(match specdir_format_v1 specdir with
 	    [spec;files;findreq;pack_version] ->
-	      let top_dir = Params.get_param "top-dir" in	      
+	      let top_dir = Params.get_param "top-dir" in
 	      check_rh_build_env ();
 	      copy_to_buildroot ~top_dir files;
 	      rpmbuild
-		~top_dir
+		~top_dir		
 		~platform ~version ~release
 		~spec ~files ~findreq ()
 	  | _-> assert false)
