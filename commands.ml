@@ -62,13 +62,13 @@ let with_component_dir ?(strict=true) component thunk =
 	  | Tree_changed ->
 	      log_message "status: working tree changed";
 	      with_dir (fun () ->
-		git_clean ();
-		checkout_component component))
+		checkout_component component;
+		git_clean ()))
     | Tree_exists_with_other_key ->
 	log_message "status: working tree exists with other key";
 	with_dir (fun () ->
-	  git_clean ();
-	  checkout_component component)
+	  checkout_component component;
+	  git_clean ())
   
 let non_empty_iter f = function
     []   -> log_error "don't know what to do"
@@ -126,13 +126,6 @@ let rebuild_component component =
   with_component_dir ~strict:true component
     (fun () ->
       build_component_native component)
-  (*
-  let bf_build =
-    Filename.concat component.name ".bf-build" in
-  if Sys.file_exists bf_build then
-    Sys.remove bf_build;
-  build_component component
-  *)
   
 let rebuild components =
   non_empty_iter rebuild_component components
