@@ -381,13 +381,16 @@ let rpmbuild
   let fullname =
     sprintf "%s-%s-%s.%s.%s.rpm"
       pkgname version release platform arch in
-  match Unix.system cmd with
-    | Unix.WEXITED 0 ->
-	location,fullname
-    | _ ->
-	log_error
-	  (sprintf "Cannot build package: %s/%s" location fullname)
-
+  if Sys.file_exists (Filename.concat location fullname) then
+    location,fullname
+  else    
+    match Unix.system cmd with
+      | Unix.WEXITED 0 ->
+	  location,fullname
+      | _ ->
+	  log_error
+	    (sprintf "Cannot build package: %s/%s" location fullname)
+	    
 type content =
     [
     | `File of string
