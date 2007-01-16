@@ -4,10 +4,23 @@ open Printf
 
 let path_list = ["/bin";"/sbin";"/usr/bin";"/usr/sbin"];;
 
+let process_env = ref [||];;
+
 (* new *)
 
 exception Error of string
 
+let set_process_env env =
+  process_env := env
+    
+let get_process_env () = !process_env
+
+let split_env_var s =
+  let len = String.length s in
+  let pos = String.index s '=' in
+  String.sub s 0 pos,
+  String.sub s (succ pos) (len - pos - 1) 
+    
 let string_of_exn exn =
   Printexc.to_string exn
 
@@ -116,7 +129,7 @@ let list_of_directory dir =
   with End_of_file -> !acc
 
 let read_lines ?(ignore_error=false) ?(filter=(fun _ -> true)) command =
-  let (ch,out,err) = Unix.open_process_full command (Unix.environment ()) in
+  let (ch,out,err) = Unix.open_process_full command (get_process_env ()) in
   let rec read acc =
     try
       let s = input_line ch in

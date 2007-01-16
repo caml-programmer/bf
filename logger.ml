@@ -79,28 +79,42 @@ let log_command prog args =
     (fun logger ->
       try
 	let program = with_path prog in
-	let cmd = Shell.cmd ~cmdname:program program args in
+	let environment = Shell_sys.current_env () in
+	Array.iter 
+	  (fun s ->
+	    (try
+	      let (key,value) = 
+		System.split_env_var s
+	      in Shell_sys.set_env_var environment key value
+	    with Not_found -> ()))
+	  (System.get_process_env ());
+	let cmd =
+	  Shell.cmd 
+	    ~cmdname:program 
+	    ~environment
+	    program args 
+	in
 	let cmd_s = program ^ " " ^ (String.concat " " args) in
 	log_message ~logger (sprintf "run: %s" cmd_s);
 	Shell.call
 	  ~stdout:(Shell.to_buffer out_buf)
 	  ~stderr:(Shell.to_buffer err_buf) [cmd];
 	log_message ~logger (sprintf "success: %s" cmd_s)
-      with Shell.Subprocess_error errors ->
-	List.iter
-	(fun (cmd,ps) ->
-	  (match ps with
-	    | Unix.WEXITED rc ->
-		log_message ~logger (sprintf "failed: %d" rc);
-		exit rc
-	    | Unix.WSIGNALED n -> 
-		log_message ~logger (sprintf "killed: %d" n);
-		exit n
-	    | Unix.WSTOPPED n ->
-		log_message ~logger (sprintf "stopped: %d" n);
-		exit n))
-	errors)
-
+	with Shell.Subprocess_error errors ->
+	  List.iter
+	  (fun (cmd,ps) ->
+	    (match ps with
+	      | Unix.WEXITED rc ->
+		  log_message ~logger (sprintf "failed: %d" rc);
+		  exit rc
+	      | Unix.WSIGNALED n -> 
+		  log_message ~logger (sprintf "killed: %d" n);
+		  exit n
+	      | Unix.WSTOPPED n ->
+		  log_message ~logger (sprintf "stopped: %d" n);
+		  exit n))
+	  errors)
+    
 let log_error error =
   log_message ~key:"error" error;
   exit 3

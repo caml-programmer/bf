@@ -14,6 +14,15 @@ let string_of_sval = function
   | Ssymbol s -> s
   | sval      -> raise (Invalid_scheme_value sval)
 
+let output_scheme_value ch v =
+  let port = Ocs_port.output_port ch in
+  Ocs_print.print port false v;
+  Ocs_port.flush port
+
+let error sval =
+  print_endline "Error: invalid scheme value:\n";
+  output_scheme_value stdout sval; exit 4
+
 let string_list_of_sval_array v =
   List.map string_of_sval (Array.to_list v)
 
@@ -24,15 +33,22 @@ let eval_code handler s =
   Ocs_eval.eval thread handler
     (Ocs_compile.compile env (Ocs_read.read_from_string s))
 
-let output_scheme_value ch v =
-  let port = Ocs_port.output_port ch in
-  Ocs_print.print port false v;
-  Ocs_port.flush port
+let eval_sval s =
+  match s with
+    | Sstring x -> Sstring x
+    | _ ->
+	begin
+	  let res = ref None in
+	  let handler sval =
+	    res := Some sval in
+	  Ocs_eval.eval thread handler
+	    (Ocs_compile.compile env s);
+	  match !res with
+	    | None -> raise (Invalid_scheme_value s)
+	    | Some sval -> sval
+	end
 
 let component_of_sval s =
-  let error sval =
-    print_endline "Error: invalid scheme value:\n";
-    output_scheme_value stdout sval; exit 4 in
   match s with
     | Spair v ->
 	let name =
@@ -54,7 +70,7 @@ let component_of_sval s =
 				    (match v4.car with
 					Sstring s -> s
 				      | sval -> error sval)
-				| sval -> error sval)				
+				| sval -> error sval)
 			| Ssymbol "tag" ->
 			    Tag
 			      (match v3.cdr with
@@ -62,7 +78,7 @@ let component_of_sval s =
 				    (match v4.car with
 					Sstring s -> s
 				      | sval -> error sval)
-				| sval -> error sval)				
+				| sval -> error sval)
 			| sval -> error sval)
 		  | sval -> error sval)
 	    | sval -> error sval)
@@ -71,4 +87,79 @@ let component_of_sval s =
  
 let components_of_sval_array v =
   List.map component_of_sval (Array.to_list v)
-  
+
+let eval_pair v =
+  let (a,b) = v in
+  (match a with
+    | Ssymbol s -> s
+    | Sstring s -> s
+    | sval -> error sval),
+  (match b with
+    | Sstring s -> s
+    | Ssymbol s -> s
+    | _ ->
+	(match (eval_sval b) with
+	  | Ssymbol s -> s
+	  | Sstring s -> s
+	  | sval -> error sval))
+
+let eval_pair_opt v =
+  let (a,b) = v in
+  (match a with
+    | Ssymbol s -> s
+    | Sstring s -> s
+    | sval -> error sval),
+  (match b with
+    | Sstring s -> Some s
+    | Ssymbol s -> Some s
+    | Snull -> None
+    | _ ->
+	(match (eval_sval b) with
+	  | Ssymbol s -> Some s
+	  | Sstring s -> Some s
+	  | Snull     -> None
+	  | sval -> error sval))
+
+let make_pair f = function
+  | Spair v ->
+      (match v.cdr with
+	| Spair x ->
+	    (match x.car with
+	      | Sstring s ->
+		  f (v.car,Sstring s)
+	      | sval ->
+		  f (v.car,sval)
+		    (*f (v.car,v.cdr)*))
+	| Snull ->
+	    f (v.car,Snull)
+	| sval -> error sval)
+  | sval -> error sval
+
+let rec make_list acc = function
+  | Snull -> acc
+  | Spair v ->
+      make_list (acc@[v.car]) v.cdr
+  | sval -> error sval
+
+let env_list_of_sval v =
+  let x = List.map (make_pair eval_pair) (make_list [] v) in
+  Printf.printf "len: %d" (List.length x);
+  List.iter (fun (a,b) ->
+    print_string a;
+    print_string "=";
+    print_endline b) x;
+  x
+
+let make_params_of_sval v =
+  List.map (make_pair eval_pair_opt) (make_list [] v)
+
+
+
+
+
+
+
+
+
+
+

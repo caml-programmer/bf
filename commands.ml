@@ -224,6 +224,21 @@ let scm_simple_make v =
 let scm_simple_install v =
   simple_install (Scheme.string_list_of_sval_array v); Snull
 
+let scm_export v =
+  print_endline "scm-export";
+  Rules.export (Scheme.env_list_of_sval v);
+  print_endline "scm-export done";
+  Snull
+
+let scm_ac_configure v =
+  Rules.ac_configure (Scheme.make_params_of_sval v); Snull
+    
+let scm_make v =
+  Rules.make (Scheme.make_params_of_sval v); Snull
+
+let scm_path_concat v =
+  Rules.path_concat (Scheme.string_list_of_sval_array v); Snull
+
 ;;
 
 Ocs_env.set_pfn Scheme.env scm_prepare "prepare";;
@@ -234,3 +249,12 @@ Ocs_env.set_pfn Scheme.env scm_install "install";;
 Ocs_env.set_pfn Scheme.env scm_simple_configure "simple-configure";;
 Ocs_env.set_pfn Scheme.env scm_simple_make "simple-make";;
 Ocs_env.set_pfn Scheme.env scm_simple_install "simple-install";;
+
+Ocs_env.set_pf1 Scheme.env scm_export "ml-export";;
+Ocs_env.set_pf1 Scheme.env scm_ac_configure "ml-ac-configure";;
+Ocs_env.set_pf1 Scheme.env scm_make "ml-make";;
+
+Ocs_env.set_pfn Scheme.env scm_path_concat "path-concat";;
+
+
+
