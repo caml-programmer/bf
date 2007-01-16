@@ -43,19 +43,27 @@ let component_of_sval s =
 	let label =
 	  (match v.cdr with
 	    | Snull -> Current
-	    | Spair v ->
-		(match v.car with
-		  | Ssymbol label_type -> 
-		      (match label_type with
-			| "branch" ->
-			    (match v.cdr with
-			      | Sstring s -> Branch s
-			      | sval -> error sval)
-			| "tag" ->
-			    (match v.cdr with
-			      | Sstring s -> Tag s
-			      | sval -> error sval)
-			| _ -> error (Spair v))
+	    | Spair v2 ->
+		(match v2.car with
+		  | Spair v3 ->
+		      (match v3.car with 
+			| Ssymbol "branch" ->
+			    Branch
+			      (match v3.cdr with
+				| Spair v4 ->
+				    (match v4.car with
+					Sstring s -> s
+				      | sval -> error sval)
+				| sval -> error sval)				
+			| Ssymbol "tag" ->
+			    Tag
+			      (match v3.cdr with
+				| Spair v4 ->
+				    (match v4.car with
+					Sstring s -> s
+				      | sval -> error sval)
+				| sval -> error sval)				
+			| sval -> error sval)
 		  | sval -> error sval)
 	    | sval -> error sval)
 	in { name = name ; label = label }

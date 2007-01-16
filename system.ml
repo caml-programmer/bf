@@ -6,6 +6,8 @@ let path_list = ["/bin";"/sbin";"/usr/bin";"/usr/sbin"];;
 
 (* new *)
 
+exception Error of string
+
 let string_of_exn exn =
   Printexc.to_string exn
 
@@ -112,6 +114,28 @@ let list_of_directory dir =
 	acc := !acc @ [s];      
     done; []
   with End_of_file -> !acc
+
+let read_lines ?(ignore_error=false) ?(filter=(fun _ -> true)) command =
+  let (ch,out,err) = Unix.open_process_full command (Unix.environment ()) in
+  let rec read acc =
+    try
+      let s = input_line ch in
+      if filter s then
+	read (acc @ [s])
+      else
+	read acc
+    with End_of_file ->
+      if not ignore_error then
+	let error = string_of_channel err in
+	match Unix.close_process_full (ch,out,err) with
+	  | Unix.WEXITED 0 -> acc
+	  | _ ->
+	      raise 
+		(Error 
+		  (sprintf "cannot read lines from [%s] (%s)" command error))
+      else acc
+  in read []
+
 
 (* old *)
 

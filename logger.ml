@@ -13,8 +13,10 @@ let current_time () = Unix.gettimeofday ()
 let open_logfile () =
   let logfile =
     Filename.concat
-      (Params.get_param "log-dir")
-      (Params.get_param "component")
+      (Params.get_param "start-dir")
+      (Filename.concat
+	(Params.get_param "log-dir")
+	(Params.get_param "component"))
   in
   create_directory_r (path_directory logfile);
   open_out_gen

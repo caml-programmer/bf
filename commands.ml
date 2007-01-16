@@ -5,55 +5,14 @@ open Ocs_env
 open Ocs_types
 open Types
 
-type analyze_result =
-  | Worktree_conflicted
-  | Worktree_prepared
-  | Worktree_need_checkout
-  | Worktree_need_recreate
-  | Worktree_need_create
-
-let key_status component =
-  let cur = Sys.getcwd () in
-  Sys.chdir component.name;
-  let status =
-    git_key_status component
-  in Sys.chdir cur; status
-
-let worktree_analyze component =
-  let composite_mode =
-    Params.used_composite_mode () in
-  
-  match git_tree_status component with
-    | Exists ->
-	(* but different -> checkout all or recreate *)
-	if composite_mode then
-	  Worktree_need_recreate
-	else
-	  Worktree_conflicted
-    | Not_exists ->
-	(* clone, checkout -> create *)
-	Worktree_need_create
-    | Be_set ->
-	(* check tag && branch if needed *)
-	(match key_status component with
-	  | Exists ->
-	      if composite_mode then
-		Worktree_need_recreate (* todo: stave off loop *)
-	      else
-		Worktree_need_checkout
-	  | Not_exists ->
-	      Worktree_need_recreate
-	  | Be_set ->
-	      Worktree_prepared)
-
 let checkout_component component =
   match component.label with
     | Tag key ->
-	git_checkout ~key ()
+	git_checkout ~force:true ~key ()
     | Branch key -> 
-	git_checkout ~key ()
+	git_checkout ~force:true ~key ()
     | Current ->
-	git_checkout ()
+	git_checkout ~force:true ()
 
 let remove_component component =
   if System.is_directory component.name then
@@ -63,8 +22,9 @@ let clone_component component =
   git_clone
     (Filename.concat
       (Params.get_param "git-url") component.name)
+    component.name
 
-let with_component_dir component thunk =
+let with_component_dir ?(strict=true) component thunk =
   let curdir = Sys.getcwd () in
 
   let with_dir f =
@@ -82,22 +42,34 @@ let with_component_dir component thunk =
   log_message
     (Printf.sprintf "=> with-component-dir(%s %s [%s])"
       (curdir ^ "/" ^ component.name) label_type label);
-  
-  match worktree_analyze component with
-    | Worktree_conflicted ->
-	log_error (Printf.sprintf "=> component %s is conflicted" component.name)
-    | Worktree_prepared ->
-	with_dir (fun () -> ())
-    | Worktree_need_checkout ->
-	with_dir (fun () -> checkout_component component)
-    | Worktree_need_recreate ->
+
+  let composite_mode =
+    Params.used_composite_mode () in
+
+  match git_worktree_status ~strict component with
+    | Tree_not_exists ->
+	log_message "status: working tree not exists";
 	remove_component component;
 	clone_component component;
-	with_dir (fun () -> checkout_component component)
-    | Worktree_need_create ->
-	clone_component component;
-	with_dir (fun () -> checkout_component component)
-
+	with_dir (fun () ->
+	  git_track_new_branches ();
+	  checkout_component component)
+    | Tree_exists_with_given_key content_status ->
+	(match content_status with
+	  | Tree_prepared ->
+	      log_message "status: working tree prepared";
+	      with_dir (fun () -> ())
+	  | Tree_changed ->
+	      log_message "status: working tree changed";
+	      with_dir (fun () ->
+		git_clean ();
+		checkout_component component))
+    | Tree_exists_with_other_key ->
+	log_message "status: working tree exists with other key";
+	with_dir (fun () ->
+	  git_clean ();
+	  checkout_component component)
+  
 let non_empty_iter f = function
     []   -> log_error "don't know what to do"
   | list -> List.iter f list
@@ -106,10 +78,27 @@ let non_empty_iter f = function
 (* Projects support *)
 
 let prepare_component component =
-  with_component_dir component git_clean
+  with_component_dir ~strict:false component git_clean
 
 let prepare components =
   non_empty_iter prepare_component components
+
+let update_component component =
+  with_component_dir ~strict:true component
+    (fun () ->
+      git_pull (Filename.concat (Params.get_param "git-url") component.name);
+      git_track_new_branches ())
+
+let update components =
+  non_empty_iter update_component components
+
+let forward_component component =
+  with_component_dir ~strict:false component
+    (fun () ->
+      git_push (Filename.concat (Params.get_param "git-url") component.name))
+
+let forward components =
+  non_empty_iter forward_component components
 
 let build_component_native component =
   if Sys.file_exists ".bf-build" then
@@ -126,7 +115,7 @@ let build_component_native component =
     end
 
 let build_component component =
-  with_component_dir component
+  with_component_dir ~strict:false component
     (fun () ->
       build_component_native component)
 	  
@@ -134,17 +123,22 @@ let build components =
   non_empty_iter build_component components
 
 let rebuild_component component =
+  with_component_dir ~strict:true component
+    (fun () ->
+      build_component_native component)
+  (*
   let bf_build =
     Filename.concat component.name ".bf-build" in
   if Sys.file_exists bf_build then
     Sys.remove bf_build;
   build_component component
-	  
+  *)
+  
 let rebuild components =
   non_empty_iter rebuild_component components
 
 let install_component component =
-  with_component_dir component
+  with_component_dir ~strict:false component
     (fun () ->
       if Sys.file_exists ".bf-install" then
 	log_message (component.name ^ " already installed, noting to do")
@@ -170,9 +164,9 @@ let components_of_composite composite =
     | Snull -> acc
     | Spair v ->
 	(match v.cdr with
-	  | Snull -> acc
-	  | Spair v ->
-	      iter (acc @ [Scheme.component_of_sval v.car]) (Spair v)
+	  | Snull -> acc @ [Scheme.component_of_sval v.car]
+	  | Spair v2 ->
+	      iter (acc @ [Scheme.component_of_sval v.car]) (Spair v2)
 	  | _ -> log_error "invalid composition")
     | _ -> log_error "invalid composition"
   in iter [] composite
@@ -180,6 +174,14 @@ let components_of_composite composite =
 let prepare_composite composite =
   log_message ("=> prepare-composite " ^ composite);
   prepare (components_of_composite composite)
+
+let update_composite composite =
+  log_message ("=> update-composite " ^ composite);
+  update (components_of_composite composite)
+
+let forward_composite composite =
+  log_message ("=> forward-composite " ^ composite);
+  forward (components_of_composite composite)
   
 let build_composite composite =
   log_message ("=> build-composite " ^ composite);
