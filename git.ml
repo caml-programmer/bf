@@ -4,19 +4,22 @@ open System
 let git_clone url =
   log_command "git" ["clone";"-n";"-q";url]
 
-let git_checkout ?key ?name () =
-  match (key,name) with
+let git_pull url =
+  log_command "git" ["pull";url]
+
+let git_checkout ?key ?files () =
+  match (key,files) with
     | None, None ->
 	log_command "git "["checkout"]
-    | None, Some n ->
-	log_command "git" ["checkout";n]
+    | None, Some fl ->
+	log_command "git" ("checkout"::fl)
     | Some k, None ->
 	log_command "git" ["checkout";k]
-    | Some k, Some n ->
-	log_command "git" ["checkout";k;n]
+    | Some k, Some fl ->
+	log_command "git" ("checkout"::k::fl)
 
 let git_branch () =
-  let (ch,out,err) = Unix.open_process_full "git branch" (Unix.environment ()) in
+  let (ch,out,err) = Unix.open_process_full "git branch -r" (Unix.environment ()) in
   let rec read acc =
     try
       let s = input_line ch in
@@ -33,3 +36,4 @@ let git_branch () =
   
 let git_clean () =
   log_command "git" ["clean";"-d";"-x"]
+

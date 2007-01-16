@@ -2,6 +2,7 @@
 
 open Ocs_prim
 open Ocs_types
+open Types
 
 let env = Ocs_top.make_env ();;
 let thread = Ocs_top.make_thread ();;
@@ -15,6 +16,9 @@ let string_of_sval = function
 
 let string_list_of_sval_array v =
   List.map string_of_sval (Array.to_list v)
+
+let components_of_sval_array v =
+  [ { name = "demo"; label = (Branch "master") } ]
 
 let eval_file file =
   Ocs_prim.load_file env thread file

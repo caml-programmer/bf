@@ -3,44 +3,144 @@ open Rules
 open Logger
 open Ocs_env
 open Ocs_types
+open Types
 
 exception Checkout_done
+
+(*
+
+let checkout_branch () =
+  let uname = System.uname () in
+  let branches = git_branch () in
+  let branch_order =
+    List.map (fun b -> "origin/" ^ b)
+      [uname;"jet";"master"]
+  in
+  (try
+    List.iter
+      (fun branch ->
+	print_endline branch;
+	if List.mem branch branches then
+	  begin
+	    git_checkout ~key:branch ();
+	    raise Checkout_done
+	  end)
+      branch_order
+      git_checkout ();
+  with Checkout_done -> ());
+  
+*)
+
+type component_dir_status = {
+  tag: string option;
+  branch: string option;
+  different: bool;
+}
+
+
+(** Должны быть разные стратегии поведения при сборки компонента и 
+  композиции, при сборке компонента на ошибках надо валиться, а 
+  при сборке композиции надо стараться их исправлять *)
+
+type analyze_result =
+  | Component_dir_conflicted
+  | Component_dir_prepared
+  | Component_dir_need_checkout
+  | Component_dir_need_recreate
+  | Component_dir_need_create
+
+let get_component_status s =
+  { tag = None; branch = None; different = false }
+
+let component_dir_analyze s = Component_dir_conflicted
+
+let checkout_component component =
+  match component.label with
+    | Tag key ->
+	git_checkout ~key ()
+    | Branch key -> 
+	git_checkout ~key ()
+    | Current ->
+	git_checkout ()
+
+let remove_component component =
+  if System.is_directory component.name then
+    System.remove_directory component.name
+      
+let clone_component component =
+  git_clone
+    (Filename.concat
+      (Params.get_param "git-url") component.name)
 
 let with_component_dir component thunk =
   let curdir = Sys.getcwd () in
 
-  Params.update_param "component" component;
+  let with_dir f =
+    Sys.chdir component.name; f (); thunk (); Sys.chdir curdir in
 
-  log_message 
-    (Printf.sprintf "with_component_dir(%s)" (curdir ^ "/" ^ component));
-    
-  if not (Sys.file_exists component) then
+  Params.update_param "component" component.name;
+  Params.update_param "component-label" (string_of_label component.label);
+
+  log_message
+    (Printf.sprintf "with_component_dir(%s)" (curdir ^ "/" ^ component.name));
+                 
+  (* refactoring result *)
+  
+  match component_dir_analyze component.name with
+    | Component_dir_conflicted ->
+	log_error (Printf.sprintf "component %s is conflicted" component.name)
+    | Component_dir_prepared ->
+	with_dir (fun () -> ())
+    | Component_dir_need_checkout ->
+	with_dir (fun () -> checkout_component component)
+    | Component_dir_need_recreate ->
+	remove_component component;
+	clone_component component;
+	with_dir (fun () -> checkout_component component)
+    | Component_dir_need_create ->
+	clone_component component;
+	with_dir (fun () -> checkout_component component)
+
+  (* refactoring start *)
+(*
+  if not (Sys.file_exists component.name) then
     begin
-      git_clone (Filename.concat (Params.get_param "git-url") component);
-      Sys.chdir component;
+      git_clone (Filename.concat (Params.get_param "git-url") component.name);
+      Sys.chdir component.name;
+
       let uname = System.uname () in
       let branches = git_branch () in
-      let select = [uname;"jet";"master"] in
+      let branch_order =
+	List.map (fun b -> "origin/" ^ b)
+	  [uname;"jet";"master"]
+      in
       (try
 	List.iter
 	  (fun branch ->
+	    print_endline branch;
 	    if List.mem branch branches then
 	      begin
-		git_checkout ~name:branch ();
+		git_checkout ~key:branch ();
 		raise Checkout_done
 	      end)
-	  branches;
+	  branch_order;
 	git_checkout ();
       with Checkout_done -> ());
+
       thunk ();
       Sys.chdir curdir
     end
   else
-    begin 
-      Sys.chdir component;
+    begin
+      Sys.chdir component.name;
       thunk ();
-      Sys.chdir curdir 
+      Sys.chdir curdir
     end
+    *)
+
+(* refactoring stop *)
+
+      
 
 let non_empty_iter f = function
     []   -> log_error "don't know what to do"
@@ -57,12 +157,12 @@ let prepare components =
 
 let build_component_native component =
   if Sys.file_exists ".bf-build" then
-    log_message (component ^ " already built, nothing to do")
+    log_message (component.name ^ " already built, nothing to do")
   else
     begin
-      log_message ("building " ^ component);
+      log_message ("building " ^ component.name);
       build_rules ();
-      log_message (component ^ " built");
+      log_message (component.name ^ " built");
       let ch = open_out ".bf-build" in
       output_string ch (string_of_float (Unix.gettimeofday ()));
       output_string ch "\n";
@@ -91,14 +191,14 @@ let install_component component =
   with_component_dir component
     (fun () ->
       if Sys.file_exists ".bf-install" then
-	log_message (component ^ "already installed, noting to do")
+	log_message (component.name ^ "already installed, noting to do")
       else
 	begin
 	  if not (Sys.file_exists ".bf-build") then
 	    build_component_native component;
-	  log_message ("installing " ^ component);
+	  log_message ("installing " ^ component.name);
 	  install_rules ();
-	  log_message (component ^ " installed");
+	  log_message (component.name ^ " installed");
 	  let ch = open_out ".bf-install" in
 	  output_string ch (string_of_float (Unix.gettimeofday ()));
 	  output_string ch "\n";
@@ -124,16 +224,16 @@ let simple_install args =
 (* Scheme bindings *)
 
 let scm_prepare v =
-  prepare (Scheme.string_list_of_sval_array v); Snull
+  prepare (Scheme.components_of_sval_array v); Snull
 
 let scm_build v =
-  build (Scheme.string_list_of_sval_array v); Snull
+  build (Scheme.components_of_sval_array v); Snull
 
 let scm_rebuild v =
-  rebuild (Scheme.string_list_of_sval_array v); Snull
+  rebuild (Scheme.components_of_sval_array v); Snull
 
 let scm_install v =
-  install (Scheme.string_list_of_sval_array v); Snull
+  install (Scheme.components_of_sval_array v); Snull
 
 let scm_simple_configure v =
   simple_configure (Scheme.string_list_of_sval_array v); Snull

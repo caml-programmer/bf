@@ -35,7 +35,7 @@ let set_param ~default s =
   let value =
     try
       Hashtbl.find user_params s
-    with Not_found -> default 
+    with Not_found -> default
   in
   
   Ocs_env.set_glob Scheme.env
@@ -62,3 +62,7 @@ set_param ~default:"git://localhost/" "git-url";;
 set_param ~default:"/opt/dozor" "prefix";;
 set_param ~default:"/" "destdir";;
 set_param ~default:"bf" "component";;
+set_param ~default:"branch" "label-type";;
+set_param ~default:"master" "label";;
+set_param ~default:"../composite" "composite-dir";;
+

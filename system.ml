@@ -48,8 +48,11 @@ let path_strip_directory file =
     else file
   else file
 
+exception Cannot_create_directory of string
+
 let create_directory_r dir =
-  ignore(Sys.command (sprintf "mkdir -p %s" dir))
+  let rc = Sys.command (sprintf "mkdir -p %s" dir) in
+  if rc <> 0 then raise (Cannot_create_directory dir)
 
 let path_directory file =
   Filename.dirname file
@@ -70,6 +73,12 @@ let is_directory s =
     | Unix.S_DIR -> true
     | _ -> false
 
+exception Cannot_remove_directory of string
+
+let remove_directory dir =
+  let rc = Sys.command (sprintf "rm -rf %s" dir) in
+  if rc <> 0 then raise (Cannot_remove_directory dir)
+
 let copy_file file dest =
   let name = Filename.basename file in
   if is_directory dest then
@@ -80,7 +89,7 @@ let copy_file file dest =
     
 let uname () =
   let ch = Unix.open_process_in "uname" in
-  let name = input_line ch in
+  let name = String.lowercase (input_line ch) in
   close_in ch; name
 
 (* old *)

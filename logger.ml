@@ -100,4 +100,5 @@ let log_command prog args =
 	errors)
 
 let log_error error =
-  log_message ~key:"error" error
+  log_message ~key:"error" error;
+  exit 3
