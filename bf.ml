@@ -69,6 +69,7 @@ let _ =
 	    | "install" -> Commands.install [component]
 	    | _         -> usage ())
       | Is_composite composite ->
+	  Params.set_composite_mode ();
 	  (match action with
 	    | "prepare" -> Commands.prepare_composite composite
 	    | "build"   -> Commands.build_composite   composite

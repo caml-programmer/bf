@@ -5,54 +5,46 @@ open Ocs_env
 open Ocs_types
 open Types
 
-exception Checkout_done
-
-(*
-
-let checkout_branch () =
-  let uname = System.uname () in
-  let branches = git_branch () in
-  let branch_order =
-    List.map (fun b -> "origin/" ^ b)
-      [uname;"jet";"master"]
-  in
-  (try
-    List.iter
-      (fun branch ->
-	print_endline branch;
-	if List.mem branch branches then
-	  begin
-	    git_checkout ~key:branch ();
-	    raise Checkout_done
-	  end)
-      branch_order
-      git_checkout ();
-  with Checkout_done -> ());
-  
-*)
-
-type component_dir_status = {
-  tag: string option;
-  branch: string option;
-  different: bool;
-}
-
-
-(** Должны быть разные стратегии поведения при сборки компонента и 
-  композиции, при сборке компонента на ошибках надо валиться, а 
-  при сборке композиции надо стараться их исправлять *)
-
 type analyze_result =
-  | Component_dir_conflicted
-  | Component_dir_prepared
-  | Component_dir_need_checkout
-  | Component_dir_need_recreate
-  | Component_dir_need_create
+  | Worktree_conflicted
+  | Worktree_prepared
+  | Worktree_need_checkout
+  | Worktree_need_recreate
+  | Worktree_need_create
 
-let get_component_status s =
-  { tag = None; branch = None; different = false }
+let key_status component =
+  let cur = Sys.getcwd () in
+  Sys.chdir component.name;
+  let status =
+    git_key_status component
+  in Sys.chdir cur; status
 
-let component_dir_analyze s = Component_dir_conflicted
+let worktree_analyze component =
+  let composite_mode =
+    Params.used_composite_mode () in
+  
+  match git_tree_status component with
+    | Exists ->
+	(* but different -> checkout all or recreate *)
+	if composite_mode then
+	  Worktree_need_recreate
+	else
+	  Worktree_conflicted
+    | Not_exists ->
+	(* clone, checkout -> create *)
+	Worktree_need_create
+    | Be_set ->
+	(* check tag && branch if needed *)
+	(match key_status component with
+	  | Exists ->
+	      if composite_mode then
+		Worktree_need_recreate (* todo: stave off loop *)
+	      else
+		Worktree_need_checkout
+	  | Not_exists ->
+	      Worktree_need_recreate
+	  | Be_set ->
+	      Worktree_prepared)
 
 let checkout_component component =
   match component.label with
@@ -78,7 +70,7 @@ let with_component_dir component thunk =
   let with_dir f =
     Sys.chdir component.name; f (); thunk (); Sys.chdir curdir in
 
-  let label_type = 
+  let label_type =
     string_of_label_type component.label in
   let label = 
     string_of_label component.label in
@@ -89,65 +81,22 @@ let with_component_dir component thunk =
 
   log_message
     (Printf.sprintf "=> with-component-dir(%s %s [%s])"
-      (curdir ^ "/" ^ component.name) label_type label);
+      (curdir ^ "/" ^ component.name) label_type label); 
   
-  (* refactoring result *)
-  
-  match component_dir_analyze component.name with
-    | Component_dir_conflicted ->
+  match worktree_analyze component with
+    | Worktree_conflicted ->
 	log_error (Printf.sprintf "=> component %s is conflicted" component.name)
-    | Component_dir_prepared ->
+    | Worktree_prepared ->
 	with_dir (fun () -> ())
-    | Component_dir_need_checkout ->
+    | Worktree_need_checkout ->
 	with_dir (fun () -> checkout_component component)
-    | Component_dir_need_recreate ->
+    | Worktree_need_recreate ->
 	remove_component component;
 	clone_component component;
 	with_dir (fun () -> checkout_component component)
-    | Component_dir_need_create ->
+    | Worktree_need_create ->
 	clone_component component;
 	with_dir (fun () -> checkout_component component)
-
-  (* refactoring start *)
-(*
-  if not (Sys.file_exists component.name) then
-    begin
-      git_clone (Filename.concat (Params.get_param "git-url") component.name);
-      Sys.chdir component.name;
-
-      let uname = System.uname () in
-      let branches = git_branch () in
-      let branch_order =
-	List.map (fun b -> "origin/" ^ b)
-	  [uname;"jet";"master"]
-      in
-      (try
-	List.iter
-	  (fun branch ->
-	    print_endline branch;
-	    if List.mem branch branches then
-	      begin
-		git_checkout ~key:branch ();
-		raise Checkout_done
-	      end)
-	  branch_order;
-	git_checkout ();
-      with Checkout_done -> ());
-
-      thunk ();
-      Sys.chdir curdir
-    end
-  else
-    begin
-      Sys.chdir component.name;
-      thunk ();
-      Sys.chdir curdir
-    end
-    *)
-
-(* refactoring stop *)
-
-      
 
 let non_empty_iter f = function
     []   -> log_error "don't know what to do"

@@ -56,6 +56,17 @@ let update_param name value =
   Hashtbl.replace user_params name value
 ;;
 
+let set_composite_mode () =
+  update_param "composite-mode" "true"
+;;
+
+let used_composite_mode () =
+  match get_param "composite-mode" with
+    | "false" -> false
+    | "true"  -> true
+    | _       -> assert false
+;;
+
 set_param ~default:(Sys.getcwd()) "top-dir";;
 set_param ~default:((get_param "top-dir") ^ "/logs") "log-dir";;
 set_param ~default:"git://localhost/" "git-url";;
@@ -64,6 +75,7 @@ set_param ~default:"/" "destdir";;
 set_param ~default:"bf" "component";;
 set_param ~default:"branch" "label-type";;
 set_param ~default:"master" "label";;
-set_param ~default:"../composite" "composite-dir";;
+(* set_param ~default:"../composite" "composite-dir";; *)
 set_param ~default:"../plugins" "plugins-dir";;
+set_param ~default:"false" "composite-mode";;
 
