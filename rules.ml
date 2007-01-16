@@ -423,12 +423,12 @@ let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
 	| `File s -> 
 	    System.create_directory_r 
 	      (Filename.concat buildroot (Filename.dirname s));
-	    System.copy_file s (Filename.concat buildroot s)
+	    System.copy_file ("/" ^ s) (Filename.concat buildroot s)
 	| `Dir s ->
 	    remove_directory (Filename.concat buildroot s);
 	    System.create_directory_r 
 	      (Filename.concat buildroot (Filename.dirname s));
-	    System.copy_dir s (Filename.concat buildroot s);
+	    System.copy_dir ("/" ^ s) (Filename.concat buildroot s);
 	| `Empty_dir s -> 
 	    System.create_directory_r 
 	      (Filename.concat buildroot s)
