@@ -88,6 +88,7 @@ let update_component component = (* todo: more smart implementation *)
   with_component_dir ~strict:true component
     (fun () ->
       git_clean ();
+      git_checkout ~force:true ();
       List.iter
       (fun branch ->
 	git_pull ~refspec:branch (Filename.concat (Params.get_param "git-url") component.name))
