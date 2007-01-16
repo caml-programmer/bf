@@ -12,8 +12,8 @@ let current_time () = Unix.gettimeofday ()
 
 let open_logfile () =
   let logfile =
-    (with_exn "log-dir not found" (get_env "log-dir")) ^ "/" ^
-    (with_alt "bf" (get_env "component"))
+    (with_exn "log-dir not found" (Params.get_param "log-dir")) ^ "/" ^
+    (with_alt "bf" (Params.get_param "component"))
   in
   create_directory_r (path_directory logfile);
   open_out_gen 

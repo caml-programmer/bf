@@ -116,7 +116,7 @@ let write_string ~file ~string =
 let read_file ~file =
   if Sys.file_exists file then
     let ch = open_in file in
-    let buffer = Buffer.create 32 in  
+    let buffer = Buffer.create 32 in
     try
       while true do
 	Buffer.add_string buffer (input_line ch);

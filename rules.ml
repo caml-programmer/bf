@@ -1,19 +1,23 @@
 open Eval
 open Logger
 open System
+open Printf
 
 let read_rules () =
-  let s = System.read_file ~file:".rules" in
-  eval_reset ();
-  eval_phrase s;
-  eval_value "build",
-  eval_value "install"
+  printf 
+    "read rules from %s/.bf-rules\n" (Sys.getcwd());
+  System.read_file ~file:".bf-rules"
 
 let build_rules () =
-  fst (read_rules ())
+  let s = read_rules () in
+  eval_reset ();
+  eval_phrase (s ^ "build ()")
 
 let install_rules () =
-  snd (read_rules ())
+  let s = read_rules () in
+  eval_reset ();
+  eval_phrase (s ^ "install ()")
+    
 
 let make () =
   log_command "make"

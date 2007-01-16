@@ -1,10 +1,10 @@
 include Makefile.config
-SOURCES   = system.ml config.ml eval.ml logger.ml params.ml git.ml rules.ml commands.ml
+SOURCES   = system.ml config.ml eval.ml params.ml logger.ml git.ml rules.ml commands.ml
 OBJECTS   = $(SOURCES:.ml=.cmo)
 XOBJECTS  = $(OBJECTS:.cmo=.cmx)
 ARCHIVE   = archive.cma
 XARCHIVE  = $(ARCHIVE:.cma=.cmxa)
-REQUIRES  = getopt pcre shell
+REQUIRES  = getopt pcre shell ocs
 
 all: $(ARCHIVE)
 	$(OCAMLC) -o bf -custom toplevellib.cma $(ARCHIVE) bf.ml -linkpkg

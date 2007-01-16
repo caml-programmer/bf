@@ -51,9 +51,8 @@ let build_component component =
       if Sys.file_exists ".bf-build" then
 	log_message (component ^ " already built, nothing to do")
       else
-	let build = build_rules () in
 	log_message ("building " ^ component);
-	build ();
+	build_rules ();
 	log_message (component ^ " built");
 	let ch = open_out ".bf-build" in
 	output_string ch (string_of_float (Unix.gettimeofday ()));
@@ -79,9 +78,8 @@ let install_component component =
       if Sys.file_exists ".bf-install" then
 	log_message (component ^ "already installed, noting to do")
       else
-	let install = install_rules () in
 	log_message ("installing " ^ component);
-	install ();
+	install_rules ();
 	log_message (component ^ " installed");
 	let ch = open_out ".bf-install" in
 	output_string ch (string_of_float (Unix.gettimeofday ()));

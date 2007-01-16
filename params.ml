@@ -3,11 +3,11 @@ open System
 let read_params () =
   let params = Hashtbl.create 32 in
   let filename =
-    if Sys.file_exists ".bf_params" then
+    if Sys.file_exists ".bf-params" then
       Some ".bf-params"
     else
       if Sys.file_exists "/etc/bf-params"
-      then Some "/etc/params" else None
+      then Some "/etc/bf-params" else None
   in match filename with
     | None -> params
     | Some filename ->
@@ -31,6 +31,12 @@ let set_param ~default s =
   try
     Hashtbl.find user_params s
   with Not_found -> default
+;;
+
+let get_param s =
+  try 
+    Some (Hashtbl.find user_params s)
+  with Not_found -> None
 ;;
 
 let top_dir = set_param ~default:(Sys.getcwd()) "top-dir";;
