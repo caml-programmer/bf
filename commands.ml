@@ -16,7 +16,7 @@ let with_component_dir component thunk =
     
   if not (Sys.file_exists component) then
     begin
-      git_clone ((Params.get_param "git_url") ^ "/" ^ component);
+      git_clone ((Params.get_param "git-url") ^ "/" ^ component);
       Sys.chdir component;
       let uname = System.uname () in
       let branches = git_branch () in

@@ -10,7 +10,7 @@ all: $(ARCHIVE)
 	$(OCAMLC) -o bf -custom toplevellib.cma $(ARCHIVE) bf.ml -linkpkg
 
 opt: $(XARCHIVE)
-	echo "Unused" #$(OCAMLOPT) -o bf $(XARCHIVE) bf.ml -linkpkg
+	$(OCAMLOPT) -o bf $(XARCHIVE) bf.ml -linkpkg
 
 $(ARCHIVE): $(OBJECTS)
 	$(OCAMLC) -a -o $(ARCHIVE) $(OBJECTS)
