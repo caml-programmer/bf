@@ -251,4 +251,7 @@ let remove_directory dir =
   log_command "rm" ["-rf";dir]
   
 let create_symlink src dst =
+  Unix.symlink src dst
+
+let create_link src dst =
   Unix.link src dst

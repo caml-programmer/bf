@@ -219,7 +219,7 @@ let scm_prepare v =
   with_dir ".."
     (fun () ->
       prepare (Scheme.components_of_sval_array v)); Snull
-
+      
 let scm_build v =
   with_dir ".."
     (fun () ->
@@ -227,13 +227,18 @@ let scm_build v =
 
 let scm_rebuild v =
   with_dir ".."
-    (fun () ->      
+    (fun () ->
       rebuild (Scheme.components_of_sval_array v)); Snull
-
+      
 let scm_install v =
   with_dir ".."
     (fun () ->
       install (Scheme.components_of_sval_array v)); Snull
+
+let scm_reinstall v =
+  with_dir ".."
+    (fun () ->
+      reinstall (Scheme.components_of_sval_array v)); Snull
 
 let scm_simple_configure v =
   Rules.simple_configure (Scheme.string_list_of_sval_array v); Snull
@@ -349,13 +354,19 @@ let scm_create_symlink src dst =
     (Scheme.string_of_sval dst);
   Snull
 
+let scm_create_link src dst =
+  Rules.create_link
+    (Scheme.string_of_sval src)
+    (Scheme.string_of_sval dst);
+  Snull
+
 ;;
 
-Ocs_env.set_pfn Scheme.env scm_prepare "prepare";;
-Ocs_env.set_pfn Scheme.env scm_build   "build";;
-Ocs_env.set_pfn Scheme.env scm_rebuild "rebuild";;
-Ocs_env.set_pfn Scheme.env scm_install "install";;
+Ocs_env.set_pfn Scheme.env scm_prepare "prepare-components";;
+Ocs_env.set_pfn Scheme.env scm_build   "build-components";;
+Ocs_env.set_pfn Scheme.env scm_rebuild "rebuild-components";;
 Ocs_env.set_pfn Scheme.env scm_install "install-components";;
+Ocs_env.set_pfn Scheme.env scm_reinstall "reinstall-components";;
 
 Ocs_env.set_pfn Scheme.env scm_simple_configure "simple-configure";;
 Ocs_env.set_pfn Scheme.env scm_simple_make "simple-make";;
@@ -385,6 +396,7 @@ Ocs_env.set_pfn Scheme.env scm_make_directory "make-directory";;
 Ocs_env.set_pf2 Scheme.env scm_move_directory "move-directory";;
 Ocs_env.set_pf1 Scheme.env scm_remove_directory "remove-directory";;
 Ocs_env.set_pf2 Scheme.env scm_create_symlink "create-symlink";;
+Ocs_env.set_pf2 Scheme.env scm_create_link "create-link";;
 
 
 

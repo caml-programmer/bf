@@ -55,6 +55,12 @@ let with_logger proc =
 exception Found_program of string
 
 let with_path s =
+  let len = String.length s in
+  if len > 2 && String.sub s 0 2 = "./" then
+    Filename.concat 
+      (Sys.getcwd ()) 
+      (String.sub s 2 (len - 2))
+  else
   try
     List.iter
       (fun dir ->

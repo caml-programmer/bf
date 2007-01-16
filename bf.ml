@@ -96,7 +96,7 @@ let teleport f =
       Params.update_param "start-dir"
 	((Params.get_param "start-dir") ^ "/..");
       Params.update_param "log-dir"
-	((Params.get_param "log-dir") ^ "/..");      
+	((Params.get_param "log-dir") ^ "/..");
       f ()
     end
   else
