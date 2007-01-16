@@ -27,10 +27,10 @@ let open_logger () =
   { port = open_logfile (); start_time = current_time () }
   
 let human_timestamp t =
-  let nano_sec =
-    int_of_float (t -. (floor t)) in
+  let nano_sec = 
+    int_of_float (10000.0 *. (t -. (floor t))) in
   let tm = Unix.localtime t in
-  sprintf "%02d/%02d %02d:%02d:%02d %04d"
+  sprintf "%02d/%02d %02d:%02d:%02d.%04d"
     (tm.Unix.tm_mon+1)
     tm.Unix.tm_mday
     tm.Unix.tm_hour
