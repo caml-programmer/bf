@@ -360,6 +360,10 @@ let scm_create_link src dst =
     (Scheme.string_of_sval dst);
   Snull
 
+let scm_is_directory s =
+  if System.is_directory (Scheme.string_of_sval s) 
+  then Strue else Sfalse
+
 ;;
 
 Ocs_env.set_pfn Scheme.env scm_prepare "prepare-components";;
@@ -397,6 +401,7 @@ Ocs_env.set_pf2 Scheme.env scm_move_directory "move-directory";;
 Ocs_env.set_pf1 Scheme.env scm_remove_directory "remove-directory";;
 Ocs_env.set_pf2 Scheme.env scm_create_symlink "create-symlink";;
 Ocs_env.set_pf2 Scheme.env scm_create_link "create-link";;
+Ocs_env.set_pf1 Scheme.env scm_is_directory "is-directory";;
 
 
 
