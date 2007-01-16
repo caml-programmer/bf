@@ -1,17 +1,16 @@
 include Makefile.config
-SOURCES   = lib.ml environment.ml config.ml
+SOURCES   = system.ml config.ml eval.ml logger.ml params.ml rules.ml commands.ml
 OBJECTS   = $(SOURCES:.ml=.cmo)
 XOBJECTS  = $(OBJECTS:.cmo=.cmx)
 ARCHIVE   = archive.cma
 XARCHIVE  = $(ARCHIVE:.cma=.cmxa)
-REQUIRES  = getopt num netstring equeue shell smtp camlzip
+REQUIRES  = getopt pcre shell
 
 all: $(ARCHIVE)
-	$(OCAMLC) -o bf -custom $(ARCHIVE) bf.ml -linkpkg
+	$(OCAMLC) -o bf -custom toplevellib.cma $(ARCHIVE) bf.ml -linkpkg
 
 opt: $(XARCHIVE)
-	$(OCAMLOPT) -o bf $(XARCHIVE) bf.ml -linkpkg
-
+	echo "Unused" #$(OCAMLOPT) -o bf $(XARCHIVE) bf.ml -linkpkg
 
 $(ARCHIVE): $(OBJECTS)
 	$(OCAMLC) -a -o $(ARCHIVE) $(OBJECTS)

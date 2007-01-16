@@ -1,5 +1,55 @@
 open Printf
 
+(* global variables *)
+
+let path_list = ["/bin";"/sbin";"/usr/bin";"/usr/sbin"];;
+
+(* new *)
+
+let string_of_exn exn =
+  Printexn.to_string exn
+
+let string_of_channel ch =
+  let b = Buffer.create 32 in
+  let rec read () =
+    try
+      read (Buffer.add_string b (input_line s))
+    with End_of_file -> Buffer.contents b
+  in read ()
+
+let list_of_channel ch =
+  let rec read acc =
+    try
+      read (acc @ [input_line s])
+    with End_of_file -> acc
+  in read []
+
+exception Env_problem of string
+
+let get_env name =
+  try Some (Sys.getenv name) with Not_found -> None
+
+let set_env name value =
+  Unix.putenv name value
+
+let with_alt s = function
+  | Some value -> value
+  | None -> s
+
+let with_exn s = function
+  | Some value -> value
+  | None -> raise (Env_problem s)
+
+let path_strip_directory file =
+  let len = String.length file in
+  if len > 0 then
+    if file.[len-1] = '/' then
+      String.sub file 0 (len - 1)
+    else file
+  else file
+
+(* old *)
+
 let with_prefix prefix list =
   List.map (fun v -> prefix ^ "/" ^ v) list
 
@@ -54,5 +104,4 @@ let pid_exists file =
     with End_of_file -> ();
       int_of_string (Buffer.contents b)
   in Sys.command (sprintf "kill -0 %d" pid) = 0
-
 
