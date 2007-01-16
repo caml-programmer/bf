@@ -310,6 +310,9 @@ let create_symlink src dst =
 let create_link src dst =
   Unix.link src dst
 
+let send_file_over_ssh src dst =
+  log_command "scp" [src;dst]
+
 (* Package *)
 
 type platform =
@@ -355,10 +358,13 @@ let rpmbuild
   let add s = args := !args @ [s] in
   let define n v =
     add (sprintf "--define='%s %s'" n v) in
+  let location = Sys.getcwd () in
+  let arch = System.arch () in
+  let platform = string_of_platform platform in
   add "-bb";
-  add ("--target=" ^ System.arch ());
+  add ("--target=" ^ arch);
   add spec;
-  define "_rpmdir" (Sys.getcwd ());
+  define "_rpmdir" location;
   define "fileslist" files; (* must be absolute *)
   define top_label top_dir;
   define "nocopy" nocopy;
@@ -367,17 +373,20 @@ let rpmbuild
   define "pkgname" pkgname;
   define "pkgvers" version;
   define "pkgrel" release;
-  define "rhsys" (string_of_platform platform);
+  define "rhsys" platform;
   define "findreq" findreq;
   define "_unpackaged_files_terminate_build" "0";
-  (* log_command "rpmbuild" !args *)
   let cmd = "rpmbuild " ^ (String.concat " " !args) in
   log_message (sprintf "run: %s" cmd);
+  let fullname =
+    sprintf "%s-%s-%s.%s.%s.rpm"
+      pkgname version release platform arch in
   match Unix.system cmd with
-    | Unix.WEXITED 0 -> ()
+    | Unix.WEXITED 0 ->
+	location,fullname
     | _ ->
-	log_error 
-	  (sprintf "Cannot build package: %s-%s-%s" pkgname version release)
+	log_error
+	  (sprintf "Cannot build package: %s/%s" location fullname)
 
 type content =
     [
@@ -493,11 +502,22 @@ let build_rh_package platform args =
 	      check_rh_build_env ();
 	      log_command "chmod" ["+x";findreq];
 	      copy_to_buildroot ~top_dir files;
-	      rpmbuild
-		~top_dir
-		~pkgname:(Filename.basename specdir)
-		~platform ~version ~release
-		~spec ~files ~findreq ()
+	      let (location,fullname) =
+		rpmbuild
+		  ~top_dir
+		  ~pkgname:(Filename.basename specdir)
+		  ~platform ~version ~release
+		  ~spec ~files ~findreq ()
+	      in
+	      let hooks =
+		Filename.concat specdir "hooks.scm" in
+	      if Sys.file_exists hooks then
+		begin
+		  Scheme.eval_file hooks;
+		  Scheme.eval_code (fun _ -> ())
+		    (sprintf "(after-build \"%s\" \"%s\" \"%s\")"
+		      (System.hostname ()) location fullname)
+		end
 	  | _-> assert false)
     | _ -> log_error "build_rh_package: wrong arguments"
 

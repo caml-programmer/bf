@@ -79,3 +79,9 @@ set_param ~default:"false" "composite-mode";;
 set_param ~default:(Sys.getcwd()) "start-dir";;
 set_param ~default:"low" "log-level";; (* low,high *)
 
+
+set_param ~default:"smtp-server" "localhost";;
+set_param ~default:"smtp-port" "25";;
+set_param ~default:"smtp-subject" "bf message";;
+set_param ~default:"smtp-from-name" "bf";;
+set_param ~default:"smtp-from-mail" "bf@notify";;

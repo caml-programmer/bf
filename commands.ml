@@ -12,7 +12,7 @@ let checkout_component component =
     | Branch key -> 
 	git_checkout ~force:true ~key ()
     | Current ->
-	git_checkout ~force:true ()
+	git_checkout ~force:true ~key:"master" ()
 
 let remove_component component =
   if System.is_directory component.name then
@@ -84,7 +84,7 @@ let prepare_component component =
 let prepare components =
   non_empty_iter prepare_component components
 
-let update_component component =
+let update_component component = (* todo: more smart implementation *)
   with_component_dir ~strict:true component
     (fun () ->
       git_pull (Filename.concat (Params.get_param "git-url") component.name);
@@ -364,8 +364,33 @@ let scm_create_link src dst =
   Snull
 
 let scm_is_directory s =
-  if System.is_directory (Scheme.string_of_sval s) 
+  if System.is_directory (Scheme.string_of_sval s)
   then Strue else Sfalse
+
+let scm_send_file_over_ssh src dst =
+  Rules.send_file_over_ssh
+    (Scheme.string_of_sval src)
+    (Scheme.string_of_sval dst);
+  Snull
+
+let scm_package_build_message v =
+  match Scheme.string_list_of_sval_array v with
+    | [host;location;pkgname;storage] ->
+	Sstring 
+	  (Notify.package_build_message
+	    ~host ~location ~pkgname ~storage)
+    | _  ->
+	log_error "Invalid package-build-message usage"
+
+let scm_send_message msg rcpts =
+  let content = Scheme.string_of_sval msg in
+  let recipients =
+    List.map Scheme.string_of_sval
+      (Scheme.list_of_sval rcpts) in
+  List.iter
+    (Notify.send_message ~content)
+    recipients;
+  Snull
 
 ;;
 
@@ -406,7 +431,8 @@ Ocs_env.set_pf1 Scheme.env scm_remove_directory "remove-directory";;
 Ocs_env.set_pf2 Scheme.env scm_create_symlink "create-symlink";;
 Ocs_env.set_pf2 Scheme.env scm_create_link "create-link";;
 Ocs_env.set_pf1 Scheme.env scm_is_directory "is-directory";;
-
+Ocs_env.set_pf2 Scheme.env scm_send_file_over_ssh "send-file-over-ssh";;
+Ocs_env.set_pf2 Scheme.env scm_send_message "send-message";;
 
 
 
