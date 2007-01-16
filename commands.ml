@@ -93,7 +93,6 @@ let update_component component = (* todo: more smart implementation *)
 	git_clean ();
 	git_pull ~refspec:branch (Filename.concat (Params.get_param "git-url") component.name))
       (git_branch ());
-      git_pull (Filename.concat (Params.get_param "git-url") component.name);
       git_track_new_branches ())
 
 let update components =
