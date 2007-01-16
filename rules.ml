@@ -114,7 +114,7 @@ let make args =
     | [] -> List.rev acc
     | (key,value)::tl ->
 	match value with
-	  | Some v -> prepare ((key^"="^v)::acc) tl
+	  | Some v -> prepare ((String.uppercase key^"="^v)::acc) tl
 	  | None   -> prepare (key::acc) tl
   in log_command "make" (prepare [] args)
 
