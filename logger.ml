@@ -26,6 +26,18 @@ let open_logfile () =
 let open_logger () =
   { port = open_logfile (); start_time = current_time () }
   
+let human_timestamp t =
+  let nano_sec =
+    int_of_float (t -. (floor t)) in
+  let tm = Unix.localtime t in
+  sprintf "%02d/%02d %02d:%02d:%02d %04d"
+    (tm.Unix.tm_mon+1)
+    tm.Unix.tm_mday
+    tm.Unix.tm_hour
+    tm.Unix.tm_min
+    tm.Unix.tm_sec
+    nano_sec
+
 let log_message ?key ?logger message =
   let timestamp = current_time () in
   let (starttime,port) =
@@ -35,8 +47,8 @@ let log_message ?key ?logger message =
   in 
   let s =
     match key with
-      | None   -> (sprintf "%f %f> %s\n"      starttime timestamp message)
-      | Some k -> (sprintf "%f %f> [%s] %s\n" starttime timestamp k message)
+      | None   -> (sprintf "%s> %s\n"      (human_timestamp timestamp) message)
+      | Some k -> (sprintf "%s> [%s] %s\n" (human_timestamp timestamp) k message)
   in
   output_string port s; flush port;
   output_string stdout s; flush stdout;
