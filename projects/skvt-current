@@ -1,0 +1,68 @@
+;; The old demo test:
+;;
+;; (define (composite)
+;;   '((demo (branch "jet"))
+;;     (sender (branch "master"))
+;;     (demo (tag "stable"))
+;;     (demo (tag "t1"))))
+;;
+
+;; ------------------------------
+;; For use it composite following
+;; packages must be preinstalled:
+;;
+;; - godi
+;; - godi-pcre
+;; - godi-ocamlnet
+;; - godi-getopt
+;; ...
+;; - ocamldbi
+;; ------------------------------
+
+(define (composite)
+  '((plt)
+    (mimer)
+    (ngramm)
+    (ngramm-maps)
+    (file-ng)
+    (icu)
+    (boost)
+    (log4cpp)
+    (cppunit)
+    (openssl)
+    (mod-ssl)
+    (mod-mzscheme)
+    (samba)
+    (daemontools)
+    (retranslator)
+    (action-server)
+    (pool-server)
+    (scheduler)
+    (logger)
+    (skvt-base)
+    (skvt-tools)
+    (skvt-dozor)
+    (postgresql)
+    (squid)
+    (wizor2)))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
