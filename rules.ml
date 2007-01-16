@@ -63,9 +63,11 @@ let build_rules () =
   Scheme.eval_code (fun _ -> ()) "(build ())"
     
 let install_rules () =
+  print_string "load plugins...";
   load_plugins ();
   clear_component_env ();
   Scheme.eval_file (rules_file ());
+  print_endline "ok";
   if Sys.file_exists ".bf-build" then
     Scheme.eval_code (fun _ -> ()) "(install ())"
   else
@@ -74,8 +76,16 @@ let install_rules () =
 
 (*** Component rules *)
 
+let simple_configure args =
+  log_command "./configure" args
+ 
+let simple_make args =
+  log_command "make" args
+
+let simple_install args =
+  log_command "make" ("install"::args)
+
 let export args =
-  print_endline "call-export";
   List.iter
     (fun (key,value) ->
       printf "export: %s=%s\n" key value;
@@ -101,14 +111,11 @@ let ac_configure args =
 	  | None   -> prepare (("--"^key)::acc) tl
   in log_command "./configure" (prepare [] args)
 
-
 let path_concat args =
   let rec concat acc = function
       [] -> acc
-    | hd::tl -> concat (acc@[Filename.concat hd]) tl
-  in concat [] args
-
-(* Files and directories *)
+    | hd::tl -> concat (Filename.concat acc hd) tl
+  in concat "" args
 
 let install_file file dir =
   with_logger

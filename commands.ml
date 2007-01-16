@@ -40,7 +40,7 @@ let with_component_dir ?(strict=true) component thunk =
   Params.update_param "label-type" label_type;
 
   log_message
-    (Printf.sprintf "=> with-component-dir(%s %s [%s])"
+    (Printf.sprintf "=> component (%s %s [%s])"
       (curdir ^ "/" ^ component.name) label_type label);
 
   let composite_mode =
@@ -189,18 +189,6 @@ let install_composite composite =
   install (components_of_composite composite)
 ;;
 
-(* Components support *)
-
-let simple_configure args =
-  log_command "./configure" args
- 
-let simple_make args =
-  log_command "make" args
-
-let simple_install args =
-  log_command "make" ("install"::args)
-  
-
 (* Scheme bindings *)
 
 let scm_prepare v =
@@ -215,20 +203,18 @@ let scm_rebuild v =
 let scm_install v =
   install (Scheme.components_of_sval_array v); Snull
 
+
 let scm_simple_configure v =
-  simple_configure (Scheme.string_list_of_sval_array v); Snull
+  Rules.simple_configure (Scheme.string_list_of_sval_array v); Snull
 
 let scm_simple_make v =
-  simple_make (Scheme.string_list_of_sval_array v); Snull
+  Rules.simple_make (Scheme.string_list_of_sval_array v); Snull
 
 let scm_simple_install v =
-  simple_install (Scheme.string_list_of_sval_array v); Snull
+  Rules.simple_install (Scheme.string_list_of_sval_array v); Snull
 
 let scm_export v =
-  print_endline "scm-export";
-  Rules.export (Scheme.env_list_of_sval v);
-  print_endline "scm-export done";
-  Snull
+  Rules.export (Scheme.env_list_of_sval v); Snull
 
 let scm_ac_configure v =
   Rules.ac_configure (Scheme.make_params_of_sval v); Snull
@@ -237,7 +223,10 @@ let scm_make v =
   Rules.make (Scheme.make_params_of_sval v); Snull
 
 let scm_path_concat v =
-  Rules.path_concat (Scheme.string_list_of_sval_array v); Snull
+  Sstring (Rules.path_concat (Scheme.string_list_of_sval_array v))
+
+
+
 
 ;;
 

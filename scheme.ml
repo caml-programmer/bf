@@ -105,6 +105,7 @@ let eval_pair v =
 
 let eval_pair_opt v =
   let (a,b) = v in
+  (* error b;*)
   (match a with
     | Ssymbol s -> s
     | Sstring s -> s
@@ -127,9 +128,15 @@ let make_pair f = function
 	    (match x.car with
 	      | Sstring s ->
 		  f (v.car,Sstring s)
-	      | sval ->
-		  f (v.car,sval)
-		    (*f (v.car,v.cdr)*))
+	      | Ssymbol n as sym ->
+		  (* Global variables handling *)
+		  (match Ocs_env.find_var env sym with
+		    | Some (Vglob g) ->
+			(match g.g_val with
+			  | Sstring s as gs -> f (v.car,gs)
+			  | _               -> f (v.car,sym))
+		    | _  ->  f (v.car,sym))
+	      | sval -> f (v.car,sval))
 	| Snull ->
 	    f (v.car,Snull)
 	| sval -> error sval)
@@ -142,15 +149,10 @@ let rec make_list acc = function
   | sval -> error sval
 
 let env_list_of_sval v =
-  let x = List.map (make_pair eval_pair) (make_list [] v) in
-  Printf.printf "len: %d" (List.length x);
-  List.iter (fun (a,b) ->
-    print_string a;
-    print_string "=";
-    print_endline b) x;
-  x
+  List.map (make_pair eval_pair) (make_list [] v)
 
 let make_params_of_sval v =
+  (* error v; *)
   List.map (make_pair eval_pair_opt) (make_list [] v)
 
 

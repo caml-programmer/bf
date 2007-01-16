@@ -19,14 +19,18 @@
 
 ;; make
 
-(define-syntax gmake
+(define-syntax gnu-make
   (syntax-rules ()
-    ((_)             (ml-make ()))
+    ((_ (e) (e1 e2) ...) (ml-make '((e ()) (e1 e2) ...)))
     ((_ (e1 e2) ...) (ml-make '((e1 e2) ...)))
     ((_ (e1 e2))     (ml-make '((e1 e2))))
     ((_ e1 e2)       (ml-make '((e1 e2))))
     ((_ (e))         (ml-make '((e ()))))
-    ((_ e)           (ml-make '((e ()))))))
+    ((_ e)           (ml-make '((e ()))))
+    ((_)             (ml-make ()))))
+
+;; tested:
+;; (make (install) (root top-dir))
 
 ;; export
 
