@@ -411,13 +411,18 @@ let copy_to_buildroot ?(builddir="builddir") ~top_dir files =
   let prepare s =
     System.create_directory_r s; s
   in
+  let clean_copy_dir src dst =
+    if System.is_directory dst then
+      remove_directory dst;	
+    System.copy_dir src dst
+  in
   let ch = open_in files in
   try
     while true do
       let raw = input_line ch in
       match parse_line raw with
 	| `File s      -> System.copy_file s (prepare (Filename.concat builddir s))
-	| `Dir s       -> System.copy_dir  s (prepare (Filename.concat builddir s))
+	| `Dir s       -> clean_copy_dir s (prepare (Filename.concat builddir s))
 	| `Empty_dir s -> System.create_directory_r (Filename.concat builddir s)
 	| `None        -> log_message (sprintf "copy_to_buildroot: skipped %s" raw)
     done

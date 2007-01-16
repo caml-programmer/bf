@@ -131,11 +131,13 @@ let copy_dir dir dest =
 let uname () =
   let ch = Unix.open_process_in "uname" in
   let name = String.lowercase (input_line ch) in
+  (try while true do ignore(input_line ch) done with End_of_file -> ());
   close_in ch; name
 
 let arch () =
   let ch = Unix.open_process_in "arch" in
   let name = input_line ch in
+  (try while true do ignore(input_line ch) done with End_of_file -> ());
   close_in ch; name
 
 let list_of_directory dir =
