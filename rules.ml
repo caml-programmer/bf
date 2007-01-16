@@ -43,10 +43,10 @@ let load_plugins () =
       Filename.concat start dir
   in
   if not (System.is_regular (Filename.concat plugdir "lib.scm")) then
-    raise (Not_found_plugins_directory dir);
-  
-  List.iter Scheme.eval_file
-    (System.with_prefix plugdir (System.list_of_directory plugdir))
+    raise (Not_found_plugins_directory dir);  
+  System.with_extension "scm"
+    Scheme.eval_file
+    (System.with_prefix plugdir (System.list_of_directory plugdir))    
 
 let load_composite file =
   let composite = ref None in
@@ -106,7 +106,7 @@ let get_env name =
     Some (Hashtbl.find component_environment name)
   with Not_found -> None
 
-let gnu_make args =
+let make args =
   let rec prepare acc = function
     | [] -> List.rev acc
     | (key,value)::tl ->
@@ -179,9 +179,60 @@ let read_directory dir =
 
 let with_dir dir f =
   let cur = Sys.getcwd () in
-  try    
+  try
+    Sys.chdir dir;
     let r = f () in
-    Sys.chdir cur; r
+    Sys.chdir cur;
+    r
   with exn ->
     Sys.chdir cur; raise exn
 
+let read_command cmd =
+  let ch = Unix.open_process_in cmd in
+  let rec read acc =
+    try
+      read (acc @ [input_line ch])
+    with End_of_file -> 
+      close_in ch; acc
+  in read []
+
+let replace_param key value content =
+  let key = String.uppercase key in
+  let rex =
+    Pcre.regexp 
+      ~flags:[`MULTILINE] ("^" ^ key ^ "\\s*=.*?$")
+  in Pcre.replace 
+       ~rex 
+       ~templ:(key ^ "=" ^ 
+       (match value with 
+	 | Some v -> v 
+	 | None -> "")) content
+
+let rec replace_params content = function
+  | [] -> content
+  | (key,value)::tl ->
+      replace_params (replace_param key value content) tl
+
+let update_make_params v =
+  let name = fst (List.hd v) in
+  let params = List.tl v in
+  let tmpname = name ^ ".tmp" in
+  let content =    
+    System.read_file ~file:name in
+  System.write_string
+    ~file:tmpname ~string:(replace_params content params);
+  Sys.rename tmpname name
+
+let move_file src dir =
+  let name = Filename.basename src in
+  let dst = Filename.concat dir name in
+  Sys.rename src dst
+
+let make_directory dir =
+  Unix.mkdir dir 0o755
+
+let move_directory src dst =
+  log_command (sprintf "mv %s %s" src dst) []
+  
+let create_symlink src dst =
+  Unix.link src dst

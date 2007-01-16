@@ -149,6 +149,18 @@ let read_lines ?(ignore_error=false) ?(filter=(fun _ -> true)) command =
       else acc
   in read []
 
+let with_extension ext f files =
+  List.iter
+    (fun file ->
+      try
+	let len = String.length file in
+	let pos = String.rindex file '.' in
+	if
+	  String.sub file (succ pos) (len - pos - 1) = ext
+	then f file
+      with Not_found -> ())
+    files
+
 
 (* old *)
 

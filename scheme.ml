@@ -24,6 +24,14 @@ let string_of_sval = function
 let string_list_of_sval_array v =
   List.map string_of_sval (Array.to_list v)
 
+let list_of_sval v =
+  let rec make acc = function      
+    | Snull -> acc
+    | Spair p ->
+	make (acc@[p.car]) p.cdr
+    | sval -> error sval
+  in make [] v
+
 let eval_file file =
   Ocs_prim.load_file env thread file
 
@@ -166,6 +174,20 @@ let unit_handler_of_sval v =
 	    | Some sval -> sval)
       | sval -> error sval)
 
+let string_handler_of_sval v =
+  (fun file ->
+    match v with
+	Sproc (p,e) ->
+	  let res = ref None in
+	  let handler sval =
+	    res := Some sval in	  		  
+	  Ocs_eval.eval thread handler
+	    (Capply1 ((Cval (Sproc (p,e))),Cval (Sstring file)));	  	  
+	  (match !res with
+	    | None -> error v
+	    | Some sval -> ())
+      | sval -> error sval)
+  
 
 
 

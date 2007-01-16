@@ -242,18 +242,15 @@ let scm_export v =
 let scm_ac_configure v =
   Rules.ac_configure (Scheme.make_params_of_sval v); Snull
     
-let scm_gnu_make v =
-  Rules.gnu_make (Scheme.make_params_of_sval v); Snull
+let scm_make v =
+  Rules.make (Scheme.make_params_of_sval v); Snull
 
 let scm_path_concat v =
   Sstring (Rules.path_concat (Scheme.string_list_of_sval_array v))
 
-let scm_string_concat v =
-  print_endline "scm-string-concat";
-  let r = Scheme.string_list_of_sval_array v in
-  print_endline "dddd";
-  let x = Sstring (Rules.string_concat r) in
-  print_endline "done"; x
+let scm_string_concat v =  
+  Sstring (Rules.string_concat 
+    (Scheme.string_list_of_sval_array v))
 
 let scm_log_command v =
   let l = Scheme.string_list_of_sval_array v in
@@ -276,6 +273,14 @@ let scm_with_dir dir f =
     (Scheme.string_of_sval dir)
     (Scheme.unit_handler_of_sval f)
 
+let scm_with_extension ext f files =
+  System.with_extension
+    (Scheme.string_of_sval ext)
+    (Scheme.string_handler_of_sval f)
+    (List.map Scheme.string_of_sval
+      (Scheme.list_of_sval files));
+  Snull
+
 let scm_file_exists file =
   if Sys.file_exists 
     (Scheme.string_of_sval file)
@@ -286,6 +291,48 @@ let scm_get_env name =
   match Rules.get_env (Scheme.string_of_sval name) with
     | Some v -> Sstring v
     | None   -> Sfalse
+
+let scm_read_command cmd =
+  scm_make_list (fun s -> Sstring s)
+    (Rules.read_command (Scheme.string_of_sval cmd))
+
+let scm_update_make_params v =
+  Rules.update_make_params (Scheme.make_params_of_sval v);
+  Snull
+
+let scm_current_directory () =
+  Sstring (Sys.getcwd ())
+
+let scm_uname () =
+  Sstring (List.hd (Rules.read_command "uname"))
+
+let scm_remove_file v =
+  List.iter Sys.remove
+    (Scheme.string_list_of_sval_array v);
+  Snull
+
+let scm_move_file file dir =
+  Rules.move_file 
+    (Scheme.string_of_sval file)
+    (Scheme.string_of_sval dir);
+  Snull
+
+let scm_make_directory dir =
+  Rules.make_directory 
+    (Scheme.string_of_sval dir);
+  Snull
+
+let scm_move_directory src dst =
+  Rules.move_directory
+    (Scheme.string_of_sval src)
+    (Scheme.string_of_sval dst);
+  Snull
+
+let scm_create_symlink src dst =
+  Rules.create_symlink
+    (Scheme.string_of_sval src)
+    (Scheme.string_of_sval dst);
+  Snull
 
 ;;
 
@@ -300,7 +347,8 @@ Ocs_env.set_pfn Scheme.env scm_simple_install "simple-install";;
 
 Ocs_env.set_pf1 Scheme.env scm_export "ml-export";;
 Ocs_env.set_pf1 Scheme.env scm_ac_configure "ml-ac-configure";;
-Ocs_env.set_pf1 Scheme.env scm_gnu_make "ml-gnu-make";;
+Ocs_env.set_pf1 Scheme.env scm_make "ml-make";;
+Ocs_env.set_pf1 Scheme.env scm_update_make_params "ml-update-make-params";;
 
 Ocs_env.set_pfn Scheme.env scm_log_command "log-command";;
 Ocs_env.set_pfn Scheme.env scm_path_concat "path-concat";;
@@ -308,9 +356,18 @@ Ocs_env.set_pfn Scheme.env scm_string_concat "string-concat";;
 Ocs_env.set_pf2 Scheme.env scm_install_file "install-file";;
 Ocs_env.set_pf1 Scheme.env scm_read_directory "read-directory";;
 Ocs_env.set_pf2 Scheme.env scm_with_dir "with-dir";;
+Ocs_env.set_pf3 Scheme.env scm_with_extension "with-extension";;
 Ocs_env.set_pf1 Scheme.env scm_file_exists "file-exists";;
 Ocs_env.set_pf1 Scheme.env scm_get_env "get-env";;
+Ocs_env.set_pf1 Scheme.env scm_read_command "read-command";;
+Ocs_env.set_pf0 Scheme.env scm_current_directory "current-directory";;
 
+Ocs_env.set_pf0 Scheme.env scm_uname "uname";;
+Ocs_env.set_pfn Scheme.env scm_remove_file "remove-file";;
+Ocs_env.set_pf2 Scheme.env scm_move_file "move-file";;
+Ocs_env.set_pf1 Scheme.env scm_make_directory "make-directory";;
+Ocs_env.set_pf2 Scheme.env scm_move_directory "move-directory";;
+Ocs_env.set_pf2 Scheme.env scm_create_symlink "create-symlink";;
 
 
 

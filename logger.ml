@@ -80,7 +80,7 @@ let log_command prog args =
       try
 	let program = with_path prog in
 	let environment = Shell_sys.current_env () in
-	Array.iter 
+	Array.iter
 	  (fun s ->
 	    (try
 	      let (key,value) = 

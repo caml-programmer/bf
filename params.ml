@@ -68,6 +68,7 @@ let used_composite_mode () =
 ;;
 
 set_param ~default:(Sys.getcwd()) "top-dir";;
+set_param ~default:(Sys.getcwd()) "dev-dir";;
 set_param ~default:((get_param "top-dir") ^ "/logs") "log-dir";;
 set_param ~default:"git://localhost/" "git-url";;
 set_param ~default:"/opt/dozor" "prefix";;

@@ -1,7 +1,7 @@
 ;; configure
 
 (define-syntax ac-configure
-  (syntax-rules ()    
+  (syntax-rules ()
     ((_ (e1 e2) ...) (ml-ac-configure '((e1 e2) ...)))
     ((_ (e1 e2))     (ml-ac-configure '((e1 e2))))
     ((_ e1 e2)       (ml-ac-configure '((e1 e2))))
@@ -22,13 +22,13 @@
 
 (define-syntax make
   (syntax-rules ()
-    ((_ (e) (e1 e2) ...) (ml-gnu-make '((e ()) (e1 e2) ...)))
-    ((_ (e1 e2) ...)     (ml-gnu-make '((e1 e2) ...)))
-    ((_ (e1 e2))         (ml-gnu-make '((e1 e2))))
-    ((_ e1 e2)           (ml-gnu-make '((e1 e2))))
-    ((_ (e))             (ml-gnu-make '((e ()))))
-    ((_ e)               (ml-gnu-make '((e ()))))
-    ((_)                 (ml-gnu-make '()))))
+    ((_ (e) (e1 e2) ...) (ml-make '((e ()) (e1 e2) ...)))
+    ((_ (e1 e2) ...)     (ml-make '((e1 e2) ...)))
+    ((_ (e1 e2))         (ml-make '((e1 e2))))
+    ((_ e1 e2)           (ml-make '((e1 e2))))
+    ((_ (e))             (ml-make '((e ()))))
+    ((_ e)               (ml-make '((e ()))))
+    ((_)                 (ml-make '()))))
 
 ;; tested:
 ;; (make (install) (root top-dir))
@@ -52,7 +52,17 @@
 ;; (export (HOST "localhost"))
 ;; (export (HOST "localhost") (PORT "22"))
 
+(define-syntax update-make-params
+  (syntax-rules ()
+    ((_ (e) (e1 e2) ...) (ml-update-make-params '((e ()) (e1 e2) ...)))
+    ((_  e  (e1 e2) ...) (ml-update-make-params '((e ()) (e1 e2) ...)))))
 
+;; tested:
+;; (update-make-params "make.params"
+;;                     (SRC_DIR (current-directory))
+;;                     (SKVT_HOME (path-concat top-dir "skvt"))
+;;                     (SKVT_BASE top-dir)
+;;                     (TARGET_FORMAT "zo"))
 
 
 

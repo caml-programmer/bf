@@ -15,30 +15,30 @@ let git_push ?refspec url =
     | Some spec -> log_command "git" ["push";url;spec]
     | None -> log_command "git" ["push";url]
 
-let git_checkout 
+let git_checkout
   ?(force=false)
   ?branch
   ?(modify=false)
   ?(track=false) ?key ?files () =
   let args = ref ["checkout"] in
   let add arg = args := !args @ [arg] in
-  if force  then add "-f";
-  if track  then add "--track";
+  if force then add "-f";
+  if track then add "--track";
   (match branch with Some b -> add "-b"; add b | None -> ());
   if modify then add "-m";
   (match key   with Some k -> add k | None -> ());
-  (match files with Some l -> List.iter add l | None -> ());  
+  (match files with Some l -> List.iter add l | None -> ());
   log_command "git" !args
 
 let git_branch ?(filter=(fun _ -> true)) ?(remote=false) () =
   try
     List.map
       (fun s -> String.sub s 2 ((String.length s) - 2))
-      (read_lines 
+      (read_lines
 	~filter:(fun s -> String.length s > 2 && filter s)
 	(if remote then "git branch -r" else "git branch"))
   with System.Error s -> log_error s
-    
+
 let strip_branch_prefix branch =
   let len = String.length branch in
   let pos = String.index branch '/' in
@@ -59,7 +59,8 @@ let git_track_new_branches () =
   List.iter
     (fun b ->
       if not (List.mem (strip_branch_prefix b) lb) then
-	git_track b) rb
+	git_track b) rb;
+  git_checkout ~force:true ~key:"master" ()
   
 let git_current_branch () =
   let current =
