@@ -1,0 +1,3 @@
+#!/bin/sh
+
+git pull && git clean && git checkout -f && ./configure && make opt && make install
