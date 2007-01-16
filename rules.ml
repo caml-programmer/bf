@@ -1,21 +1,32 @@
 open Logger
-open System
 open Printf
+
+exception Not_found_plugins_directory of string
 
 let rules_file () =
   Filename.concat (Sys.getcwd()) ".bf-rules"
 
 let load_plugins () =
-  print_endline "=> load plugins";
+  let dir = Params.get_param "plugins-dir" in
+  let plugdir =
+    let start = Params.get_param "start-dir" in    
+    if System.is_regular (Filename.concat dir "lib.scm") then
+      dir
+    else
+      Filename.concat start dir
+  in
+  if not (System.is_regular (Filename.concat plugdir "lib.scm")) then
+    raise (Not_found_plugins_directory dir);
+  
   List.iter Scheme.eval_file
-    (System.list_of_directory (Params.get_param "plugins-dir"))
+    (System.with_prefix plugdir (System.list_of_directory plugdir))
 
 let load_composite file =
   let composite = ref None in
   Scheme.eval_file file;
-  Scheme.eval_code (fun v -> composite := Some v) "(composition)";
+  Scheme.eval_code (fun v -> composite := Some v) "(composite)";
   match !composite with
-    | None -> log_error "composition handler is not called"
+    | None -> log_error "composite handler is not called"
     | Some v -> v
   
 let build_rules () =
@@ -39,11 +50,11 @@ let install_file file dir =
       if not (Sys.file_exists dir) then
 	begin
 	  log_message ~logger ("creating directory " ^ dir);
-	  create_directory_r dir
+	  System.create_directory_r dir
 	end;
-      let dest_file = Filename.concat dir (path_strip_directory file) in
+      let dest_file = Filename.concat dir (System.path_strip_directory file) in
       if Sys.file_exists dest_file then
 	Sys.remove dest_file;
-      copy_file file (Filename.concat dir (path_strip_directory file)))
+      System.copy_file file (Filename.concat dir (System.path_strip_directory file)))
 
 

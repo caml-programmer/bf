@@ -11,7 +11,7 @@ let git_pull url =
 let git_checkout ?key ?files () =
   match (key,files) with
     | None, None ->
-	log_command "git "["checkout"]
+	log_command "git" ["checkout"]
     | None, Some fl ->
 	log_command "git" ("checkout"::fl)
     | Some k, None ->
@@ -121,7 +121,7 @@ let git_tree_status component =
       let status =
 	git_diff ()
       in Sys.chdir cur;
-      if status then 
+      if status then
 	Exists
       else Be_set
     end

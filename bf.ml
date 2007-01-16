@@ -18,20 +18,20 @@ let make_component s =
 
 let analyze_arguments () =
   match Array.length Sys.argv with
-    | 1 -> usage ()
-    | 2 ->
+    | 1 | 2 -> usage ()
+    | 3 ->
 	let two = Sys.argv.(2) in
-	if Sys.file_exists two then
+	if Sys.file_exists two && System.is_regular two then
 	  Is_composite two
 	else
 	  Is_components [ make_component two ]
-    | 3 ->
+    | 4 ->
 	(match  Sys.argv.(3) with
 	  | "branch" | "tag" -> usage ()
 	  |  _ -> 
 	       Is_components 
 		[ make_component Sys.argv.(2); make_component Sys.argv.(3) ])
-    | 4 ->
+    | 5 ->
 	(match  Sys.argv.(3) with
 	  | "branch" ->
 	      Is_component_with_label
@@ -50,31 +50,37 @@ let analyze_arguments () =
 	Is_components
 	  (List.map make_component (List.tl (List.tl (Array.to_list Sys.argv))))	
 
+let main () =
+    if Array.length Sys.argv > 1 then
+      let action = Sys.argv.(1) in
+      match analyze_arguments () with
+	| Is_components components ->	  
+	    (match action with
+	      | "prepare" -> Commands.prepare components
+	      | "build"   -> Commands.build   components
+	      | "rebuild" -> Commands.rebuild components
+	      | "install" -> Commands.install components
+	      | _         -> usage ())
+	| Is_component_with_label component ->
+	    (match action with
+	      | "prepare" -> Commands.prepare [component]
+	      | "build"   -> Commands.build   [component]
+	      | "rebuild" -> Commands.rebuild [component]
+	      | "install" -> Commands.install [component]
+	      | _         -> usage ())
+	| Is_composite composite ->
+	    Params.set_composite_mode ();
+	    (match action with
+	      | "prepare" -> Commands.prepare_composite composite
+	      | "build"   -> Commands.build_composite   composite
+	      | "rebuild" -> Commands.rebuild_composite composite
+	      | "install" -> Commands.install_composite composite
+	      | _         -> usage ())
+    else usage ()
+
 let _ =
-  if Array.length Sys.argv > 1 then
-    let action = Sys.argv.(1) in
-    match analyze_arguments () with
-      | Is_components components ->
-	  (match action with
-	    | "prepare" -> Commands.prepare components
-	    | "build"   -> Commands.build   components
-	    | "rebuild" -> Commands.rebuild components
-	    | "install" -> Commands.install components
-	    | _         -> usage ())	  
-      | Is_component_with_label component ->
-	  (match action with
-	    | "prepare" -> Commands.prepare [component]
-	    | "build"   -> Commands.build   [component]
-	    | "rebuild" -> Commands.rebuild [component]
-	    | "install" -> Commands.install [component]
-	    | _         -> usage ())
-      | Is_composite composite ->
-	  Params.set_composite_mode ();
-	  (match action with
-	    | "prepare" -> Commands.prepare_composite composite
-	    | "build"   -> Commands.build_composite   composite
-	    | "rebuild" -> Commands.rebuild_composite composite
-	    | "install" -> Commands.install_composite composite
-	    | _         -> usage ())
-  else usage ()
-    
+  let current = Sys.getcwd () in
+  try
+    main ()
+  with exn ->
+    Sys.chdir current; raise exn

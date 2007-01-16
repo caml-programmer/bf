@@ -78,4 +78,5 @@ set_param ~default:"master" "label";;
 (* set_param ~default:"../composite" "composite-dir";; *)
 set_param ~default:"../plugins" "plugins-dir";;
 set_param ~default:"false" "composite-mode";;
+set_param ~default:(Sys.getcwd()) "start-dir";;
 

@@ -81,7 +81,7 @@ let with_component_dir component thunk =
 
   log_message
     (Printf.sprintf "=> with-component-dir(%s %s [%s])"
-      (curdir ^ "/" ^ component.name) label_type label); 
+      (curdir ^ "/" ^ component.name) label_type label);
   
   match worktree_analyze component with
     | Worktree_conflicted ->
@@ -134,10 +134,10 @@ let build components =
   non_empty_iter build_component components
 
 let rebuild_component component =
-  with_component_dir component
-    (fun () ->
-      if Sys.file_exists ".bf-build" then
-	Sys.remove ".bf-build");
+  let bf_build =
+    Filename.concat component.name ".bf-build" in
+  if Sys.file_exists bf_build then
+    Sys.remove bf_build;
   build_component component
 	  
 let rebuild components =
@@ -147,7 +147,7 @@ let install_component component =
   with_component_dir component
     (fun () ->
       if Sys.file_exists ".bf-install" then
-	log_message (component.name ^ "already installed, noting to do")
+	log_message (component.name ^ " already installed, noting to do")
       else
 	begin
 	  if not (Sys.file_exists ".bf-build") then
@@ -178,15 +178,19 @@ let components_of_composite composite =
   in iter [] composite
 
 let prepare_composite composite =
+  log_message ("=> prepare-composite " ^ composite);
   prepare (components_of_composite composite)
   
 let build_composite composite =
+  log_message ("=> build-composite " ^ composite);
   build (components_of_composite composite)
 
 let rebuild_composite composite =
+  log_message ("=> rebuild-composite " ^ composite);
   rebuild (components_of_composite composite)
 
 let install_composite composite =
+  log_message ("=> install-composite " ^ composite);
   install (components_of_composite composite)
 ;;
 

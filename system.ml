@@ -68,10 +68,20 @@ let transfer_file src dst =
     close_in a; close_out b
 
 let is_directory s =
-  let st = Unix.stat s in
-  match st.Unix.st_kind with
-    | Unix.S_DIR -> true
-    | _ -> false
+  try
+    let st = Unix.stat s in
+    match st.Unix.st_kind with
+      | Unix.S_DIR -> true
+      | _ -> false
+  with Unix.Unix_error(_,_,_) -> false
+
+let is_regular s =
+  try
+    let st = Unix.stat s in
+    match st.Unix.st_kind with
+      | Unix.S_REG -> true
+      | _ -> false
+  with Unix.Unix_error(_,_,_) -> false
 
 exception Cannot_remove_directory of string
 
