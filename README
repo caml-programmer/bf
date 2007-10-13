@@ -1,0 +1,501 @@
+*** Описание GIT-buildfarm ***
+
+Схема взаимодействия:
+
+ __________________________                          _________________________
+|                          |                        |                         |
+|      Git-repositary      |                        |        Build-Host       |
+|__________________________|                        |_________________________|      ____________
+       |                                                   |                        /            \
+       |- <component> >-------< clone,pull,push >----------|-< <working tree> >--< (   checkout   )
+       |- <component> >-------< clone,pull,push >----------|-< <working tree>       \____________/
+       |- <bf> --------------------------------------------|-> <build farm building>
+       |   ^                                               |
+       ~   |                                               ~
+           |
+ __________|_______________
+|                          |
+|     BF development       |
+|__________________________|
+
+
+Сборочная система представляет собой:
+
+- систему контроля версий git
+- git-репозитарий с набором компонентов
+- одну или несколько сборочных машин
+- утилиту bf, производяую сборку компонтов,
+  также хранящуюся в репозитории
+
+
+
+* Установка системы контроля версий *
+
+Система контроля версий git должна быть версии 1.5.x.y
+Установлена с помощью пакета в штатное место /usr/bin,
+либо собрана из исходников и установлена в каталог
+/opt/git, при этом необходимо каталог /opt/git/bin 
+добавить в PATH.
+
+Скачать исходные тексты можно с сайта http://git.or.cz
+
+Установка из исходников производится следующим образом:
+
+# make prefix=/opt/git
+# make prefix=/opt/git install
+
+
+
+* Подготовка сборочной среды, для сборки утилиты bf *
+
+Для сборки утилиты bf необходм компилятор языка
+Objective Caml и набор следующих пакетов к нему:
+pcre shell ocs ocamlnet.
+
+Наиболее простым способом установки компилятора
+и пакетов является использование GODI.
+
+Что такое GODI? Это система управления пакетами
+для компилятора Objective Caml, основанная на
+pkgsrc из NetBSD.
+
+Скачать godi-тарбол можно тут - http://godi.ocaml-programming.de
+
+Установка производится в две стадии:
+
+1) bootstrap.sh --prefix=/opt/godi
+
+Тут мы задем префикс для установки, традиционно используется
+/opt/godi, если необходимо, чтобы GODI был доступен всем
+пользователям системы, при необходимости ничто не мешает
+поставить его в своей домашний каталог.
+
+После завершения первой стадии небходимо установить
+переменные окружения PATH и MANPATH примерно следующим
+образом:
+
+echo 'export PATH=/opt/godi/bin:/opt/godi/sbin:$PATH' > /etc/profile.d/godi.sh
+echo 'export MANPATH=/opt/godi/man:$MANPATH' >> /etc/profile.d/godi.sh
+chmod +x /etc/profile.d/godi.sh
+
+2) bootstrap_stage2.sh
+
+На второй стадии потребуется подключение к Инетернет,
+хотя бы через прокси сервер, поэтому необходимо в таком
+случае заранее выставить переменные среды http_proxy и
+ftp_proxy для утилиты wget, которая используются
+по-умолчанию.
+
+Базовые настройки в GODI производятся в 
+файле: /opt/godi/etc/godi.conf
+
+После успешной установки в распоряжение
+должна появится утилита godi_console, с помощью,
+которой можно произовдить установку, переустановку
+и обновление пакетов.
+
+
+
+* Установка утилиты bf *
+
+Для сборки потребуются следующие 
+модули: pcre shell ocs smtp
+
+Установить их можно следующим способом:
+
+# godi_console perform -build godi-pcre
+# godi_console perform -build godi-ocamlnet
+# godi_console perform -build godi-ocs
+
+Далее скачиваем исходики bf:
+
+git clone http://caml.ru/repos/bf.git bf.git
+
+В отличии от godi_console, git использует
+curl для скачивания файлов, поэтому необходимые
+пременные окружения также должны быть выставлены.
+
+Переходим в катлог с исходными текстам и запускам сборку:
+
+cd bf.git
+./confgire /usr
+make opt
+
+Смотрим что получилось:
+
+$ ldd ./bf 
+        linux-gate.so.1 =>  (0xffffe000)
+        librt.so.1 => /lib/librt.so.1 (0xb7f07000)
+        libpcre.so.0 => /lib/libpcre.so.0 (0xb7ee0000)
+        libm.so.6 => /lib/libm.so.6 (0xb7ebb000)
+        libdl.so.2 => /lib/libdl.so.2 (0xb7eb7000)
+        libc.so.6 => /lib/libc.so.6 (0xb7d86000)
+        libpthread.so.0 => /lib/libpthread.so.0 (0xb7d6e000)
+        /lib/ld-linux.so.2 (0xb7f23000)
+
+Получилось хорошо, главное следить, чтобы libpcre.so какая-нибудь 
+левая не подцепилась, иначе придется делать симлинки (в случае идентичных
+версий с разными названиями), либо пересобирать модуль pcre c нужной 
+libpcre.so.
+
+Производим установку утилиты bf в каталог /usr/bin:
+
+$ su -c "make install"
+
+
+
+* Использование утилиты bf *
+
+
+Запуск утилиты bf без параметров выводит возможные варианты
+использования:
+
+Usage: bf (prepare|update|forward|[re]build|[re]install) <components>
+   or: bf (prepare|update|forward|[re]build|[re]install) <component> [branch <branch> | tag <tag>]
+   or: bf (prepare|update|forward|[re]build|[re]install) <composite>
+   or: bf pack <specdir> <version> <release>
+
+Где под <composite> подразумевается файл с определением функции composite,
+на языке Scheme, возвращающий список компонентов, над которым необходимо 
+произвести действия. Содержание этого файла может быть примерно следующим:
+
+--------------------------------------------------
+(define (composite)
+  '((icu)
+    (boost (tag "version/1.35"))
+    (log4cpp)
+    (cppunit)
+    (openssl)
+    (mod-ssl)
+    (squid (branch "light"))
+    (steel-collar (branch "polishing-stone"))))
+--------------------------------------------------
+Если branch или tag не указаны, то собирается HEAD 
+из ветки master.
+
+Технологический утилита bf представляет собой набор
+функций, которые могут потребоваться для сборки
+компонента со встроенным интерпретатором языка
+Scheme (R5RS). Таким образом в каждом ветке
+компонента в его корне должен хранится файл .bf-rules,
+содрежащий алгоритм сборки и установки на языке Scheme.
+
+Помимо стандартных функций Scheme, утилита bf предоставляет
+следующие функции для работы:
+
+
+(prepare-components "component1" ... "componentN")
+выполняет git clean -d -x для каждого компонента
+
+(build-components "component1" ... "componentN")
+запускает последовательно сборочное правило каждого
+компонента
+
+(rebuild-components "component1" ... "componentN")
+пересобирает ранее собранные компоненты, используется
+для обхода механизмов фиксации статусов компонентов
+
+(install-components "component1" ... "componentN")
+выполняет инструкции по установке для каждого
+компонента
+
+(reinstall-components "component1" ... "componentN")
+переустанавливает ранее установленные компоненты,
+используется для обхода механизмов фиксации статусов
+компонентов
+
+(simple-configure "arg1" ... "argN")
+выполняет команду configure arg1 ... argN  в каталоге компонента
+
+(simple-make "arg1" ... "argN")
+выполняет команду make в каталоге компонента
+
+(simple-install  "arg1" ... "argN")
+выполняет команду make install  arg1 ... argN в каталоге компонента
+
+(export (NAME1 "value1") (NAME2 "value2") ...)
+экспортирует переменные в локальное окружение компонента на момент сборки
+
+(ac-configure (name1 "value1") (name2 ()) ...)
+выполняет команду ./configure --name1=value1 --name2 ...
+
+(make (target)? (NAME1 "value1") (NAME2 "value2") ...)
+выполняет команду make <target> NAME1=value1 NAME2=value2 ...
+или make NAME1=value1 NAME2=value2 ...
+
+(update-make-params "updated.file" (NAME1 "value1") (NAME2 "value2") ...)
+побновлеет все переданные параметры в заданном файле
+
+(log-command "cmd" "arg1" ... "argN")
+запускает команду на исполнение с аргументами
+
+(path-concat "path1" ... "pathN")
+производит формирование пути из нескольких частей
+
+(string-concat "string1" "string2" ...)
+аналог string-append, в принципе не нужен
+
+(install-file "file" "directory")
+инсталлирует файл в заданную директорию, если
+директория не существует, она создается с 
+правами 775
+
+(read-directory "directory")
+читает список файлов в директории
+
+(with-dir "directory" (lambda ()))
+выполнение lambda-функции в заданной
+директории
+
+(with-extension "extension" (lambda (file)))
+выполнение действий над файлами с заданным
+расширением в текущей директории
+
+(file-exists "file")
+проверка существования файла (директория является файлом)
+
+(get-env "NAME")
+получение значения заданной переменной окружения,
+если переменная не задана, возвращается пустая строка
+
+(read-command "command-with-args")
+возращает результат выполнения команды в виде
+списка строк
+
+(current-directory)
+возвражает текущую директорию
+
+(uname)
+возвращет результат выполнения команды uname
+
+(arch)
+возвращает результат выполнения команды arch
+
+(remove-file "file1" ... "fileN")
+удаляет заданные файлы
+
+(move-file "file" "directory")
+перемещает файл в директорию
+
+(make-directory "dir1" ... "dirN")
+создает заданные директории рекурсивно "mkdir -p ..."
+
+(move-directory "dirsrc" "dirdst")
+перемещает директорию
+
+(remove-directory "directory")
+удаляет заданную директорию
+
+(create-symlink "src" "dst")
+создает символьную ссылку
+
+(create-link "src" "dst")
+создает жесткую ссылку
+
+(is-directory "dir")
+проверка, является ли файл директорей
+
+Полный список функций всегда можно посмотреть
+в исходных текстах в файле commands.ml
+
+
+* Запуск сборки нового проекта *
+
+Для этого необходимо выделить директорию
+для сборки и прописать файл .bf-params,
+в котором будут переопределены переменные,
+используемые в процессе сборки.
+
+Список переменных по-умолчанию можно получить
+следующим образом:
+
+$ grep ^set_param params.ml
+
+set_param ~default:(Sys.getcwd()) "top-dir";;
+set_param ~default:(Sys.getcwd()) "dev-dir";;
+set_param ~default:"logs" "log-dir";;
+set_param ~default:"git://localhost/" "git-url";;
+set_param ~default:"bf" "component";;
+set_param ~default:"branch" "label-type";;
+set_param ~default:"master" "label";;
+set_param ~default:"." "plugins-dir";;
+set_param ~default:"false" "composite-mode";;
+set_param ~default:(Sys.getcwd()) "start-dir";;
+set_param ~default:"low" "log-level";; (* low,high *)
+set_param ~default:"" "make-opts";;
+set_param ~default:"localhost" "smtp-server";;
+set_param ~default:"25" "smtp-port";;
+set_param ~default:"bf message" "smtp-subject";;
+set_param ~default:"bf" "smtp-from-name";;
+set_param ~default:"bf@notify" "smtp-from-mail";;
+
+Типичный .bf-params может выглядеть
+следующим образом:
+
+git-url ssh://user@host/repos/project/components
+top-dir /opt/project
+dev-dir /opt/devel
+make-opts -j2
+log-level high
+
+При этом переменная top-dir используется в файлах
+.bf-rules как prefix, а dev-dir как место, куда
+устанавливать ненужные для дальнейшей пакетизации
+файлы (например файлы документации или заголовочные 
+файлы).
+
+Параметр make-ops добавляет опции при вызове
+каждого make в .bf-rules. Многопроцессорных системах
+удобно использовать опцию -j утилиты make.
+
+Параметр log-level указывает выводить ли низкоуровневый
+процесс сборки на консоль.
+
+Параметр plugins-dir указывает директорию, где
+лежат плагины на языке Scheme, для того, чтобы
+плагины подключились, там должен сушествовать
+файл lib.scm, при этом плагины могут загружаться
+в произвольном порядке и не должны быть
+зависимы в этом плане друг от друга (для 
+динамического языка Scheme это вроде не проблема).
+
+Все параметры глобальные и нативно доступны в
+.bf-rules, как переменные языка Scheme.
+
+Для удобства написания правил в файлах .bf-rules
+были заданы несколько предустановленных макросов
+для export, ac-configure, make, update-make-params.
+Варианты их использования можно посмотреть в файле
+plugins/lib.scm
+
+В дальнейшем макросы будут переписаны на рекурсивные, 
+чтобы обрабатывать более разнообразные синтаксы,
+например когда пара значений и одно значение постоянно
+чередуются в списке аргументов.
+
+
+
+* Пакетирование *
+
+Для сборки пакетов используется действие bf pack,
+у которого три аргумента: specdir, version и release.
+
+Формат specdir следующий:
+
+Файл: hooks.scm - набор хуков, например:
+(define (after-build host location pkgname)
+  (let ((storage "root@host:/var/tmp"))
+    (send-file-over-ssh
+     (path-concat location pkgname) storage)
+    (send-file-over-ssh
+     (path-concat location pkgname) "user@192.168.13.12:/var/tmp")
+    (send-message
+     (string-append "Package " pkgname)
+     (package-build-message host location pkgname storage)
+     (map (lambda (goblin)
+            (string-append goblin "@oper.nu"))
+          '("masha" "roma" "choops")))))
+
+Файл: rh.files - список файлов в формате RPM-spec, например
+%topdir/bin/
+%dir %topdir/var
+
+Файл: rh.req  - скрипт, генерирующий зависимости, например:
+#!/bin/bash
+/usr/lib/rpm/find-requires \
+| sed -e 's/BEGIN;.*//' \
+| sed -e 's/perl.*//' \
+| sed -e 's/cppunit.*//' \
+| sed -e 's/libpcre.*//' \
+| sed -e 's/^lib$//' \
+| sed -e 's#/usr/bin/##'
+
+Файл rh.spec - RPM-спецификация (набор используемых подстановочных символов можно посмотреть в функции rpmbuild в rules.ml)
+Файл version - файл с номером версии, пока 1.0
+
+
+Соответственно, для того чтобы успешно работала функция:
+
+(send-file-over-ssh <local-source> <remote-destination>)
+
+Необходмо подложить ssh ключи, например с помощью
+такой утилиты:
+
+$ cat /usr/local/bin/make-autologin
+#!/bin/sh
+
+if [ "$1" = "" ]; then
+    echo "Usage: make-autologin user@host"
+    exit 1
+fi
+
+if [ ! -f "$HOME/.ssh/id_rsa.pub" ]; then
+    ssh-keygen -t rsa
+fi
+
+ssh-copy-id -i $HOME/.ssh/id_rsa.pub $1
+
+Если же в вашей системе нет утилиыт ssh-copy-id, то
+можно её также положить в /usr/local/bin:
+
+$ cat /usr/bin/ssh-copy-id 
+#!/bin/sh
+
+# Shell script to install your identity.pub on a remote machine
+# Takes the remote machine name as an argument.
+# Obviously, the remote machine must accept password authentication,
+# or one of the other keys in your ssh-agent, for this to work.
+
+ID_FILE="${HOME}/.ssh/identity.pub"
+
+if [ "-i" = "$1" ]; then
+  shift
+  # check if we have 2 parameters left, if so the first is the new ID file
+  if [ -n "$2" ]; then
+    if expr "$1" : ".*\.pub" ; then
+      ID_FILE="$1"
+    else
+      ID_FILE="$1.pub"
+    fi
+    shift         # and this should leave $1 as the target name
+  fi
+else
+  if [ x$SSH_AUTH_SOCK != x ] ; then
+    GET_ID="$GET_ID ssh-add -L"
+  fi
+fi
+
+if [ -z "`eval $GET_ID`" ] && [ -r "${ID_FILE}" ] ; then
+  GET_ID="cat ${ID_FILE}"
+fi
+
+if [ -z "`eval $GET_ID`" ]; then
+  echo "$0: ERROR: No identities found" >&2
+  exit 1
+fi
+
+if [ "$#" -lt 1 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+  echo "Usage: $0 [-i [identity_file]] [user@]machine" >&2
+  exit 1
+fi
+
+{ eval "$GET_ID" ; } | ssh $1 "umask 077; test -d .ssh || mkdir .ssh ; cat >> .ssh/authorized_keys" || exit 1
+
+cat <<EOF
+Now try logging into the machine, with "ssh '$1'", and check in:
+
+  .ssh/authorized_keys
+
+to make sure we haven't added extra keys that you weren't expecting.
+
+EOF
+
+
+Ну а далее просто запускаю следующую команду на машине, 
+на которой должна запускаться send-file-over-ssh:
+
+$ make-autologin user@host
+
+Ввожу пароль и всё работает.
+
+
