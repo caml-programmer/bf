@@ -1,0 +1,11 @@
+(define (build args)
+  (with-dir "source"
+	    (lambda ()
+	      (ac-configure (prefix dev-dir)
+			    (libdir (path-concat top-dir "lib")))
+	      (simple-make))))
+
+(define (install args)
+  (with-dir "source"
+	    (lambda ()
+	      (simple-install))))

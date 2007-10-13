@@ -1,0 +1,7 @@
+(define (build args)
+  (prepare-components '(apache))
+  (ac-configure
+   (with-apache "../apache")))
+
+(define (install args)
+  (install-components '(apache)))

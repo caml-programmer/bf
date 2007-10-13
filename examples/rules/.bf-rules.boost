@@ -1,0 +1,15 @@
+(define (build args)
+  (ac-configure
+   (prefix top-dir)
+   (libdir (path-concat top-dir "lib"))
+   (includedir (path-concat dev-dir "include"))
+   (with-icu dev-dir)
+   (with-libraries "program_options,filesystem,thread,date_time,serialization,regex,graph,iostream"))
+  (simple-make))
+
+(define (install args)
+  (export (ICU_LINK (string-concat "-L" top-dir "/lib")))
+  (simple-install)
+  (create-symlink
+   (path-concat dev-dir "include/boost-1_35/boost")
+   (path-concat dev-dir "include/boost")))

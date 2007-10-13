@@ -1,0 +1,11 @@
+(define (build args)
+  (remove-file "Makefile.bak")
+  (if (eqv? (arch) "x86_64")
+      (log-command "./config" "shared" "-fPIC" (string-append "--prefix=" top-dir))
+      (log-command "./config" "-fPIC" (string-concat "--prefix=" top-dir)))
+  (export (CFLAGS ())
+          (CXXFLAGS ()))
+  (make))
+
+(define (install args)
+  (simple-install))

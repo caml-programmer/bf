@@ -1,0 +1,51 @@
+(define (build args)
+  (export (LD_SHLIB "gcc"))
+  (let ((config
+         '((prefix top-dir)
+           (datadir (path-concat top-dir "share/apache"))
+           (logfiledir (path-concat top-dir "var/log/httpd"))
+           (sysconfdir (path-concat top-dir "etc/httpd"))
+           (runtimedir (path-concat top-dir "var/run"))
+           (proxycachedir (path-concat top-dir "var/proxy"))
+           (libexecdir (path-concat top-dir "lib/apache"))
+           (localstatedir (path-concat top-dir "var"))
+           (includedir (path-concat top-dir "include/apache"))
+           (enable-module "access")
+           (enable-module "actions")
+           (enable-module "alias")
+           (enable-module "auth")
+           (enable-module "cern_meta")
+           (enable-module "cgi")
+           (enable-module "env")
+           (enable-module "dir")
+           (enable-module "digest")
+           (enable-module "log_agent")
+           (enable-module "mime_magic")
+           (enable-module "log_config")
+           (enable-module "log_referer")
+           (enable-module "mime")
+           (enable-module "setenvif")
+           (enable-module "negotiation")
+           (enable-module "rewrite")
+           (enable-module "expires")
+           (enable-module "asis")
+           (enable-module "include")
+           (enable-module "imap")
+           (enable-shared "max"))))
+    (if (and (file-exists "../mod-ssl/.bf-build")
+             (file-exists "../openssl/.bf-build"))
+        (begin
+          (export (SSL_BASE "../openssl"))
+          (ml-ac-configure
+           (cons '(enable-module "ssl") config)))
+        (ml-ac-configure config))
+  (make)))
+
+(define (install args)
+  (make (install)))
+
+
+
+
+
+

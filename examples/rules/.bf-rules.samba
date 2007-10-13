@@ -1,0 +1,22 @@
+(define (build args)
+  (with-dir "source"
+            (lambda ()
+              (ac-configure
+               (prefix top-dir)
+               (disable-cups ())
+               (with-fhs ())
+               (with-ldap ())
+               (with-ads ())
+               (with-winbind ())
+               (with-aio-support ())
+               (with-privatdir (path-concat top-dir "etc/samba"))
+               (with-configdir (path-concat top-dir "etc/samba"))
+               (with-lockdir (path-concat top-dir "var/lock"))
+               (with-piddir (path-concat top-dir "var/run"))
+               (with-logfilebasedir (path-concat top-dir "var/log/samba")))
+            (make))))
+
+(define (install args)
+  (with-dir "source"
+            (lambda ()
+              (simple-install))))
