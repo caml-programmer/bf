@@ -199,7 +199,7 @@ let changelog_component buf tag_a tag_b component =
       if String.length log > 2 then
 	begin
 	  Buffer.add_string buf
-	    (Printf.sprintf "=> component: %s\n" component.name);
+	    (Printf.sprintf "*** Component %s\n\n" (String.uppercase component.name));
 	  Buffer.add_string buf log
 	end)
 
