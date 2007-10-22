@@ -17,7 +17,16 @@ let git_push ?refspec url =
     | None -> log_command "git" ["push";url]
 
 let git_tag tag =
-  log_command "git" ["tag";"-a";"-m";tag;tag]
+  let error_handler ps =
+    match ps with
+	Unix.WEXITED 128 ->
+	  log_message (sprintf "tag %s already exists" tag)
+      | _ ->
+	  log_message ("cannot create tag: " ^ tag);
+	  exit 2
+  in log_command 
+       ~error_handler 
+       "git" ["tag";"-a";"-m";tag;tag]
 
 let git_checkout
   ?(force=false)

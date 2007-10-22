@@ -90,7 +90,7 @@ let linearization s =
       s.[i] <- ' ';
   done; s
 
-let log_command prog args =
+let log_command ?error_handler prog args =
   let out_buf = Buffer.create 256 in
   let err_buf = Buffer.create 256 in
   with_logger
@@ -129,14 +129,23 @@ let log_command prog args =
 	  (fun (cmd,ps) ->
 	    (match ps with
 	      | Unix.WEXITED rc ->
-		  log_message ~logger (sprintf "failed: %d" rc);
-		  exit rc
+		  (match error_handler with
+		      Some f -> f ps
+		    | None ->
+			log_message ~logger (sprintf "failed: %d" rc);
+			exit rc)
 	      | Unix.WSIGNALED n -> 
-		  log_message ~logger (sprintf "killed: %d" n);
-		  exit n
+		  (match error_handler with
+		      Some f -> f ps
+		    | None ->			
+			log_message ~logger (sprintf "killed: %d" n);
+			exit n)
 	      | Unix.WSTOPPED n ->
-		  log_message ~logger (sprintf "stopped: %d" n);
-		  exit n))
+		  (match error_handler with
+		      Some f -> f ps
+		    | None ->
+			log_message ~logger (sprintf "stopped: %d" n);
+			exit n)))
 	  errors)
     
 let log_error error =
