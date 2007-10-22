@@ -169,11 +169,12 @@ let reinstall components =
 let tag_component tag component =
   with_component_dir ~strict:false component
     (fun () ->
+      let url = 
+	Filename.concat
+	  (Params.get_param "git-url") component.name in
       git_tag tag;
-      git_pull
-	(Filename.concat
-	  (Params.get_param "git-url")
-	  component.name))
+      git_push url;
+      git_pull url)
 
 let make_tag tag components =
   non_empty_iter (tag_component tag) components
