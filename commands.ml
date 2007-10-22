@@ -172,9 +172,13 @@ let tag_component tag component =
       let url = 
 	Filename.concat
 	  (Params.get_param "git-url") component.name in
-      git_tag tag;
-      git_push ~refspec:tag url;
-      git_pull url)
+      match git_current_branch () with
+	  Some branch ->
+	    git_tag tag;
+	    git_push ~refspec:tag url;
+	    git_pull ~refspec:branch url
+	| None ->
+	    log_error ("cannot find current branch for " ^ component.name))
 
 let make_tag tag components =
   non_empty_iter (tag_component tag) components
