@@ -12,6 +12,8 @@ let usage () =
   print_endline "   or: bf (prepare|update|forward|[re]build|[re]install) <component> [branch <branch> | tag <tag>]";
   print_endline "   or: bf (prepare|update|forward|[re]build|[re]install) <composite>";
   print_endline "   or: bf pack <specdir> <version> <release>";
+  print_endline "   or: bf tag <composite> <tag>";
+  print_endline "   or: bf diff <composite> <tag-a> <tag-b>";
   print_endline "   or: bf log <logdir>";
   exit 1
 
@@ -68,6 +70,14 @@ let main () =
 	| "log" ->
 	    if len = 2 then
 	      Rules.log_wizor Sys.argv.(2)
+	    else usage ()
+	| "tag" ->
+	    if len = 4 then
+	      Commands.tag_composite Sys.argv.(2) Sys.argv.(3)
+	    else usage ()
+	| "diff" ->
+	    if len = 5 then
+	      Commands.diff_composite Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	    else usage ()
 	| _ ->
 	    (match analyze_arguments () with

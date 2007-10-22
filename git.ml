@@ -1,6 +1,7 @@
 open Types
 open Logger
 open System
+open Printf
 
 let git_clone url name =
   log_command "git" ["clone";"-n";"-q";url;name]
@@ -14,6 +15,9 @@ let git_push ?refspec url =
   match refspec with
     | Some spec -> log_command "git" ["push";url;spec]
     | None -> log_command "git" ["push";url]
+
+let git_tag tag =
+  log_command "git" ["tag";"-a";"-m";tag;tag]
 
 let git_checkout
   ?(force=false)
@@ -86,6 +90,20 @@ let git_diff ?tag () =
     close_in ch; true 
   with End_of_file ->
     close_in ch; false
+
+let git_diff_view ~tag_a ~tag_b =
+  let cmd =
+    sprintf "git diff %s %s" tag_a tag_b in
+  let buf = Buffer.create 64 in
+  let ch = Unix.open_process_in cmd in
+  (try
+    while true do
+      Buffer.add_string buf (input_line ch);
+      Buffer.add_string buf "\n";
+    done; close_in ch
+  with End_of_file ->
+    close_in ch);
+  Buffer.contents buf
 
 let git_tag_list () =
   try

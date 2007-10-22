@@ -166,6 +166,23 @@ let reinstall_component component =
 let reinstall components =
   non_empty_iter reinstall_component components
 
+let tag_component tag component =
+  with_component_dir ~strict:false component
+    (fun () ->
+      git_tag tag)
+
+let make_tag tag components =
+  non_empty_iter (tag_component tag) components
+
+let diff_component tag_a tag_b component =
+  with_component_dir ~strict:false component
+    (fun () ->
+      print_endline (git_diff_view ~tag_a ~tag_b))
+
+let make_diff tag_a tag_b components =
+  non_empty_iter (diff_component tag_a tag_b) components
+
+
 let components_of_composite composite =
   let composite = Rules.load_composite composite in
   let rec iter acc = function
@@ -206,6 +223,15 @@ let install_composite composite =
 let reinstall_composite composite =
   log_message ("=> reinstall-composite " ^ composite);
   reinstall (components_of_composite composite)
+
+let tag_composite composite tag =
+  log_message ("=> tag-composite " ^ composite ^ " " ^ tag);
+  make_tag tag (components_of_composite composite)
+
+let diff_composite composite tag_a tag_b =
+  log_message ("=> diff-composite " ^ composite ^ " " ^ tag_a ^ ":" ^ tag_b);
+  make_diff tag_a tag_b (components_of_composite composite)
+
 ;;
 
 (* Utils *)
