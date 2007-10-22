@@ -194,6 +194,8 @@ let make_diff tag_a tag_b components =
 let changelog_component buf tag_a tag_b component =
   with_component_dir ~strict:false component
     (fun () ->
+      Buffer.add_string buf
+      (Printf.sprintf "*** COMPONENT %s ***\n\n" component.name);
       Buffer.add_string buf (git_log tag_a tag_b))
 
 let make_changelog tag_a tag_b components =
