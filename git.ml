@@ -28,6 +28,20 @@ let git_tag tag =
        ~error_handler 
        "git" ["tag";"-a";"-m";tag;tag]
 
+let git_log tag_a tag_b =
+  let cmd =
+    sprintf "git log -p %s..%s" tag_a tag_b in
+  let buf = Buffer.create 64 in
+  let ch = Unix.open_process_in cmd in
+  (try
+    while true do
+      Buffer.add_string buf (input_line ch);
+      Buffer.add_string buf "\n";
+    done; close_in ch
+  with End_of_file ->
+    close_in ch);
+  Buffer.contents buf
+
 let git_checkout
   ?(force=false)
   ?branch

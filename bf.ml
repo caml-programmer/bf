@@ -11,9 +11,9 @@ let usage () =
   print_endline "Usage: bf (prepare|update|forward|[re]build|[re]install) <components>";
   print_endline "   or: bf (prepare|update|forward|[re]build|[re]install) <component> [branch <branch> | tag <tag>]";
   print_endline "   or: bf (prepare|update|forward|[re]build|[re]install) <composite>";
+  print_endline "   or: bf (diff|changelog) <composite> <tag-a> <tag-b>";
   print_endline "   or: bf pack <specdir> <version> <release>";
   print_endline "   or: bf tag <composite> <tag>";
-  print_endline "   or: bf diff <composite> <tag-a> <tag-b>";
   print_endline "   or: bf log <logdir>";
   exit 1
 
@@ -78,6 +78,10 @@ let main () =
 	| "diff" ->
 	    if len = 5 then
 	      Commands.diff_composite Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
+	    else usage ()
+	| "changelog" ->
+	    if len = 5 then
+	      Commands.changelog_composite Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	    else usage ()
 	| _ ->
 	    (match analyze_arguments () with

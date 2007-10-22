@@ -191,6 +191,19 @@ let diff_component tag_a tag_b component =
 let make_diff tag_a tag_b components =
   non_empty_iter (diff_component tag_a tag_b) components
 
+let changelog_component buf tag_a tag_b component =
+  with_component_dir ~strict:false component
+    (fun () ->
+      Buffer.add_string buf (git_log tag_a tag_b))
+
+let make_changelog tag_a tag_b components =
+  let buf = Buffer.create 512 in
+  non_empty_iter
+    (changelog_component buf tag_a tag_b) components;
+  Notify.send_message
+    ~subject:(Printf.sprintf "bf@changelog %s -> %s" tag_a tag_b)
+    ~content:(Buffer.contents buf)
+    (Params.get_param "smtp-notify-email")
 
 let components_of_composite composite =
   let composite = Rules.load_composite composite in
@@ -240,6 +253,10 @@ let tag_composite composite tag =
 let diff_composite composite tag_a tag_b =
   log_message ("=> diff-composite " ^ composite ^ " " ^ tag_a ^ ":" ^ tag_b);
   make_diff tag_a tag_b (components_of_composite composite)
+
+let changelog_composite composite tag_a tag_b =
+  log_message ("=> changelog-composite " ^ composite ^ " " ^ tag_a ^ ":" ^ tag_b);
+  make_changelog tag_a tag_b (components_of_composite composite)
 
 ;;
 
