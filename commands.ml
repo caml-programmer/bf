@@ -173,8 +173,8 @@ let tag_component tag component =
 	Filename.concat
 	  (Params.get_param "git-url") component.name in
       git_tag tag;
-      git_push url;
-      git_pull url)
+      git_push ~refspec:tag url;
+      git_pull ~refspec:tag url)
 
 let make_tag tag components =
   non_empty_iter (tag_component tag) components
