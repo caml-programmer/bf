@@ -94,6 +94,7 @@ let remove_directory dir =
   let rc = Sys.command (sprintf "rm -rf %s" dir) in
   if rc <> 0 then raise (Cannot_remove_directory dir)
 
+
 let transfer_file src dst =
   let a = open_in_bin src in
   let b = open_out_bin dst in
@@ -104,13 +105,21 @@ let transfer_file src dst =
   with End_of_file ->
     close_in a; close_out b
 
+let copy_perm orig target =
+  Unix.chmod target
+    (Unix.stat orig).Unix.st_perm
+
 let copy_file file dest =
   let name = Filename.basename file in
   if is_directory dest then
     let dest_file = Filename.concat dest name in
-    transfer_file file dest_file
+    transfer_file file dest_file;
+    copy_perm file dest_file
   else
-    transfer_file file dest
+    begin
+      transfer_file file dest;
+      copy_perm file dest
+    end
 
 let transfer_dir src dst =
   let rc = Sys.command (sprintf "cp -arf %s %s" src dst) in
