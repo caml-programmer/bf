@@ -1,0 +1,12 @@
+#!/bin/sh
+
+if [ "$1" = "" ]; then
+    echo "Usage: make-autologin user@host"
+    exit 1
+fi
+
+if [ ! -f "$HOME/.ssh/id_rsa.pub" ]; then
+    ssh-keygen -t rsa
+fi
+
+ssh-copy-id -i $HOME/.ssh/id_rsa.pub $1
