@@ -417,7 +417,7 @@ let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
 	Pcre.replace ~pat:"%dir " ~templ:""
 	  (Pcre.replace ~pat:"%topdir" ~templ:top_dir
 	    (Pcre.replace
-	      ~pat:"%config(noreplace) %topdir"
+	      ~pat:"%config\\(noreplace\\) %topdir"
 	      ~templ:top_dir s))
       in 
       let m = 
