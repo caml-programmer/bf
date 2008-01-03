@@ -457,6 +457,12 @@ let scm_send_message subj msg rcpts =
     recipients;
   Snull
 
+let scm_write_file src dst =
+  System.write_string
+    ~file:(Scheme.string_of_sval src)
+    ~string:(Scheme.string_of_sval dst);
+  Snull
+
 ;;
 
 Ocs_env.set_pfn Scheme.env scm_prepare "prepare-components";;
@@ -499,6 +505,6 @@ Ocs_env.set_pf1 Scheme.env scm_is_directory "is-directory";;
 Ocs_env.set_pf2 Scheme.env scm_send_file_over_ssh "send-file-over-ssh";;
 Ocs_env.set_pfn Scheme.env scm_package_build_message "package-build-message";;
 Ocs_env.set_pf3 Scheme.env scm_send_message "send-message";;
-
+Ocs_env.set_pf2 Scheme.env scm_write_file "write-file";;
 
 
