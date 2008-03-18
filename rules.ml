@@ -409,7 +409,7 @@ let rpmbuild
       else
 	begin
 	  let _ =
-	    Unix.execvp "rpmbuild" (Array.of_list !args) in
+	    Unix.execvp "rpmbuild" (Array.of_list ("rpmbuild"::!args)) in
 	  exit 0
 	end
     end
