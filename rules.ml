@@ -383,21 +383,36 @@ let rpmbuild
   define "rhsys" platform;
   define "findreq" findreq;
   define "_unpackaged_files_terminate_build" "0";
+
   let cmd = "rpmbuild " ^ (String.concat " " !args) in
+
   log_message (sprintf "run: %s" cmd);
+  
   let fullname =
     sprintf "%s-%s-%s.%s.%s.rpm"
       pkgname version release platform arch in
   if Sys.file_exists (Filename.concat location fullname) then
     location,fullname
-  else    
-    match Unix.system cmd with
-      | Unix.WEXITED 0 ->
-	  location,fullname
-      | _ ->
-	  log_error
-	    (sprintf "Cannot build package: %s/%s" location fullname)
-	    
+  else
+    begin
+      let pid = Unix.fork () in
+      if pid > 0 then
+	begin
+	  match Unix.waitpid [] pid with
+	    | n,Unix.WEXITED 0 ->
+		location,fullname
+	    | n,_ ->
+		log_error
+		  (sprintf "Cannot build package: %s/%s" location fullname)
+	end
+      else
+	begin
+	  let _ = 
+	    Unix.execve "rpmbuild" (Array.of_list !args) in
+	  exit 0	  
+	end
+    end
+
 type content =
     [
     | `File of string
