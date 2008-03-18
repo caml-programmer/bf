@@ -385,7 +385,9 @@ let rpmbuild
   define "findreq" findreq;
   define "_unpackaged_files_terminate_build" "0";
 
-  let cmd = "rpmbuild " ^ (String.concat " " !args) in
+  let cmd = 
+    sprintf "rpmbuild %s" 
+      (String.concat " " (List.map (fun x -> "'" ^ x ^ "'") !args)) in
 
   log_message (sprintf "run: %s" cmd);
   
@@ -404,21 +406,19 @@ let rpmbuild
 	    while true do
 	      match Unix.waitpid [Unix.WNOHANG] pid with
 		| 0,_ -> 
-		    log_message (sprintf "waiting for build package as pid %d" pid);
 		    Unix.sleep 1
 		| n,Unix.WEXITED 0 when n = pid ->
 		    raise Not_found
-		| n,_ ->
+		| _,_ ->
 		    log_error
-		      (sprintf "Cannot build package: %s/%s" location
-			fullname)		      
+		      (sprintf "Cannot build package: %s/%s" location fullname)
 	    done; location,fullname
 	  with 
 	    | Not_found ->
 		location,fullname
 	    | exn ->
 		log_error
-		  (sprintf "Cannot build package: %s/%s" location fullname)		    
+		  (sprintf "Cannot build package[%s]: %s/%s" (Printexc.to_string exn) location fullname)
 	end
       else
 	begin
