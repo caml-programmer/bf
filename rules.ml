@@ -408,8 +408,9 @@ let rpmbuild
       else
 	begin
 	  let _ = 
+	    log_message "exec: rpmbuild begin";
 	    Unix.execve "rpmbuild" (Array.of_list !args) in
-	  exit 0	  
+	  exit 0
 	end
     end
 
