@@ -399,12 +399,16 @@ let rpmbuild
       if pid > 0 then
 	begin
 	  log_message "waiting for build package";
-	  match Unix.waitpid [] pid with
-	    | n,Unix.WEXITED 0 ->
-		location,fullname
-	    | n,_ ->
-		log_error
-		  (sprintf "Cannot build package: %s/%s" location fullname)
+	  try
+	    match Unix.waitpid [] pid with
+	      | n,Unix.WEXITED 0 ->
+		  location,fullname
+	      | n,_ ->
+		  log_error
+		    (sprintf "Cannot build package: %s/%s" location fullname)
+	  with exn ->
+	      log_error
+		(sprintf "Cannot build package: %s/%s" location fullname)		    
 	end
       else
 	begin
