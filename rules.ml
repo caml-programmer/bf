@@ -398,6 +398,7 @@ let rpmbuild
       let pid = Unix.fork () in
       if pid > 0 then
 	begin
+	  log_message "waiting for build package";
 	  match Unix.waitpid [] pid with
 	    | n,Unix.WEXITED 0 ->
 		location,fullname
