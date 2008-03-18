@@ -364,7 +364,8 @@ let rpmbuild
   let args = ref [] in
   let add s = args := !args @ [s] in
   let define n v =
-    add (sprintf "--define='%s %s'" n v) in
+    add "-D"; add (sprintf "%s %s" n v)
+  in
   let location = Sys.getcwd () in
   let arch = System.arch () in
   let platform = string_of_platform platform in
@@ -398,7 +399,7 @@ let rpmbuild
       let pid = Unix.fork () in
       if pid > 0 then
 	begin
-	  log_message "waiting for build package";
+	  log_message (sprintf "waiting for build package as pid %d" pid);
 	  try
 	    match Unix.waitpid [] pid with
 	      | n,Unix.WEXITED 0 ->
