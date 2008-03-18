@@ -401,15 +401,24 @@ let rpmbuild
 	begin
 	  log_message (sprintf "waiting for build package as pid %d" pid);
 	  try
-	    match Unix.waitpid [] pid with
-	      | n,Unix.WEXITED 0 ->
-		  location,fullname
-	      | n,_ ->
-		  log_error
-		    (sprintf "Cannot build package: %s/%s" location fullname)
-	  with exn ->
-	      log_error
-		(sprintf "Cannot build package: %s/%s" location fullname)		    
+	    while true do
+	      match Unix.waitpid [Unix.WNOHANG] pid with
+		| 0,_ -> 
+		    log_message (sprintf "waiting for build package as pid %d" pid);
+		    Unix.sleep 1
+		| n,Unix.WEXITED 0 when n = pid ->
+		    raise Not_found
+		| n,_ ->
+		    log_error
+		      (sprintf "Cannot build package: %s/%s" location
+			fullname)		      
+	    done; location,fullname
+	  with 
+	    | Not_found ->
+		location,fullname
+	    | exn ->
+		log_error
+		  (sprintf "Cannot build package: %s/%s" location fullname)		    
 	end
       else
 	begin
