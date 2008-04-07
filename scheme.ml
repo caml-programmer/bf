@@ -21,6 +21,12 @@ let string_of_sval = function
   | Ssymbol s -> s
   | sval      -> error sval
 
+let write_scheme_value fn v =
+  let port = Ocs_port.open_output_port fn in
+  Ocs_print.print port false v;
+  Ocs_port.flush port;
+  Ocs_port.close port
+
 let string_list_of_sval_array v =
   List.map string_of_sval (Array.to_list v)
 

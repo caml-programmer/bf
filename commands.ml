@@ -469,6 +469,10 @@ let scm_write_file src dst =
     ~string:(Scheme.string_of_sval dst);
   Snull
 
+let scm_write_scheme_value src dst =
+  Scheme.write_scheme_value (Scheme.string_of_sval src) dst;
+  Snull
+    
 ;;
 
 Ocs_env.set_pfn Scheme.env scm_prepare "prepare-components";;
@@ -514,5 +518,6 @@ Ocs_env.set_pf2 Scheme.env scm_send_file_over_ssh "send-file-over-ssh";;
 Ocs_env.set_pfn Scheme.env scm_package_build_message "package-build-message";;
 Ocs_env.set_pf3 Scheme.env scm_send_message "send-message";;
 Ocs_env.set_pf2 Scheme.env scm_write_file "write-file";;
+Ocs_env.set_pf2 Scheme.env scm_write_scheme_value "write-scheme-value";;
 
 
