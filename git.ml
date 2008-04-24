@@ -99,7 +99,7 @@ let git_current_branch () =
     | _      -> None
 
 let git_clean () =
-  log_command "git" ["clean";"-d";"-x"]
+  log_command "git" ["clean";"-d";"-x";"-f"]
 
 let git_diff ?tag () =
   let cmd =
