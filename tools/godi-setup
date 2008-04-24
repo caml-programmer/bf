@@ -16,6 +16,7 @@ echo "export PATH=$H/bin:$H/sbin:\$PATH" > /etc/profile.d/godi.sh
 echo "export MANPATH=$H/man:\$MANPATH"  >> /etc/profile.d/godi.sh
 chmod +x /etc/profile.d/godi.sh
 source /etc/profile
+echo "GODI_BASEPKG_PCRE=yes" >> $H/etc/godi.conf
 ./bootstrap_stage2
 
 
