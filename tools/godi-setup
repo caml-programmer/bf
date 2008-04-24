@@ -1,0 +1,21 @@
+#!/bin/sh -e
+#
+# Shell script for GODI installation.
+#
+# Usage: godi-setup http://www.ocaml-programming.de/packages/godi-bootstrap-20080118.tar.gz
+#
+
+H=/opt/godi
+G=$1
+
+wget -O godi.tar.gz $G
+tar -zxvf godi.tar.gz
+cd godi-bootstrap*
+./bootstrap --prefix $H
+echo "export PATH=$H/bin:$H/sbin:\$PATH" > /etc/profile.d/godi.sh
+echo "export MANPATH=$H/man:\$MANPATH"  >> /etc/profile.d/godi.sh
+chmod +x /etc/profile.d/godi.sh
+source /etc/profile
+./bootstrap_stage2
+
+
