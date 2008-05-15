@@ -4,6 +4,7 @@ GODI_HOME=/opt/godi
 CONSOLE="$GODI_HOME/sbin/godi_console"
 
 gp_install () {
+    echo "installing $1"
     $CONSOLE perform -build $1
 }
 
