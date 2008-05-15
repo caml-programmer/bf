@@ -1,7 +1,7 @@
 #!/bin/sh
 
 GODI_HOME=/opt/godi
-CONSOLE="$GODI_HOME/bin/godi_console"
+CONSOLE="$GODI_HOME/sbin/godi_console"
 
 gp_install () {
     $CONSOLE perform -build $1
