@@ -1,0 +1,27 @@
+#!/bin/sh
+
+GODI_HOME=/opt/godi
+CONSOLE="$GODI_HOME/bin/godi_console"
+
+gp_install {
+    $CONSOLE perform -build $1
+}
+
+gp_install "godi-pcre"
+gp_install "godi-ocamlnet"
+gp_install "godi-ocs"
+gp_install "godi-crypt"
+gp_install "godi-ocamlldap"
+gp_install "godi-ulex"
+gp_install "godi-pxp"
+gp_install "godi-syslog"
+gp_install "godi-zip"
+
+# TODO:
+# installation godi-postgresql, godi-ocamldbi
+# currently is manual installation, needed:
+# - postgresql-ocaml-1.5.2
+# - ocamldbi-0.9.11
+# Sources may be download from /opt/godi/build/distfiles
+# on existing GODI installation
+
