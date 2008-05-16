@@ -17,12 +17,4 @@ gp_install "godi-ulex"
 gp_install "godi-pxp"
 gp_install "godi-syslog"
 gp_install "godi-zip"
-
-# TODO:
-# installation godi-postgresql, godi-ocamldbi
-# currently is manual installation, needed:
-# - postgresql-ocaml-1.5.2
-# - ocamldbi-0.9.11
-# Sources may be download from /opt/godi/build/distfiles
-# on existing GODI installation
-
+gp_install "godi-postgresql"
