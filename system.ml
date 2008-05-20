@@ -4,16 +4,9 @@ open Printf
 
 let path_list = ["/bin";"/sbin";"/usr/bin";"/usr/sbin"];;
 
-let process_env = ref [||];;
-
 (* new *)
 
 exception Error of string
-
-let set_process_env env =
-  process_env := env
-    
-let get_process_env () = !process_env
 
 let split_env_var s =
   let len = String.length s in
@@ -163,9 +156,8 @@ let list_of_directory dir =
     done; []
   with End_of_file -> !acc
 
-let read_lines ?(ignore_error=false) ?(filter=(fun _ -> true)) command =
-  let penv = get_process_env () in
-  let (ch,out,err) = Unix.open_process_full command penv in
+let read_lines ?(env=Unix.environment()) ?(ignore_error=false) ?(filter=(fun _ -> true)) command =
+  let (ch,out,err) = Unix.open_process_full command env in
   let rec read acc =
     try
       let s = input_line ch in
@@ -185,7 +177,7 @@ let read_lines ?(ignore_error=false) ?(filter=(fun _ -> true)) command =
 		  (fun s ->
 		    Buffer.add_string b s;
 		    Buffer.add_char b '\n')
-		  penv;
+		  env;
 		Buffer.contents b
 	      in
 	      raise

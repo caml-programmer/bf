@@ -90,7 +90,7 @@ let linearization s =
       s.[i] <- ' ';
   done; s
 
-let log_command ?error_handler prog args =
+let log_command ?(env=Unix.environment()) ?error_handler prog args =
   let out_buf = Buffer.create 256 in
   let err_buf = Buffer.create 256 in
   with_logger
@@ -105,7 +105,7 @@ let log_command ?error_handler prog args =
 		System.split_env_var s
 	      in Shell_sys.set_env_var environment key value
 	    with Not_found -> ()))
-	  (System.get_process_env ());
+	  env;
 	let cmd =
 	  Shell.cmd
 	    ~cmdname:program 
