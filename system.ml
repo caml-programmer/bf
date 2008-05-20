@@ -164,7 +164,8 @@ let list_of_directory dir =
   with End_of_file -> !acc
 
 let read_lines ?(ignore_error=false) ?(filter=(fun _ -> true)) command =
-  let (ch,out,err) = Unix.open_process_full command (get_process_env ()) in
+  let penv = get_process_env () in
+  let (ch,out,err) = Unix.open_process_full command penv in
   let rec read acc =
     try
       let s = input_line ch in
@@ -178,9 +179,18 @@ let read_lines ?(ignore_error=false) ?(filter=(fun _ -> true)) command =
 	match Unix.close_process_full (ch,out,err) with
 	  | Unix.WEXITED 0 -> acc
 	  | _ ->
-	      raise 
+	      let curenv =
+		let b = Buffer.create 32 in
+		Array.iter
+		  (fun s ->
+		    Buffer.add_string b s;
+		    Buffer.add_char b '\n')
+		  penv;
+		Buffer.contents b
+	      in
+	      raise
 		(Error 
-		  (sprintf "cannot read lines from [%s] (%s)" command error))
+		  (sprintf "cannot read lines from [%s] (%s) with env:\n\n%s" command error curenv))
       else acc
   in read []
 
