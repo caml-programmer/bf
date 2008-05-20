@@ -237,13 +237,7 @@ let with_dir dir f =
     Sys.chdir cur; raise exn
 
 let read_command cmd =
-  let ch = Unix.open_process_in cmd in
-  let rec read acc =
-    try
-      read (acc @ [input_line ch])
-    with End_of_file -> 
-      close_in ch; acc
-  in read []
+  System.read_lines cmd
 
 let replace_param key value content =
   let key = String.uppercase key in
