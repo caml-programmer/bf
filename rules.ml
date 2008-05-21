@@ -1,33 +1,6 @@
 open Logger
 open Printf
 
-(*** Component envirionment support *)
-
-let component_environment = Hashtbl.create 32;;
-let system_environment = Hashtbl.create 32;;
-
-let make_system_env () =
-  Hashtbl.clear system_environment;  
-  Array.iter
-    (fun s ->
-      (try
-	let (key,value) = System.split_env_var s in
-	Hashtbl.add system_environment key value
-      with Not_found -> ()))
-    (Unix.environment ());
-  Hashtbl.iter
-    (Hashtbl.replace system_environment)
-    component_environment;
-  
-  let view key value acc = 
-    acc @ [key ^ "=" ^ value] in
-  
-  Array.of_list
-    (Hashtbl.fold view system_environment [])
-
-let prepare_component_env () =
-  Hashtbl.clear component_environment
-
 (*** Rules execution *)
 
 let rules_file () =
@@ -96,7 +69,7 @@ let load_plugins () =
 
 let load_composite file =
   let composite = ref None in
-  prepare_component_env ();
+  Env.prepare ();
   Scheme.eval_file file;
   Scheme.eval_code (fun v -> composite := Some v) "(composite)";
   match !composite with
@@ -105,7 +78,7 @@ let load_composite file =
   
 let build_rules () =
   load_plugins ();
-  prepare_component_env ();
+  Env.prepare ();
   print_string "load rules...";
   Scheme.eval_file (rules_file ());
   print_endline "ok";
@@ -113,7 +86,7 @@ let build_rules () =
     
 let install_rules () =
   load_plugins ();
-  prepare_component_env ();
+  Env.prepare ();
   print_string "load rules...";
   Scheme.eval_file (rules_file ());
   print_endline "ok";
@@ -132,13 +105,13 @@ let add_make_opts v =
   (split_by_space (Params.get_param "make-opts")) @ v
 
 let simple_configure args =
-  log_command ~env:(make_system_env ()) "./configure" args
+  log_command "./configure" args
     
 let simple_make args =  
-  log_command ~env:(make_system_env ()) "make" (add_make_opts args)
+  log_command "make" (add_make_opts args)
 
 let simple_install args =
-  log_command ~env:(make_system_env ()) "make" ("install"::args)
+  log_command "make" ("install"::args)
 
 let export args =
   List.iter
@@ -146,14 +119,14 @@ let export args =
       let key = String.uppercase key in
       match value with
 	  Some v ->
-	    Hashtbl.replace component_environment key v
+	    Env.update key v
 	| None ->
-	    Hashtbl.replace component_environment key "")
+	    Env.update key "")
     args
 
 let get_env name =
   try
-    Some (Hashtbl.find component_environment name)
+    Some (Env.find name)
   with Not_found -> None
 
 let make args =
@@ -163,7 +136,7 @@ let make args =
 	match value with
 	  | Some v -> prepare ((String.uppercase key^"="^v)::acc) tl
 	  | None   -> prepare (key::acc) tl
-  in log_command ~env:(make_system_env ()) "make" (add_make_opts (prepare [] args))
+  in log_command "make" (add_make_opts (prepare [] args))
 
 let ac_configure args =
   let have_spaces s =
@@ -181,7 +154,7 @@ let ac_configure args =
 	      else
 		prepare (("--"^key^"="^v)::acc) tl
 	  | None   -> prepare (("--"^key)::acc) tl
-  in log_command ~env:(make_system_env ()) "./configure" (prepare [] args)
+  in log_command "./configure" (prepare [] args)
 
 let path_concat args =
   let rec concat acc = function
@@ -238,7 +211,7 @@ let with_dir dir f =
     Sys.chdir cur; raise exn
 
 let read_command cmd =
-  System.read_lines ~env:(make_system_env ()) cmd
+  System.read_lines ~env:(Env.current ()) cmd
 
 let replace_param key value content =
   let key = String.uppercase key in
@@ -312,7 +285,7 @@ let create_link src dst =
   Unix.link src dst
 
 let send_file_over_ssh src dst =
-  log_command ~env:(make_system_env ()) "scp" [src;dst]
+  log_command "scp" [src;dst]
 
 
 (* Package *)

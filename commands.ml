@@ -48,7 +48,7 @@ let with_component_dir ?(strict=true) component thunk =
 
   match git_worktree_status ~strict component with
     | Tree_not_exists ->
-	log_message "status: working tree not exists";
+	log_message "status: working tree is not exists";
 	remove_component component;
 	clone_component component;
 	with_dir (fun () ->
@@ -57,10 +57,10 @@ let with_component_dir ?(strict=true) component thunk =
     | Tree_exists_with_given_key content_status ->
 	(match content_status with
 	  | Tree_prepared ->
-	      log_message "status: working tree prepared";
+	      log_message "status: working tree is prepared";
 	      with_dir (fun () -> ())
 	  | Tree_changed ->
-	      log_message "status: working tree changed";
+	      log_message "status: working tree is changed";
 	      with_dir (fun () ->
 		checkout_component component;
 		git_clean ()))
