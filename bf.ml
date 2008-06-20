@@ -9,9 +9,9 @@ type analyze_result =
   | Is_composite_with_tag of (string * string)
 
 let usage () =
-  print_endline "Usage: bf (prepare|update|forward|[re]build|[re]install) <components>";
-  print_endline "   or: bf (prepare|update|forward|[re]build|[re]install) <component> [branch <branch> | tag <tag>]";
-  print_endline "   or: bf (prepare|update|forward|[re]build|[re]install) <composite> [tag]";
+  print_endline "Usage: bf (prepare|update|forward|[re]build|[re]install|status) <components>";
+  print_endline "   or: bf (prepare|update|forward|[re]build|[re]install|status) <component> [branch <branch> | tag <tag>]";
+  print_endline "   or: bf (prepare|update|forward|[re]build|[re]install|status) <composite> [tag]";
   print_endline "   or: bf (diff|changelog) <composite> <tag-a> <tag-b>";
   print_endline "   or: bf pack <specdir> <version> <release>";
   print_endline "   or: bf tag <composite> <tag>";
@@ -99,6 +99,7 @@ let main () =
 		    | "reinstall" -> Commands.reinstall components
 		    | "update"    -> Commands.update    components
 		    | "forward"   -> Commands.forward   components
+		    | "status"    -> Commands.status    components
 		    | _           -> usage ())
 	      | Is_component_with_label component ->
 		  (match action with
@@ -109,6 +110,7 @@ let main () =
 		    | "reinstall" -> Commands.reinstall [component]
 		    | "update"    -> Commands.update    [component]
 		    | "forward"   -> Commands.forward   [component]
+		    | "status"    -> Commands.status    [component]
 		    | _           -> usage ())
 	      | Is_composite composite ->
 		  Params.set_composite_mode ();
@@ -120,8 +122,8 @@ let main () =
 		    | "reinstall" -> Commands.reinstall_composite composite
 		    | "update"    -> Commands.update_composite    composite
 		    | "forward"   -> Commands.forward_composite   composite
+		    | "status"    -> Commands.status_composite    composite
 		    | _           -> usage ())
-
 	      | Is_composite_with_tag (composite,tag) ->
 		  Params.set_composite_mode ();
 		  (match action with
@@ -132,6 +134,7 @@ let main () =
 		    | "reinstall" -> Commands.reinstall_composite ~tag composite
 		    | "update"    -> Commands.update_composite	  ~tag composite
 		    | "forward"   -> Commands.forward_composite   ~tag composite
+		    | "status"    -> Commands.status_composite    ~tag composite
 		    | _           -> usage ()))
     else usage ()
       

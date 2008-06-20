@@ -166,6 +166,34 @@ let reinstall_component component =
 let reinstall components =
   non_empty_iter reinstall_component components
 
+let status_component component =
+  let curdir = Sys.getcwd () in
+  let build =
+    Sys.file_exists
+      (component.name ^ "/.bf-build") in
+  let install =
+    Sys.file_exists
+      (component.name ^ "/.bf-install") in
+  let label_type =
+    string_of_label_type component.label in
+  let label =
+    string_of_label component.label in
+  let status =
+    match git_worktree_status ~strict:true component with
+      | Tree_not_exists -> "working tree is not exists"
+      | Tree_exists_with_given_key content_status ->
+	  (match content_status with
+	    | Tree_prepared -> "working tree is prepared"
+	    | Tree_changed  -> "working tree is changed")
+      | Tree_exists_with_other_key ->
+	  "working tree exists with other key" in
+  log_message
+    (Printf.sprintf "=> component (%s %s [%s] build:%b install:%b status: %s)"
+      (curdir ^ "/" ^ component.name) label_type label build install status)
+
+let status components =
+  non_empty_iter status_component components
+
 let tag_component tag component =
   with_component_dir ~strict:false component
     (fun () ->
@@ -261,6 +289,10 @@ let install_composite ?tag composite =
 let reinstall_composite ?tag composite =
   log_message ("=> reinstall-composite " ^ composite);
   reinstall (with_tag tag (components_of_composite composite))
+
+let status_composite ?tag composite =
+  log_message ("=> status-composite " ^ composite);
+  status (with_tag tag (components_of_composite composite))
 
 let tag_composite composite tag =
   log_message ("=> tag-composite " ^ composite ^ " " ^ tag);
