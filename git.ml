@@ -133,7 +133,7 @@ let git_tag_list () =
     read_lines "git tag -l"
   with System.Error s -> log_error s
 
-let git_content_status ~strict () =
+let git_check_status ~strict () =
   try
     if not strict then Tree_prepared
     else
@@ -146,8 +146,18 @@ let git_content_status ~strict () =
 	  List.iter log_message lines;
 	  Tree_changed
 	end
-  with System.Error s -> log_error s  
+  with System.Error s -> log_error s
 
+let git_content_status ~strict component =
+  if match component.label with
+    | Current    -> git_diff ()
+    | Tag tag    -> git_diff ~tag ()
+    | Branch tag -> git_diff ~tag ()
+  then
+    Tree_changed
+  else
+    Tree_prepared
+      
 let git_tag_status ~strict component =
   match component.label with
     | Current  -> assert false
@@ -157,11 +167,9 @@ let git_tag_status ~strict component =
 	if not (List.mem m tags) then
 	  Tree_exists_with_other_key
 	else
-	  if git_diff ~tag:m () then
-	    Tree_exists_with_given_key Tree_changed
-	  else
-	    Tree_exists_with_given_key (git_content_status ~strict ())
-
+	  Tree_exists_with_given_key 
+	    (git_content_status ~strict component)
+	    
 let git_branch_status ~strict component =
   match component.label with
     | Current  -> assert false
@@ -175,7 +183,7 @@ let git_branch_status ~strict component =
 	  match git_current_branch () with
 	    | Some cur ->
 		if cur = m then
-		  Tree_exists_with_given_key (git_content_status ~strict ())
+		  Tree_exists_with_given_key (git_content_status ~strict component)
 		else
 		  Tree_exists_with_other_key
 	    | None ->
@@ -183,7 +191,7 @@ let git_branch_status ~strict component =
 
 let git_key_status ~strict component =
   match component.label with
-    | Current  -> Tree_exists_with_given_key (git_content_status ~strict ())
+    | Current  -> Tree_exists_with_given_key (git_content_status ~strict component)
     | Tag _    -> git_tag_status ~strict component
     | Branch _ -> git_branch_status ~strict component
 
