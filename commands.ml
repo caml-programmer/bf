@@ -225,33 +225,42 @@ let components_of_composite composite =
     | _ -> log_error "invalid composition"
   in iter [] composite
 
-let prepare_composite composite =
+let with_tag tag components =
+  match tag with
+    | None -> components
+    | Some tag_name ->
+	List.map
+	  (fun component ->
+	    { name = component.name; label = Tag tag_name})
+	  components
+
+let prepare_composite ?tag composite =
   log_message ("=> prepare-composite " ^ composite);
-  prepare (components_of_composite composite)
+  prepare (with_tag tag (components_of_composite composite))
 
-let update_composite composite =
+let update_composite ?tag composite =
   log_message ("=> update-composite " ^ composite);
-  update (components_of_composite composite)
+  update (with_tag tag (components_of_composite composite))
 
-let forward_composite composite =
+let forward_composite ?tag composite =
   log_message ("=> forward-composite " ^ composite);
-  forward (components_of_composite composite)
+  forward (with_tag tag (components_of_composite composite))
   
-let build_composite composite =
+let build_composite ?tag composite =
   log_message ("=> build-composite " ^ composite);
-  build (components_of_composite composite)
+  build (with_tag tag (components_of_composite composite))
 
-let rebuild_composite composite =
+let rebuild_composite ?tag composite =
   log_message ("=> rebuild-composite " ^ composite);
-  rebuild (components_of_composite composite)
+  rebuild (with_tag tag (components_of_composite composite))
 
-let install_composite composite =
+let install_composite ?tag composite =
   log_message ("=> install-composite " ^ composite);
-  install (components_of_composite composite)
+  install (with_tag tag (components_of_composite composite))
 
-let reinstall_composite composite =
+let reinstall_composite ?tag composite =
   log_message ("=> reinstall-composite " ^ composite);
-  reinstall (components_of_composite composite)
+  reinstall (with_tag tag (components_of_composite composite))
 
 let tag_composite composite tag =
   log_message ("=> tag-composite " ^ composite ^ " " ^ tag);

@@ -6,11 +6,12 @@ type analyze_result =
   | Is_components of component list
   | Is_component_with_label of component
   | Is_composite of string
+  | Is_composite_with_tag of (string * string)
 
 let usage () =
   print_endline "Usage: bf (prepare|update|forward|[re]build|[re]install) <components>";
   print_endline "   or: bf (prepare|update|forward|[re]build|[re]install) <component> [branch <branch> | tag <tag>]";
-  print_endline "   or: bf (prepare|update|forward|[re]build|[re]install) <composite>";
+  print_endline "   or: bf (prepare|update|forward|[re]build|[re]install) <composite> [tag]";
   print_endline "   or: bf (diff|changelog) <composite> <tag-a> <tag-b>";
   print_endline "   or: bf pack <specdir> <version> <release>";
   print_endline "   or: bf tag <composite> <tag>";
@@ -30,11 +31,15 @@ let analyze_arguments () =
 	else
 	  Is_components [ make_component two ]
     | 4 ->
-	(match  Sys.argv.(3) with
-	  | "branch" | "tag" -> usage ()
-	  |  _ -> 
-	       Is_components 
-		[ make_component Sys.argv.(2); make_component Sys.argv.(3) ])
+	let two = Sys.argv.(2) in
+	if Sys.file_exists two && System.is_regular two then
+	  Is_composite_with_tag (two,Sys.argv.(3))
+	else
+	  (match  Sys.argv.(3) with
+	    | "branch" | "tag" -> usage ()
+	    |  _ -> 
+		 Is_components 
+		  [ make_component Sys.argv.(2); make_component Sys.argv.(3) ])
     | 5 ->
 	(match  Sys.argv.(3) with
 	  | "branch" ->
@@ -115,6 +120,18 @@ let main () =
 		    | "reinstall" -> Commands.reinstall_composite composite
 		    | "update"    -> Commands.update_composite    composite
 		    | "forward"   -> Commands.forward_composite   composite
+		    | _           -> usage ())
+
+	      | Is_composite_with_tag (composite,tag) ->
+		  Params.set_composite_mode ();
+		  (match action with
+		    | "prepare"   -> Commands.prepare_composite   ~tag composite
+		    | "build"     -> Commands.build_composite     ~tag composite
+		    | "rebuild"   -> Commands.rebuild_composite   ~tag composite
+		    | "install"   -> Commands.install_composite   ~tag composite
+		    | "reinstall" -> Commands.reinstall_composite ~tag composite
+		    | "update"    -> Commands.update_composite	  ~tag composite
+		    | "forward"   -> Commands.forward_composite   ~tag composite
 		    | _           -> usage ()))
     else usage ()
       
