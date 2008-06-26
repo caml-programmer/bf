@@ -163,9 +163,9 @@ let git_worktree_clean () =
 let git_content_status ~strict component =
   if strict then
     if match component.label with
-      | Current    -> git_diff () && not (git_worktree_clean ())
-      | Tag tag    -> git_diff ~tag () && not (git_worktree_clean ())
-      | Branch tag -> git_diff ~tag () && not (git_worktree_clean ())
+      | Current    -> git_diff () || not (git_worktree_clean ())
+      | Tag tag    -> git_diff ~tag () || not (git_worktree_clean ())
+      | Branch tag -> git_diff ~tag () || not (git_worktree_clean ())
     then
       Tree_changed
     else
