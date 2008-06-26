@@ -101,18 +101,24 @@ let git_current_branch () =
 let git_clean () =
   log_command "git" ["clean";"-d";"-x";"-f"]
 
-let git_diff ?tag () =
+let git_diff ?(ignore=[]) ?key () =
   let cmd =
-    match tag with
-      | None   -> "git diff"
-      | Some t -> "git diff " ^ t
+    match key with
+      | None   -> "git diff --name-status"
+      | Some k -> "git diff --name-status" ^ k
+  in 
+  let files = read_lines
+    ~filter:(fun s -> not (List.mem s ignore))
+    cmd
   in
-  let ch = Unix.open_process_in cmd in
-  try
-    ignore (input_line ch);
-    close_in ch; true
-  with End_of_file ->
-    close_in ch; false
+  if files = [] then
+    true
+  else
+    begin
+      log_message "tree difference";
+      List.iter log_message files;
+      false
+    end
 
 let git_diff_view ~tag_a ~tag_b =
   let cmd =
@@ -148,7 +154,7 @@ let git_check_status ~strict () =
 	end
   with System.Error s -> log_error s
 
-let git_worktree_clean () =
+let git_worktree_cleaned () =
   try
     let lines = read_lines ~ignore_error:true "git status" in
     if List.length lines = 2 &&
@@ -158,20 +164,33 @@ let git_worktree_clean () =
       begin
 	List.iter log_message lines; false
       end
-  with System.Error s -> log_error s  
+  with System.Error s -> log_error s
 
 let git_content_status ~strict component =
-  if strict then
-    if match component.label with
-      | Current    -> git_diff () || not (git_worktree_clean ())
-      | Tag tag    -> git_diff ~tag () || not (git_worktree_clean ())
-      | Branch tag -> git_diff ~tag () || not (git_worktree_clean ())
-    then
-      Tree_changed
-    else
-      Tree_prepared
-  else
+  let ignore =
+    if Sys.file_exists ".bf-ignore" then
+      begin
+	let ch = open_in ".bf-ignore" in
+	let acc = list_of_channel ch in
+	close_in ch; acc
+      end
+    else []
+  in  
+  let cleaned_tree =
+    not strict || git_worktree_cleaned () in
+  let cleaned_source =
+    match component.label with
+      | Current ->
+	  git_diff ~ignore ()
+      | Tag key ->
+	  git_diff ~ignore ~key ()
+      | Branch key ->
+	  git_diff ~ignore ~key ()
+  in
+  if cleaned_tree && cleaned_source then
     Tree_prepared
+  else
+    Tree_changed
 
 let git_tag_status ~strict component =
   match component.label with
