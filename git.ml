@@ -110,7 +110,7 @@ let git_diff ?tag () =
   let ch = Unix.open_process_in cmd in
   try
     ignore (input_line ch);
-    close_in ch; true 
+    close_in ch; true
   with End_of_file ->
     close_in ch; false
 
@@ -148,12 +148,24 @@ let git_check_status ~strict () =
 	end
   with System.Error s -> log_error s
 
+let git_worktree_clean () =
+  try
+    let lines = read_lines ~ignore_error:true "git status" in
+    if List.length lines = 2 &&
+      List.nth lines 1 = "nothing to commit (working directory clean)"
+    then true
+    else
+      begin
+	List.iter log_message lines; false
+      end
+  with System.Error s -> log_error s  
+
 let git_content_status ~strict component =
   if strict then
     if match component.label with
-      | Current    -> git_diff ()
-      | Tag tag    -> git_diff ~tag ()
-      | Branch tag -> git_diff ~tag ()
+      | Current    -> git_diff () && not (git_worktree_clean ())
+      | Tag tag    -> git_diff ~tag () && not (git_worktree_clean ())
+      | Branch tag -> git_diff ~tag () && not (git_worktree_clean ())
     then
       Tree_changed
     else
@@ -172,7 +184,7 @@ let git_tag_status ~strict component =
 	else
 	  Tree_exists_with_given_key 
 	    (git_content_status ~strict component)
-	    
+
 let git_branch_status ~strict component =
   match component.label with
     | Current  -> assert false
