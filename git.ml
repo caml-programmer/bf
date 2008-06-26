@@ -149,15 +149,18 @@ let git_check_status ~strict () =
   with System.Error s -> log_error s
 
 let git_content_status ~strict component =
-  if match component.label with
-    | Current    -> git_diff ()
-    | Tag tag    -> git_diff ~tag ()
-    | Branch tag -> git_diff ~tag ()
-  then
-    Tree_changed
+  if strict then
+    if match component.label with
+      | Current    -> git_diff ()
+      | Tag tag    -> git_diff ~tag ()
+      | Branch tag -> git_diff ~tag ()
+    then
+      Tree_changed
+    else
+      Tree_prepared
   else
     Tree_prepared
-      
+
 let git_tag_status ~strict component =
   match component.label with
     | Current  -> assert false

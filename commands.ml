@@ -62,8 +62,7 @@ let with_component_dir ?(strict=true) component thunk =
 	  | Tree_changed ->
 	      log_message "status: working tree is changed";
 	      with_dir (fun () ->
-		checkout_component component;
-		git_clean ()))
+		checkout_component component; git_clean ()))
     | Tree_exists_with_other_key ->
 	log_message "status: working tree exists with other key";
 	with_dir (fun () ->
@@ -86,7 +85,7 @@ let prepare components =
 
 let update_component component = (* todo: more smart implementation *)
   with_component_dir ~strict:true component
-    (fun () ->      
+    (fun () ->
       List.iter
       (fun branch ->
 	git_checkout ~force:true ~key:branch ();
