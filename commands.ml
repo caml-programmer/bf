@@ -120,7 +120,7 @@ let build_component_native component =
     end
 
 let build_component component =
-  with_component_dir ~strict:false component
+  with_component_dir ~strict:true component
     (fun () ->
       build_component_native component)
 	  
@@ -181,7 +181,7 @@ let status_component component =
   let label =
     string_of_label component.label in
   let status =
-    match git_worktree_status ~strict:true component with
+    match git_worktree_status ~strict:false component with
       | Tree_not_exists -> "working tree is not exists"
       | Tree_exists_with_given_key content_status ->
 	  (match content_status with
