@@ -129,6 +129,9 @@ let build components =
   non_empty_iter build_component components
 
 let rebuild_component component =
+  let file = component.name ^ "/.bf-build" in
+  if Sys.file_exists file then
+    Sys.remove file;
   with_component_dir ~strict:true component
     (fun () ->
       build_component_native component)
