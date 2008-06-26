@@ -16,10 +16,10 @@ let string_of_label_type = function
   | Current  -> "current"
 
 type content_status =
-  | Tree_prepared              (* nothing to do *)
-  | Tree_changed               (* checkout -f && clean -d *)
+  | Tree_prepared               (* nothing to do *)
+  | Tree_changed of string list (* checkout -f && clean -d *)
 
 type worktree_status =
   | Tree_not_exists            (* do remove, clone and checkout -f *)
   | Tree_exists_with_given_key of content_status
-  | Tree_exists_with_other_key (* do checkout -f and clean -d *)
+  | Tree_exists_with_other_key of string (* do checkout -f and clean -d *)

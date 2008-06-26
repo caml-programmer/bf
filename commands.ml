@@ -3,6 +3,7 @@ open Rules
 open Logger
 open Ocs_env
 open Ocs_types
+open Printf
 open Types
 
 let checkout_component component =
@@ -12,7 +13,7 @@ let checkout_component component =
     | Branch key -> 
 	git_checkout ~force:true ~key ()
     | Current ->
-	git_checkout ~force:true ~key:"master" ()
+	git_checkout ~force:true ~key:"HEAD" ()
 
 let remove_component component =
   if System.is_directory component.name then
@@ -46,7 +47,7 @@ let with_component_dir ?(strict=true) component thunk =
   let composite_mode =
     Params.used_composite_mode () in
 
-  match git_worktree_status ~strict component with
+  match git_component_status ~strict component with
     | Tree_not_exists ->
 	log_message "status: working tree is not exists";
 	remove_component component;
@@ -59,12 +60,14 @@ let with_component_dir ?(strict=true) component thunk =
 	  | Tree_prepared ->
 	      log_message "status: working tree is prepared";
 	      with_dir (fun () -> ())
-	  | Tree_changed ->
-	      log_message "status: working tree is changed";
+	  | Tree_changed changes ->
+	      log_message
+		(sprintf "status: working tree is changed(%d)" (List.length changes));
 	      with_dir (fun () ->
 		checkout_component component; git_clean ()))
-    | Tree_exists_with_other_key ->
-	log_message "status: working tree exists with other key";
+    | Tree_exists_with_other_key key ->
+	log_message 
+	  (sprintf "status: working tree exists with other key (%s)" key);
 	with_dir (fun () ->
 	  checkout_component component;
 	  git_clean ())
@@ -86,13 +89,22 @@ let prepare components =
 let update_component component = (* todo: more smart implementation *)
   with_component_dir ~strict:true component
     (fun () ->
+      let start = git_current_branch () in
       List.iter
-      (fun branch ->
-	git_checkout ~force:true ~key:branch ();
-	git_clean ();
-	git_pull ~refspec:branch (Filename.concat (Params.get_param "git-url") component.name))
-      (git_branch ());
-      git_track_new_branches ())
+	(fun branch ->
+	  git_checkout ~force:true ~key:branch ();
+	  git_clean ();
+	  git_pull ~refspec:branch (Filename.concat (Params.get_param "git-url") component.name))
+	(git_branch ());
+      git_track_new_branches ();
+      let stop = git_current_branch () in
+      match start, stop with
+	| Some start_key, Some stop_key -> 
+	    if start_key <> stop_key then
+	      git_checkout ~force:true ~key:start_key ()
+	| Some start_key, None ->
+	    git_checkout ~force:true ~key:start_key ()
+	| None, _ -> ())
 
 let update components =
   non_empty_iter update_component components
@@ -168,8 +180,7 @@ let reinstall_component component =
 let reinstall components =
   non_empty_iter reinstall_component components
 
-let status_component component =
-  let curdir = Sys.getcwd () in
+let status_component ?(max_component_length=0) ?(max_label_length=0) component =
   let build =
     Sys.file_exists
       (component.name ^ "/.bf-build") in
@@ -180,21 +191,49 @@ let status_component component =
     string_of_label_type component.label in
   let label =
     string_of_label component.label in
+  let composite_mode =
+    Params.used_composite_mode () in
+  let changes = ref [] in
   let status =
-    match git_worktree_status ~strict:false component with
+    match git_component_status ~strict:false component with
       | Tree_not_exists -> "working tree is not exists"
       | Tree_exists_with_given_key content_status ->
 	  (match content_status with
 	    | Tree_prepared -> "working tree is prepared"
-	    | Tree_changed  -> "working tree is changed")
-      | Tree_exists_with_other_key ->
-	  "working tree exists with other key" in
+	    | Tree_changed l -> changes := l;
+		(sprintf "working tree is changed (%d)" (List.length l)))
+      | Tree_exists_with_other_key key ->
+	  (sprintf "working tree exists with other key (%s)" key) in
+  let make_suffix max s c =
+    if max = 0 then " " else String.make (2 + (max - (String.length s))) c in
+
+  let component_suffix =
+    make_suffix max_component_length component.name '.' in
+  let label_suffix =
+    make_suffix max_label_length label '_' in
+  let label_type_suffix =
+    make_suffix 7 label_type ' ' in
+
   log_message
-    (Printf.sprintf "=> component (%s %s [%s] build:%b install:%b status: %s)"
-      (curdir ^ "/" ^ component.name) label_type label build install status)
+    (Printf.sprintf "=> component (%s%s%s%s[%s]%s b:%b\ti:%b\ts: %s)"
+      component.name component_suffix label_type label_type_suffix label label_suffix build install status);
+  if not composite_mode then
+    List.iter log_message !changes    
+
+let rec max_value f cur = function
+  | [] -> cur
+  | hd::tl ->
+      max_value f (max (f hd) cur) tl
 
 let status components =
-  non_empty_iter status_component components
+  let max_component_length =
+    max_value (fun n -> String.length n.name) 0 components in
+  let max_label_length =
+    max_value (fun n -> String.length (string_of_label n.label)) 0 components in
+  non_empty_iter
+    (fun component -> 
+      status_component ~max_component_length ~max_label_length component)
+    components
 
 let tag_component tag component =
   with_component_dir ~strict:false component

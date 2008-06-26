@@ -62,7 +62,7 @@ let git_branch ?(filter=(fun _ -> true)) ?(remote=false) () =
     List.map
       (fun s -> String.sub s 2 ((String.length s) - 2))
       (read_lines
-	~filter:(fun s -> String.length s > 2 && filter s)
+	~filter:(fun s -> String.length s > 2 && filter s && s <> "* (no branch)")
 	(if remote then "git branch -r" else "git branch"))
   with System.Error s -> log_error s
 
@@ -79,15 +79,6 @@ let git_track remote_branch =
     log_command "git"
       ["checkout";"-q";"--track";"-b";local;remote_branch]
   with Not_found -> ()
-
-let git_track_new_branches () =
-  let rb = git_branch ~remote:true ~filter:(fun s -> (strip_branch_prefix s) <> "HEAD") () in
-  let lb = git_branch ~remote:false () in
-  List.iter
-    (fun b ->
-      if not (List.mem (strip_branch_prefix b) lb) then
-	git_track b) rb;
-  git_checkout ~force:true ~key:"master" ()
   
 let git_current_branch () =
   let current =
@@ -98,6 +89,14 @@ let git_current_branch () =
     | hd::[] -> Some hd
     | _      -> None
 
+let git_track_new_branches () =
+  let rb = git_branch ~remote:true ~filter:(fun s -> (strip_branch_prefix s) <> "HEAD") () in
+  let lb = git_branch ~remote:false () in
+  List.iter
+    (fun b ->
+      if not (List.mem (strip_branch_prefix b) lb) then
+	git_track b) rb
+
 let git_clean () =
   log_command "git" ["clean";"-d";"-x";"-f"]
 
@@ -105,20 +104,13 @@ let git_diff ?(ignore=[]) ?key () =
   let cmd =
     match key with
       | None   -> "git diff --name-status"
-      | Some k -> "git diff --name-status" ^ k
-  in 
-  let files = read_lines
-    ~filter:(fun s -> not (List.mem s ignore))
-    cmd
-  in
-  if files = [] then
-    true
-  else
-    begin
-      log_message "tree difference";
-      List.iter log_message files;
-      false
-    end
+      | Some k -> "git diff --name-status " ^ k
+  in read_lines
+       ~filter:(fun s -> not
+	 (List.mem
+	   (String.sub s 2
+	     (String.length s - 2)) ignore))
+       cmd
 
 let git_diff_view ~tag_a ~tag_b =
   let cmd =
@@ -139,34 +131,15 @@ let git_tag_list () =
     read_lines "git tag -l"
   with System.Error s -> log_error s
 
-let git_check_status ~strict () =
-  try
-    if not strict then Tree_prepared
-    else
-      let lines = read_lines ~ignore_error:true "git status" in
-      if List.length lines = 2 &&
-	List.nth lines 1 = "nothing to commit (working directory clean)"
-      then Tree_prepared
-      else
-	begin
-	  List.iter log_message lines;
-	  Tree_changed
-	end
-  with System.Error s -> log_error s
-
-let git_worktree_cleaned () =
+let git_status () =
   try
     let lines = read_lines ~ignore_error:true "git status" in
-    if List.length lines = 2 &&
-      List.nth lines 1 = "nothing to commit (working directory clean)"
-    then true
-    else
-      begin
-	List.iter log_message lines; false
-      end
+    if 
+      List.length lines = 2 && List.nth lines 1 = "nothing to commit (working directory clean)"
+    then [] else lines
   with System.Error s -> log_error s
 
-let git_content_status ~strict component =
+let git_worktree_status ~strict component =
   let ignore =
     if Sys.file_exists ".bf-ignore" then
       begin
@@ -176,9 +149,9 @@ let git_content_status ~strict component =
       end
     else []
   in  
-  let cleaned_tree =
-    not strict || git_worktree_cleaned () in
-  let cleaned_source =
+  let worktree_changes =
+    if not strict then [] else git_status () in
+  let source_changes =
     match component.label with
       | Current ->
 	  git_diff ~ignore ()
@@ -187,10 +160,10 @@ let git_content_status ~strict component =
       | Branch key ->
 	  git_diff ~ignore ~key ()
   in
-  if cleaned_tree && cleaned_source then
+  if source_changes = [] && worktree_changes = [] then
     Tree_prepared
   else
-    Tree_changed
+    Tree_changed (source_changes @ worktree_changes)
 
 let git_tag_status ~strict component =
   match component.label with
@@ -199,37 +172,37 @@ let git_tag_status ~strict component =
     | Tag m ->
 	let tags = git_tag_list () in
 	if not (List.mem m tags) then
-	  Tree_exists_with_other_key
+	  Tree_exists_with_other_key "unknown"
 	else
 	  Tree_exists_with_given_key 
-	    (git_content_status ~strict component)
+	    (git_worktree_status ~strict component)
 
 let git_branch_status ~strict component =
   match component.label with
     | Current  -> assert false
     | Tag _ -> assert false
     | Branch m ->
-	let current = git_current_branch () in	
+	let current = git_current_branch () in
 	let branches = git_branch ~remote:false () in
 	if not (List.mem m branches) then
-	  Tree_exists_with_other_key
+	  Tree_exists_with_other_key "unknown"
 	else
 	  match git_current_branch () with
 	    | Some cur ->
 		if cur = m then
-		  Tree_exists_with_given_key (git_content_status ~strict component)
+		  Tree_exists_with_given_key (git_worktree_status ~strict component)
 		else
-		  Tree_exists_with_other_key
+		  Tree_exists_with_other_key cur
 	    | None ->
-		Tree_exists_with_other_key
+		Tree_exists_with_other_key "unknown"
 
 let git_key_status ~strict component =
   match component.label with
-    | Current  -> Tree_exists_with_given_key (git_content_status ~strict component)
+    | Current  -> Tree_exists_with_given_key (git_worktree_status ~strict component)
     | Tag _    -> git_tag_status ~strict component
     | Branch _ -> git_branch_status ~strict component
 
-let git_worktree_status ~strict component =
+let git_component_status ~strict component =
   let cur = Sys.getcwd () in
   if not (System.is_directory component.name) then
     Tree_not_exists
