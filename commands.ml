@@ -13,7 +13,12 @@ let checkout_component component =
     | Branch key -> 
 	git_checkout ~force:true ~key ()
     | Current ->
-	git_checkout ~force:true ~key:"HEAD" ()
+	let branches = 
+	  git_branch ~remote:false () in
+	if List.mem "master" branches then
+	  git_checkout ~force:true ~key:"master" ()
+	else
+	  git_checkout ~force:true ~key:"HEAD" ()
 
 let remove_component component =
   if System.is_directory component.name then
