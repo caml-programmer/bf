@@ -339,9 +339,10 @@ let rpmbuild
   in
   let location = Sys.getcwd () in
   let arch = System.arch () in
-  let platform = string_of_platform platform in
+  let rhsys = string_of_platform platform in
   add "-bb";
-  add ("--target=" ^ arch);
+  if platform <> Cent5 then
+    add ("--target=" ^ arch);
   add spec;
   define "_rpmdir" location;
   define "fileslist" files; (* must be absolute *)
@@ -352,7 +353,7 @@ let rpmbuild
   define "pkgname" pkgname;
   define "pkgvers" version;
   define "pkgrel" release;
-  define "rhsys" platform;
+  define "rhsys" rhsys;
   define "findreq" findreq;
   define "_unpackaged_files_terminate_build" "0";
 
@@ -364,7 +365,7 @@ let rpmbuild
   
   let fullname =
     sprintf "%s-%s-%s.%s.%s.rpm"
-      pkgname version release platform arch in
+      pkgname version release rhsys arch in
   if Sys.file_exists (Filename.concat location fullname) then
     location,fullname
   else
@@ -427,7 +428,7 @@ let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
 	if l > 0 && n.[0] = '/' then
 	  String.sub n 1 (pred l)
 	else n
-      in 
+      in
       log_message (sprintf "make-path %s -> %s" s m); m
     in
     let len = String.length s in
