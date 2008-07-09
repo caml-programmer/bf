@@ -415,6 +415,9 @@ type content =
     ]
 
 let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot")) ~top_dir files =
+  remove_directory buildroot;
+  make_directory [buildroot];
+  
   let match_prefix p v =
     let pl = String.length p in
     let vl = String.length v in
