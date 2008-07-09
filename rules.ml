@@ -337,7 +337,13 @@ let rpmbuild
   let define n v =
     add "-D"; add (sprintf "%s %s" n v)
   in
-  let location = Sys.getcwd () in
+  let location = 
+    match platform with
+      | Cent5 ->
+	  "/usr/src/redhat/RPMS/x86_64"
+      | _ ->
+	  Sys.getcwd ()       
+  in
   let arch = System.arch () in
   let rhsys = string_of_platform platform in
   add "-bb";
