@@ -16,17 +16,19 @@ let git_push ?refspec url =
     | Some spec -> log_command "git" ["push";url;spec]
     | None -> log_command "git" ["push";url]
 
-let git_tag tag =
+let git_make_tag tag =
+  let state = ref Tag_created in
   let error_handler ps =
     match ps with
-	Unix.WEXITED 128 ->
-	  log_message (sprintf "tag %s already exists" tag)
+      | Unix.WEXITED 128 ->
+	  log_message (sprintf "tag %s already exists" tag);
+	  state := Tag_already_exists
       | _ ->
-	  log_message ("cannot create tag: " ^ tag);
-	  exit 2
-  in log_command 
-       ~error_handler 
-       "git" ["tag";"-a";"-m";tag;tag]
+	  log_message (sprintf "tag %s creation problem" tag);
+	  state := Tag_creation_problem
+  in log_command
+       ~error_handler "git" ["tag";"-a";"-m";tag;tag];
+  !state
 
 let git_log tag_a tag_b =
   let cmd =

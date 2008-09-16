@@ -248,9 +248,12 @@ let tag_component tag component =
 	  (Params.get_param "git-url") component.name in
       match git_current_branch () with
 	  Some branch ->
-	    git_tag tag;
-	    git_push ~refspec:tag url;
-	    git_pull ~refspec:branch url
+	    (match git_make_tag tag with
+	      | Tag_created ->
+		  git_push ~refspec:tag url;
+		  git_pull ~refspec:branch url
+	      | Tag_already_exists -> ()
+	      | Tag_creation_problem -> exit 2)
 	| None ->
 	    log_error ("cannot find current branch for " ^ component.name))
 

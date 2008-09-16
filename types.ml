@@ -23,3 +23,8 @@ type worktree_status =
   | Tree_not_exists            (* do remove, clone and checkout -f *)
   | Tree_exists_with_given_key of content_status
   | Tree_exists_with_other_key of string (* do checkout -f and clean -d *)
+
+type tag_status =
+  | Tag_already_exists
+  | Tag_created
+  | Tag_creation_problem

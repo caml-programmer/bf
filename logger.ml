@@ -137,7 +137,7 @@ let log_command ?error_handler prog args =
 	      | Unix.WSIGNALED n -> 
 		  (match error_handler with
 		      Some f -> f ps
-		    | None ->			
+		    | None ->
 			log_message ~logger (sprintf "killed: %d" n);
 			exit n)
 	      | Unix.WSTOPPED n ->
@@ -147,7 +147,7 @@ let log_command ?error_handler prog args =
 			log_message ~logger (sprintf "stopped: %d" n);
 			exit n)))
 	  errors)
-    
+
 let log_error error =
   log_message ~key:"error" error;
   exit 3
