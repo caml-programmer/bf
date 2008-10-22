@@ -30,9 +30,13 @@ let git_make_tag tag =
        ~error_handler "git" ["tag";"-a";"-m";tag;tag];
   !state
 
-let git_log tag_a tag_b =
+let git_log ?(diff=false) tag_a tag_b =
   let cmd =
-    sprintf "git log -p %s..%s" tag_a tag_b in
+    if diff then
+      sprintf "git log -p %s..%s" tag_a tag_b 
+    else
+      sprintf "git log %s..%s" tag_a tag_b
+  in
   let buf = Buffer.create 64 in
   let ch = Unix.open_process_in cmd in
   (try

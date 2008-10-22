@@ -268,11 +268,11 @@ let diff_component tag_a tag_b component =
 let make_diff tag_a tag_b components =
   non_empty_iter (diff_component tag_a tag_b) components
 
-let changelog_component buf tag_a tag_b component =
+let changelog_component ?(diff=false) buf tag_a tag_b component =
   with_component_dir ~strict:false component
     (fun () ->
       let log =
-	git_log tag_a tag_b in
+	git_log ~diff tag_a tag_b in
       if String.length log > 2 then
 	begin
 	  Buffer.add_string buf
@@ -283,7 +283,10 @@ let changelog_component buf tag_a tag_b component =
 let make_changelog tag_a tag_b components =
   let buf = Buffer.create 512 in
   non_empty_iter
-    (changelog_component buf tag_a tag_b) components;
+    (changelog_component ~diff:false buf tag_a tag_b) components;
+  Buffer.add_string buf "\n------------------ DIFF -------------------\n";
+  non_empty_iter
+    (changelog_component ~diff:true buf tag_a tag_b) components;
   Notify.send_message
     ~subject:(Printf.sprintf "bf@changelog %s -> %s" tag_a tag_b)
     ~content:(Buffer.contents buf)
