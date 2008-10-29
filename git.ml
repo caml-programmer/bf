@@ -83,7 +83,7 @@ let git_track remote_branch =
   try
     let local = strip_branch_prefix remote_branch in
     log_command "git"
-      ["checkout";"-q";"--track";"-b";local;remote_branch]
+      ["checkout";"-f";"-q";"--track";"-b";local;remote_branch]
   with Not_found -> ()
   
 let git_current_branch () =
