@@ -277,7 +277,7 @@ let changelog_component ?(diff=false) tag_a tag_b component =
   with_component_dir ~strict:false component
     (fun () ->
       let logs = git_log ~diff tag_a tag_b in
-      if List.length logs > 1 then
+      if List.length logs > 0 && String.length (List.nth logs 0) > 2 then
 	chunks := (Printf.sprintf "\n\n\n### %s\n\n" (String.uppercase component.name))::logs);
   !chunks
 
