@@ -43,7 +43,7 @@ let git_log ?(diff=false) tag_a tag_b =
   (try
     while true do
       let s = input_line ch in
-      if Buffer.length buf + String.length s >= Sys.max_string_length then
+      if Buffer.length buf + String.length s >= (Sys.max_string_length / 2) then
 	begin
 	  chunks := (Buffer.contents buf)::!chunks;
 	  Buffer.clear buf;
