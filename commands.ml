@@ -276,8 +276,9 @@ let changelog_component ?(diff=false) tag_a tag_b component =
   let chunks = ref [] in
   with_component_dir ~strict:false component
     (fun () ->
-      chunks := (git_log ~diff tag_a tag_b);
-      chunks := (Printf.sprintf "\n\n\n### %s\n\n" (String.uppercase component.name))::!chunks);
+      let logs = git_log ~diff tag_a tag_b in
+      if List.length logs > 1 then
+	chunks := (Printf.sprintf "\n\n\n### %s\n\n" (String.uppercase component.name))::logs);
   !chunks
 
 let make_changelog tag_a tag_b components =
