@@ -72,7 +72,7 @@ object (self)
     add (sprintf "This is a multi-part message in MIME format.\n");
     add (sprintf "--%s\n" boundary);
     add (sprintf "Content-type: %s\n" mimetype);
-    add (sprintf "Content-Transfer-Encoding: %s\n\n" "base64");   
+    add (sprintf "Content-Transfer-Encoding: %s\n\n" "base64");
     List.iter
       (fun content ->
 	add (Netencoding.Base64.encode ~linelength:76 content))
@@ -129,6 +129,7 @@ object (self)
 
   method input_line() =
     if closed then self # complain_closed();
+    self # check_chunk ();
     try
       let k = String.index_from str str_pos '\n' in
       let line = String.sub str str_pos (k - str_pos) in
