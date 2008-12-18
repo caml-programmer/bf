@@ -53,6 +53,109 @@ let make_header
   add (sprintf "MIME-version: %s\n" "1.0");
   add (sprintf "Content-type: multipart/mixed; boundary=\"%s\"\n" boundary)
 
+class input_contents ~header ~mimetype ~contents : in_obj_channel =
+object (self)
+  val mutable chunks = []
+  val mutable str = ""
+  val mutable str_len = 0
+  val mutable str_pos = 0
+  val mutable closed = false
+
+  initializer
+    self # set_chunks ();
+    self # check_chunk ()
+
+  method private set_chunks () =
+    let add s = chunks <- s::chunks in
+    add header;
+    add "\n";
+    add (sprintf "This is a multi-part message in MIME format.\n");
+    add (sprintf "--%s\n" boundary);
+    add (sprintf "Content-type: %s\n" mimetype);
+    add (sprintf "Content-Transfer-Encoding: %s\n\n" "base64");   
+    List.iter
+      (fun content ->
+	add (Netencoding.Base64.encode ~linelength:76 content))
+      contents;
+    add (sprintf "--%s--\n" boundary);
+    chunks <- List.rev chunks
+
+  method private set_next_chunk () =
+    match chunks with
+      | hd::tl ->
+	  chunks <- tl;
+	  str <- hd;
+	  str_len <- String.length hd;
+	  str_pos <- 0;
+	  self # check_chunk ();
+      | [] -> raise End_of_file
+
+  method private check_chunk () =
+    if str_pos >= str_len then
+      self # set_next_chunk ()
+
+  method private complain_closed() =
+    raise Closed_channel
+
+  method input buf pos len =
+    if closed then self # complain_closed();
+    if pos < 0 || len < 0 || pos+len > String.length buf then
+      invalid_arg "input";
+
+    let n = min len (str_len - str_pos) in
+    String.blit str str_pos buf pos n;
+    
+    str_pos <- str_pos + n;
+
+    if n=0 && len>0 then
+      (self # check_chunk (); 0)
+    else n
+
+  method really_input buf pos len =
+    if closed then self # complain_closed();
+    if pos < 0 || len < 0 || pos+len > String.length buf then
+      invalid_arg "really_input";
+
+    let n = self # input buf pos len in
+    if n <> len && chunks = [] then raise End_of_file;
+    ()
+
+  method input_char() =
+    if closed then self # complain_closed();
+    self # check_chunk ();
+    let c = str.[ str_pos ] in
+    str_pos <- str_pos + 1;
+    c
+
+  method input_line() =
+    if closed then self # complain_closed();
+    try
+      let k = String.index_from str str_pos '\n' in
+      let line = String.sub str str_pos (k - str_pos) in
+      str_pos <- k+1;
+      line
+    with
+	Not_found ->
+	  if str_pos >= str_len then raise End_of_file;
+	  (* Implicitly add linefeed at the end of the file: *)
+	  let line = String.sub str str_pos (str_len - str_pos) in
+	  str_pos <- str_len;
+	  line
+
+  method input_byte() =
+    Char.code (self # input_char())
+
+  method close_in() =
+    if closed then self # complain_closed();
+    str <- "";
+    closed <- true;
+
+  method pos_in = 
+    if closed then self # complain_closed();
+    str_pos
+
+end
+
 let send_message
   ?(smtp_server=(Params.get_param "smtp-server"))
   ?(smtp_port=(int_of_string (Params.get_param "smtp-port")))
@@ -60,11 +163,11 @@ let send_message
   ?(from_mail=(Params.get_param "smtp-from-mail"))
   ?(subject=(Params.get_param "smtp-subject"))
   ?(mimetype="text/plain; charset=UTF-8")
-  ~content to_mail =
+  ~contents to_mail =
   message (sprintf "Connect to %s:%d" smtp_server smtp_port);
   message (sprintf "Subject: %s" subject);
   try
-    let host = Unix.gethostbyname smtp_server in    
+    let host = Unix.gethostbyname smtp_server in
     let (in_channel,out_channel) =
       Unix.open_connection
 	(Unix.ADDR_INET(host.Unix.h_addr_list.(0),smtp_port)) in
@@ -73,34 +176,29 @@ let send_message
       new Netchannels.input_channel in_channel,
       new Netchannels.output_channel out_channel in
     
-    let buffer = Buffer.create 1024 in
-    let add = Buffer.add_string buffer in
     let smtp = new Netsmtp.client in_port out_port in
 
     List.iter message (smtp # helo ());
     smtp # mail from_mail;
     smtp # rcpt to_mail;
-    
+
+    let buffer = Buffer.create 1024 in
+
     make_header 
       ~from_name
       ~from_mail
       ~subject
       ~to_mail buffer;
 
-    add "\n";
-    add (sprintf "This is a multi-part message in MIME format.\n");
-    add (sprintf "--%s\n" boundary);
-    add (sprintf "Content-type: %s\n" mimetype);
-    add (sprintf "Content-Transfer-Encoding: %s\n\n" "base64");
-    Buffer.add_string buffer
-      (Netencoding.Base64.encode ~linelength:76 content);
-    add (sprintf "--%s--\n" boundary);
+    let stream =
+      new input_contents
+	~mimetype
+	~header:(Buffer.contents buffer)
+	~contents in
 
     message "Send message";
     message (Buffer.contents buffer);
-
-    smtp # data 
-      (new input_string (Buffer.contents buffer));
+    smtp # data stream;
 
     message "Send quit";
     smtp # quit ()

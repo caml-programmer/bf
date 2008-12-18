@@ -81,6 +81,10 @@ let non_empty_iter f = function
     []   -> log_error "don't know what to do"
   | list -> List.iter f list
 
+let non_empty_map f = function
+    []   -> log_error "don't know what to do"
+  | list -> List.map f list
+
 
 (* Projects support *)
 
@@ -285,11 +289,16 @@ let make_changelog tag_a tag_b components =
   non_empty_iter
     (changelog_component ~diff:false buf tag_a tag_b) components;
   Buffer.add_string buf "\n------------------ DIFF -------------------\n";
-  non_empty_iter
-    (changelog_component ~diff:true buf tag_a tag_b) components;
+  let buffers = 
+    non_empty_map
+      (fun component -> 
+	let buf = Buffer.create 512 in
+	changelog_component ~diff:true buf tag_a tag_b component;
+	buf) components
+  in
   Notify.send_message
     ~subject:(Printf.sprintf "bf@changelog %s -> %s" tag_a tag_b)
-    ~content:(Buffer.contents buf)
+    ~contents:(List.map Buffer.contents (buf::buffers))
     (Params.get_param "smtp-notify-email")
 
 let components_of_composite composite =
@@ -551,12 +560,12 @@ let scm_package_build_message v =
 
 let scm_send_message subj msg rcpts =
   let subject = Scheme.string_of_sval subj in
-  let content = Scheme.string_of_sval msg in
+  let contents = [Scheme.string_of_sval msg] in
   let recipients =
     List.map Scheme.string_of_sval
       (Scheme.list_of_sval rcpts) in
   List.iter
-    (Notify.send_message ~subject ~content)
+    (Notify.send_message ~subject ~contents)
     recipients;
   Snull
 
