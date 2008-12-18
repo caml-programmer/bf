@@ -37,16 +37,24 @@ let git_log ?(diff=false) tag_a tag_b =
     else
       sprintf "git log %s..%s" tag_a tag_b
   in
+  let chunks = ref [] in
   let buf = Buffer.create 64 in
   let ch = Unix.open_process_in cmd in
   (try
     while true do
-      Buffer.add_string buf (input_line ch);
+      let s = input_line ch in
+      if Buffer.length buf + String.length s >= Sys.max_string_length then
+	begin
+	  chunks := (Buffer.contents buf)::!chunks;
+	  Buffer.clear buf;
+	end;
+      Buffer.add_string buf s;
       Buffer.add_string buf "\n";
     done; close_in ch
   with End_of_file ->
     close_in ch);
-  Buffer.contents buf
+  chunks := (Buffer.contents buf)::!chunks;
+  List.rev !chunks
 
 let git_checkout
   ?(force=false)

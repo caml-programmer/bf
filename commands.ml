@@ -272,33 +272,28 @@ let diff_component tag_a tag_b component =
 let make_diff tag_a tag_b components =
   non_empty_iter (diff_component tag_a tag_b) components
 
-let changelog_component ?(diff=false) buf tag_a tag_b component =
+let changelog_component ?(diff=false) tag_a tag_b component =
+  let chunks = ref [] in
   with_component_dir ~strict:false component
     (fun () ->
-      let log =
-	git_log ~diff tag_a tag_b in
-      if String.length log > 2 then
-	begin
-	  Buffer.add_string buf
-	    (Printf.sprintf "\n\n\n### %s\n\n" (String.uppercase component.name));
-	  Buffer.add_string buf log
-	end)
+      chunks := (git_log ~diff tag_a tag_b);
+      chunks := (Printf.sprintf "\n\n\n### %s\n\n" (String.uppercase component.name))::!chunks);
+  !chunks
 
 let make_changelog tag_a tag_b components =
-  let buf = Buffer.create 512 in
+  let chunks = ref [] in
+  let add s = chunks:=s::!chunks in
   non_empty_iter
-    (changelog_component ~diff:false buf tag_a tag_b) components;
-  Buffer.add_string buf "\n------------------ DIFF -------------------\n";
-  let buffers = 
-    non_empty_map
-      (fun component -> 
-	let buf = Buffer.create 512 in
-	changelog_component ~diff:true buf tag_a tag_b component;
-	buf) components
-  in
+    (fun component -> 
+      List.iter add (changelog_component ~diff:false tag_a tag_b component)) components;
+  add "\n------------------ DIFF -------------------\n";
+  non_empty_iter
+    (fun component ->
+      List.iter add (changelog_component ~diff:true tag_a tag_b component))
+    components;
   Notify.send_message
     ~subject:(Printf.sprintf "bf@changelog %s -> %s" tag_a tag_b)
-    ~contents:(List.map Buffer.contents (buf::buffers))
+    ~contents:(List.rev !chunks)
     (Params.get_param "smtp-notify-email")
 
 let components_of_composite composite =
