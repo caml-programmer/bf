@@ -278,7 +278,10 @@ let changelog_component ?(diff=false) tag_a tag_b component =
     (fun () ->
       let logs = git_log ~diff tag_a tag_b in
       if List.length logs > 0 && String.length (List.nth logs 0) > 2 then
-	chunks := (Printf.sprintf "\n\n\n### %s\n\n" (String.uppercase component.name))::logs);
+	chunks := (Printf.sprintf "\n\n\n### %s (%s) (%s)\n\n"
+	  (String.uppercase component.name)
+	  (string_of_label_type component.label)
+	  (string_of_label component.label))::logs);
   !chunks
 
 let make_changelog tag_a tag_b components =
@@ -294,6 +297,26 @@ let make_changelog tag_a tag_b components =
     components;
   Notify.send_message
     ~subject:(Printf.sprintf "bf@changelog %s -> %s" tag_a tag_b)
+    ~contents:(List.rev !chunks)
+    (Params.get_param "smtp-notify-email")
+
+let make_review interval components =
+  let chunks = ref [] in
+  let add s = chunks:=s::!chunks in
+  non_empty_iter
+    (fun component -> 
+      let tag_b = string_of_label component.label in
+      let tag_a = sprintf "%s@{%s}" tag_b interval in
+      List.iter add (changelog_component ~diff:false tag_a tag_b component)) components;
+  add "\n------------------ DIFF -------------------\n";
+  non_empty_iter
+    (fun component ->
+      let tag_b = string_of_label component.label in
+      let tag_a = sprintf "%s@{%s}" tag_b interval in
+      List.iter add (changelog_component ~diff:true tag_a tag_b component))
+    components;
+  Notify.send_message
+    ~subject:(Printf.sprintf "bf@review (%s)" interval)
     ~contents:(List.rev !chunks)
     (Params.get_param "smtp-notify-email")
 
@@ -354,6 +377,10 @@ let status_composite ?tag composite =
 let tag_composite composite tag =
   log_message ("=> tag-composite " ^ composite ^ " " ^ tag);
   make_tag tag (components_of_composite composite)
+
+let review_composite composite interval =
+  log_message ("=> review-composite " ^ composite ^ " " ^ interval);
+  make_review interval (components_of_composite composite)
 
 let diff_composite composite tag_a tag_b =
   log_message ("=> diff-composite " ^ composite ^ " " ^ tag_a ^ ":" ^ tag_b);

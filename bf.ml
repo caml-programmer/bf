@@ -13,6 +13,7 @@ let usage () =
   print_endline "   or: bf (prepare|update|forward|[re]build|[re]install|status) <component> [branch <branch> | tag <tag>]";
   print_endline "   or: bf (prepare|update|forward|[re]build|[re]install|status) <composite> [tag]";
   print_endline "   or: bf (diff|changelog) <composite> <tag-a> <tag-b>";
+  print_endline "   or: bf review <composite> <interval>";
   print_endline "   or: bf pack <specdir> <version> <release>";
   print_endline "   or: bf tag <composite> <tag>";
   print_endline "   or: bf log <logdir>";
@@ -69,7 +70,7 @@ let main () =
 	      let specdir = Sys.argv.(2) in
 	      let version = Sys.argv.(3) in
 	      let release = Sys.argv.(4) in
-	      Rules.build_package 
+	      Rules.build_package
 		[specdir;version;release]
 	    else usage ()
 	| "log" ->
@@ -79,6 +80,10 @@ let main () =
 	| "tag" ->
 	    if len = 4 then
 	      Commands.tag_composite Sys.argv.(2) Sys.argv.(3)
+	    else usage ()
+	| "review" ->
+	    if len = 4 then
+	      Commands.review_composite Sys.argv.(2) Sys.argv.(3)
 	    else usage ()
 	| "diff" ->
 	    if len = 5 then
