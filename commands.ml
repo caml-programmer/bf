@@ -301,6 +301,8 @@ let make_changelog tag_a tag_b components =
     (Params.get_param "smtp-notify-email")
 
 let make_review interval components =
+  update components;
+
   let chunks = ref [] in
   let add s = chunks:=s::!chunks in
   non_empty_iter
