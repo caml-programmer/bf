@@ -33,9 +33,9 @@ let git_make_tag tag =
 let git_log ?(diff=false) tag_a tag_b =
   let cmd =
     if diff then
-      sprintf "git log -p %s..%s" tag_a tag_b 
+      sprintf "git log -p '%s'..'%s'" tag_a tag_b 
     else
-      sprintf "git log %s..%s" tag_a tag_b
+      sprintf "git log '%s'..'%s'" tag_a tag_b
   in
   let chunks = ref [] in
   let buf = Buffer.create 64 in
