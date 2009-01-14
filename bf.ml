@@ -13,7 +13,7 @@ let usage () =
   print_endline "   or: bf (prepare|update|forward|[re]build|[re]install|status) <component> [branch <branch> | tag <tag>]";
   print_endline "   or: bf (prepare|update|forward|[re]build|[re]install|status) <composite> [tag]";
   print_endline "   or: bf (diff|changelog) <composite> <tag-a> <tag-b>";
-  print_endline "   or: bf review <composite> <interval>";
+  print_endline "   or: bf review <composite> <since-date>";
   print_endline "   or: bf pack <specdir> <version> <release>";
   print_endline "   or: bf tag <composite> <tag>";
   print_endline "   or: bf log <logdir>";

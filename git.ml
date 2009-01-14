@@ -30,12 +30,17 @@ let git_make_tag tag =
        ~error_handler "git" ["tag";"-a";"-m";tag;tag];
   !state
 
-let git_log ?(diff=false) tag_a tag_b =
+let git_log ?(diff=false) ?(since=None) tag_a tag_b =
+  let since_str =
+    match since with
+      | Some s -> "--since='" ^ s ^ "'"
+      | None -> ""
+  in
   let cmd =
     if diff then
-      sprintf "git log -p '%s'..'%s'" tag_a tag_b 
+      sprintf "git log %s -p '%s'..'%s'" since_str tag_a tag_b
     else
-      sprintf "git log '%s'..'%s'" tag_a tag_b
+      sprintf "git log %s '%s'..'%s'" since_str tag_a tag_b
   in
   let chunks = ref [] in
   let buf = Buffer.create 64 in

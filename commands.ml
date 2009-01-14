@@ -272,11 +272,11 @@ let diff_component tag_a tag_b component =
 let make_diff tag_a tag_b components =
   non_empty_iter (diff_component tag_a tag_b) components
 
-let changelog_component ?(diff=false) tag_a tag_b component =
+let changelog_component ?(diff=false) ?(since=None) tag_a tag_b component =
   let chunks = ref [] in
   with_component_dir ~strict:false component
     (fun () ->
-      let logs = git_log ~diff tag_a tag_b in
+      let logs = git_log ~diff ~since tag_a tag_b in
       if List.length logs > 0 && String.length (List.nth logs 0) > 2 then
 	chunks := (Printf.sprintf "\n\n\n### %s (%s) (%s)\n\n"
 	  (String.uppercase component.name)
@@ -300,25 +300,24 @@ let make_changelog tag_a tag_b components =
     ~contents:(List.rev !chunks)
     (Params.get_param "smtp-notify-email")
 
-let make_review interval components =
+let make_review since components =
   update components;
 
   let chunks = ref [] in
   let add s = chunks:=s::!chunks in
   non_empty_iter
     (fun component -> 
-      let tag_b = string_of_label component.label in
-      let tag_a = sprintf "%s@{%s}" tag_b interval in
-      List.iter add (changelog_component ~diff:false tag_a tag_b component)) components;
+      let tag = string_of_label component.label in
+      List.iter add (changelog_component ~diff:false ~since:(Some since) tag tag component)) components;
   add "\n------------------ DIFF -------------------\n";
   non_empty_iter
     (fun component ->
-      let tag_b = string_of_label component.label in
-      let tag_a = sprintf "%s@{%s}" tag_b interval in
-      List.iter add (changelog_component ~diff:true tag_a tag_b component))
+      let tag = string_of_label component.label in
+      List.iter add (changelog_component ~diff:true ~since:(Some since) tag tag component))
     components;
+
   Notify.send_message
-    ~subject:(Printf.sprintf "bf@review (%s)" interval)
+    ~subject:(Printf.sprintf "bf@review (%s)" since)
     ~contents:(List.rev !chunks)
     (Params.get_param "smtp-notify-email")
 
@@ -380,9 +379,9 @@ let tag_composite composite tag =
   log_message ("=> tag-composite " ^ composite ^ " " ^ tag);
   make_tag tag (components_of_composite composite)
 
-let review_composite composite interval =
-  log_message ("=> review-composite " ^ composite ^ " " ^ interval);
-  make_review interval (components_of_composite composite)
+let review_composite composite since =
+  log_message ("=> review-composite " ^ composite ^ " " ^ since);
+  make_review since (components_of_composite composite)
 
 let diff_composite composite tag_a tag_b =
   log_message ("=> diff-composite " ^ composite ^ " " ^ tag_a ^ ":" ^ tag_b);
