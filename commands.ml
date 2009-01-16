@@ -116,13 +116,13 @@ let update_component component = (* todo: more smart implementation *)
 	| None, _ -> ())
 
 let smart_update_component component =
-  with_component_dir ~strict:true component
+  with_component_dir ~strict:false component
     (fun () ->
-      let repos = 
+      let repos =
 	Filename.concat (Params.get_param "git-url") component.name in
       let start = git_current_branch () in
       git_fetch repos;
-      git_track_new_branches ();      
+      git_track_new_branches ();
       List.iter
 	(fun branch ->
 	  if git_changed branch ("origin/" ^ branch) then
