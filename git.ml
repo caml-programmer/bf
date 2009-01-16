@@ -1,3 +1,4 @@
+
 open Types
 open Logger
 open System
@@ -21,6 +22,9 @@ let git_push ?refspec url =
     | Some spec -> log_command "git" ["push";url;spec]
     | None -> log_command "git" ["push";url]
 
+let git_remote_update () =
+  log_command "git" ["remote";"update"]
+   
 let git_make_tag tag =
   let state = ref Tag_created in
   let error_handler ps =

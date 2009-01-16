@@ -122,6 +122,7 @@ let smart_update_component component =
 	Filename.concat (Params.get_param "git-url") component.name in
       let start = git_current_branch () in
       git_fetch repos;
+      git_remote_update ();
       git_track_new_branches ();
       List.iter
 	(fun branch ->
