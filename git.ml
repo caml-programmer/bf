@@ -11,6 +11,11 @@ let git_pull ?refspec url =
     | Some spec -> log_command "git" ["pull";url;spec]
     | None -> log_command "git" ["pull";url]
 
+let git_fetch ?refspec url =
+  match refspec with
+    | Some spec -> log_command "git" ["fetch";url;spec]
+    | None -> log_command "git" ["fetch";url]
+
 let git_push ?refspec url =
   match refspec with
     | Some spec -> log_command "git" ["push";url;spec]
@@ -130,6 +135,11 @@ let git_diff ?(ignore=[]) ?key () =
 	   (String.sub s 2
 	     (String.length s - 2)) ignore))
        cmd
+
+let git_changed key_a key_b =
+  let cmd =
+    sprintf "git log '%s'..'%s'" key_a key_b in
+  read_lines cmd <> []
 
 let git_diff_view ~tag_a ~tag_b =
   let cmd =

@@ -115,8 +115,34 @@ let update_component component = (* todo: more smart implementation *)
 	    git_checkout ~force:true ~key:start_key ()
 	| None, _ -> ())
 
+let smart_update_component component =
+  with_component_dir ~strict:true component
+    (fun () ->
+      let repos = 
+	Filename.concat (Params.get_param "git-url") component.name in
+      let start = git_current_branch () in
+      git_fetch repos;
+      git_track_new_branches ();      
+      List.iter
+	(fun branch ->
+	  if git_changed branch ("origin/" ^ branch) then
+	    begin
+	      git_checkout ~force:true ~key:branch ();
+	      git_clean ();
+	      git_pull ~refspec:branch repos
+	    end)
+	(git_branch ());
+      let stop = git_current_branch () in
+      match start, stop with
+	| Some start_key, Some stop_key -> 
+	    if start_key <> stop_key then
+	      git_checkout ~force:true ~key:start_key ()
+	| Some start_key, None ->
+	    git_checkout ~force:true ~key:start_key ()
+	| None, _ -> ())
+
 let update components =
-  non_empty_iter update_component components
+  non_empty_iter smart_update_component components
 
 let forward_component component =
   with_component_dir ~strict:false component
