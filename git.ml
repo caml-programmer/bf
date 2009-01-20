@@ -17,10 +17,14 @@ let git_fetch ?refspec url =
     | Some spec -> log_command "git" ["fetch";url;spec]
     | None -> log_command "git" ["fetch";url]
 
-let git_push ?refspec url =
+let git_push ?(tags=false) ?refspec url =
   match refspec with
-    | Some spec -> log_command "git" ["push";url;spec]
-    | None -> log_command "git" ["push";url]
+    | Some spec -> 
+	let opts = if tags then ["--tags"] else [] in
+	log_command "git" (["push"] @ opts @ [url;spec])
+    | None ->
+	let opts = if tags then ["--tags"] else [] in
+	log_command "git" (["push"] @ opts @ [url])
 
 let git_remote_update () =
   log_command "git" ["remote";"update"]

@@ -281,7 +281,7 @@ let tag_component tag component =
 	  Some branch ->
 	    (match git_make_tag tag with
 	      | Tag_created ->
-		  git_push ~refspec:tag url;
+		  git_push ~tags:true ~refspec:tag url;
 		  git_pull ~refspec:branch url
 	      | Tag_already_exists -> ()
 	      | Tag_creation_problem -> exit 2)
@@ -289,7 +289,7 @@ let tag_component tag component =
 	    (* log_error ("cannot find current branch for " ^ component.name) *)
 	    (match git_make_tag tag with
 	      | Tag_created ->
-		  git_push ~refspec:tag url;
+		  git_push ~tags:true ~refspec:tag url;
 		  git_pull url
 	      | Tag_already_exists -> ()
 	      | Tag_creation_problem -> exit 2))
