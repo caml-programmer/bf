@@ -170,9 +170,16 @@ let send_message
   try
     let host = Unix.gethostbyname smtp_server in
     let (in_channel,out_channel) =
-      Unix.open_connection
-	(Unix.ADDR_INET(host.Unix.h_addr_list.(0),smtp_port)) in
-    
+      let rec make () =
+	(try
+	  Unix.open_connection
+	    (Unix.ADDR_INET(host.Unix.h_addr_list.(0),smtp_port))
+	with Unix.Unix_error(Unix.EINTR,_,_) ->
+	  message "wait one second to connect";
+	  Unix.sleep 1; make ())
+      in make ()
+    in
+	  
     let (in_port,out_port) =
       new Netchannels.input_channel in_channel,
       new Netchannels.output_channel out_channel in
