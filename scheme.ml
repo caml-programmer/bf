@@ -170,11 +170,17 @@ let make_params_of_sval v =
 let unit_handler_of_sval v =
   (fun () -> 
     match v with
-	Sproc (p,e) ->
+	Sproc (p,disp) ->
 	  let res = ref None in
 	  let handler sval =
 	    res := Some sval in
-	  Ocs_eval.eval thread handler p.proc_body;
+	  let th = {
+	    thread with
+	      th_frame = Array.make p.proc_frame_size Seof;
+	      th_display = disp;
+	      th_depth = Array.length disp }
+	  in
+	  Ocs_eval.eval th handler p.proc_body;
 	  (match !res with
 	    | None -> error v
 	    | Some sval -> sval)
