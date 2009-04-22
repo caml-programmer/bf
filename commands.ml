@@ -26,9 +26,7 @@ let remove_component component =
       
 let clone_component component =
   git_clone
-    (Filename.concat
-      (Params.get_param "git-url") component.name)
-    component.name
+    (git_create_url component) component.name
 
 let with_component_dir ?(strict=true) component thunk =
   let curdir = Sys.getcwd () in
@@ -103,7 +101,7 @@ let update_component component = (* todo: more smart implementation *)
 	(fun branch ->
 	  git_checkout ~force:true ~key:branch ();
 	  git_clean ();
-	  git_pull ~refspec:branch (Filename.concat (Params.get_param "git-url") component.name))
+	  git_pull ~refspec:branch (Filename.concat (git_create_url component) component.name))
 	(git_branch ());
       git_track_new_branches ();
       let stop = git_current_branch () in
@@ -119,7 +117,7 @@ let smart_update_component component =
   with_component_dir ~strict:false component
     (fun () ->
       let repos =
-	Filename.concat (Params.get_param "git-url") component.name in
+	Filename.concat (git_create_url component) component.name in
       let start = git_current_branch () in
       git_fetch repos;
       git_remote_update ();
@@ -148,7 +146,7 @@ let update components =
 let forward_component component =
   with_component_dir ~strict:false component
     (fun () ->
-      git_push (Filename.concat (Params.get_param "git-url") component.name))
+      git_push (Filename.concat (git_create_url component) component.name))
 
 let forward components =
   non_empty_iter forward_component components
@@ -276,7 +274,7 @@ let tag_component tag component =
     (fun () ->
       let url = 
 	Filename.concat
-	  (Params.get_param "git-url") component.name in
+	  (git_create_url component) component.name in
       match git_current_branch () with
 	  Some branch ->
 	    (match git_make_tag tag with
