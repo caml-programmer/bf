@@ -26,7 +26,8 @@ let remove_component component =
       
 let clone_component component =
   git_clone
-    (git_create_url component) component.name
+    (Filename.concat 
+      (git_create_url component) component.name) component.name
 
 let with_component_dir ?(strict=true) component thunk =
   let curdir = Sys.getcwd () in
@@ -184,6 +185,27 @@ let rebuild_component component =
 let rebuild components =
   non_empty_iter rebuild_component components
 
+let scan_entry f dir =
+  ()
+
+let create_top_state () =
+  match Params.get_param "autopkg" with
+    | "true" -> 
+	let t = Hashtbl.create 32 in
+	scan_entry 
+	  (fun (entry,last) ->
+	    Hashtbl.add t entry last) 
+	  (Params.get_param "top-dir");
+	t
+    | _ -> (Hashtbl.create 0 : fs_state)
+    
+let generate_changes a b =
+  match Params.get_param "autopkg" with
+    | "true" ->
+	let ch = open_out ".bf-list" in	
+	close_out ch
+    | _ -> ()
+
 let install_component component =
   with_component_dir ~strict:false component
     (fun () ->
@@ -194,7 +216,11 @@ let install_component component =
 	  if not (Sys.file_exists ".bf-build") then
 	    build_component_native component;
 	  log_message ("installing " ^ component.name);
+	  let state = 
+	    create_top_state () in
 	  install_rules ();
+	  generate_changes
+	    state (create_top_state ());
 	  log_message (component.name ^ " installed");
 	  let ch = open_out ".bf-install" in
 	  output_string ch (string_of_float (Unix.gettimeofday ()));
