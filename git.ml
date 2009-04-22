@@ -276,7 +276,7 @@ let git_create_url component =
   let s = Params.get_param "git-url" in
   match Pcre.split ~pat:"\\s+" s with
     | [] -> raise Invalid_url
-    | [one] -> Filename.concat one component.name
+    | [one] -> one
     | list ->
 	try
 	  List.iter
