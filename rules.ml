@@ -295,6 +295,7 @@ type platform =
   | Rhel4
   | Cent4
   | Cent5
+  | Fedora10
   | Alt
   | Solaris8
   | Solaris9
@@ -308,6 +309,7 @@ let string_of_platform = function
   | Rhel4     -> "rhel4"
   | Cent4     -> "cent4"
   | Cent5     -> "cent5"
+  | Fedora10     -> "f10"
   | Alt       -> "alt"
   | Solaris8  -> "sol8"
   | Solaris9  -> "sol9"
@@ -320,6 +322,7 @@ let platform_mapping = [
     "^Red Hat Enterprise.*?release 4",Rhel4;
     "^CentOS.*?release 4",Cent4;
     "^CentOS.*?release 5",Cent5;
+    "^Fedora.*?release 10",Fedora10;
     "^ALT Linux",Alt
   ]
 ]
@@ -555,6 +558,7 @@ let build_linux_package args =
 		| Rhel4 -> build_rh_package platform args
 		| Cent4 -> build_rh_package platform args
 		| Cent5 -> build_rh_package platform args
+		| Fedora10 -> build_rh_package platform args
 		| Alt   -> build_rh_package platform args
 		| _     -> log_error "unknown or unsupported platform")
 	  | _ -> log_error "unknown or unsupported platform")
