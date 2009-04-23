@@ -1,4 +1,3 @@
-
 open Types
 open Logger
 open System
@@ -252,4 +251,37 @@ let git_component_status ~strict component =
       status
     end
 
+exception Invalid_url
+exception Found_component of string
+exception Component_not_found of string
 
+let check_component_url url name =
+  let cmd = 
+    sprintf "git ls-remote %s" 
+      (Filename.concat url name) in
+  let ch = Unix.open_process_in cmd in
+  let check () =
+    match Unix.close_process_in ch with
+      | Unix.WEXITED 0 ->
+	  raise (Found_component url)
+      | _ -> ()
+  in
+  (try
+    while true do
+      ignore(input_line ch);
+    done; check ()
+  with End_of_file -> check ())
+
+let git_create_url component =
+  let s = Params.get_param "git-url" in
+  match Pcre.split ~pat:"\\s+" s with
+    | [] -> raise Invalid_url
+    | [one] -> one
+    | list ->
+	try
+	  List.iter
+	    (fun url ->
+	      check_component_url url component.name)
+	    list;
+	  raise (Component_not_found component.name)
+	with Found_component url -> url

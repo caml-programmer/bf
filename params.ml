@@ -86,3 +86,4 @@ set_param ~default:"bf message" "smtp-subject";;
 set_param ~default:"bf" "smtp-from-name";;
 set_param ~default:"bf@notify" "smtp-from-mail";;
 set_param ~default:"bf@notify" "smtp-notify-email";; (* used by changelog action *)
+set_param ~default:"false" "autopkg";;

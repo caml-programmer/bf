@@ -28,3 +28,9 @@ type tag_status =
   | Tag_already_exists
   | Tag_created
   | Tag_creation_problem
+
+type fs_entry =
+  | File of string
+  | Dir of string
+
+type fs_state = (fs_entry,float) Hashtbl.t
