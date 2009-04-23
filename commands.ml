@@ -246,7 +246,8 @@ let generate_changes a b =
 	let ch = open_out ".bf-list" in
 	List.iter
 	  (fun e ->
-	    output_string ch (string_of_fs_entry e))
+	    output_string ch (string_of_fs_entry e);
+	    output_string ch "\n")
 	  (List.sort entry_compare !acc);
 	close_out ch
     | _ -> ()
