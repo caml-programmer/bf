@@ -185,8 +185,26 @@ let rebuild_component component =
 let rebuild components =
   non_empty_iter rebuild_component components
 
-let scan_entry f dir =
-  ()
+let rec scan_entry f dir =
+  let dh = Unix.opendir dir in
+  let rec read acc =
+    try
+      read ((Unix.readdir dh)::acc)
+    with End_of_file ->
+      Unix.closedir dh;
+      acc      
+  in 
+  List.iter 
+    (fun s ->
+      if s <> "." && s <> ".." then
+	let abs = Filename.concat dir s in
+	let last =
+	  (Unix.stat abs).Unix.st_mtime in
+	if System.is_directory abs then
+	  (f (Dir abs,last); scan_entry f abs)
+	else
+	  f (File abs,last))
+    (read [])
 
 let create_top_state () =
   match Params.get_param "autopkg" with
@@ -194,15 +212,42 @@ let create_top_state () =
 	let t = Hashtbl.create 32 in
 	scan_entry 
 	  (fun (entry,last) ->
-	    Hashtbl.add t entry last) 
+	    Hashtbl.add t entry last)
 	  (Params.get_param "top-dir");
 	t
     | _ -> (Hashtbl.create 0 : fs_state)
     
 let generate_changes a b =
+  let string_of_fs_entry = function
+    | File s -> "f " ^ s
+    | Dir s  -> "d " ^ s
+  in
+  let entry_compare a b =
+    match a, b with
+      | File x, File y -> compare x y
+      | Dir  x, Dir  y -> compare x y
+      | File x, Dir  y -> compare x y
+      | Dir  x, File y -> compare x y
+  in
   match Params.get_param "autopkg" with
     | "true" ->
-	let ch = open_out ".bf-list" in	
+	let acc = ref [] in
+	let out s = 
+	  acc := s::!acc in
+	Hashtbl.iter
+	  (fun b_entry b_last ->
+	    (try
+	      let a_last = Hashtbl.find a b_entry in
+	      if b_last > a_last then
+		out b_entry
+	    with Not_found ->
+	      out b_entry))
+	  b;
+	let ch = open_out ".bf-list" in
+	List.iter
+	  (fun e ->
+	    output_string ch (string_of_fs_entry e))
+	  (List.sort entry_compare !acc);
 	close_out ch
     | _ -> ()
 
