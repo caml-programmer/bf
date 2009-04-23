@@ -338,7 +338,7 @@ let rpmbuild
   let args = ref [] in
   let add s = args := !args @ [s] in
   let define n v =
-    add "-D"; add (sprintf "%s %s" n v)
+    add "--define"; add (sprintf "%s %s" n v)
   in
   let arch = System.arch () in
   let location = 
