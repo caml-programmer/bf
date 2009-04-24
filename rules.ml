@@ -304,6 +304,14 @@ let send_file_over_ssh src dst =
 
 (* Package *)
 
+type os =
+  | Linux
+  | SunOS
+
+type pkg_engine =
+  | Rpm_build
+  | Pkg_trans
+
 type platform =
   | Rhel3
   | Rhel4
@@ -315,31 +323,85 @@ type platform =
   | Solaris9
   | Solaris10
 
-type platform_mapping = 
+type platform_mapping =
     (string * ((string * platform) list)) list
+
+let engine_of_platform = function
+  | Rhel3     -> Rpm_build
+  | Rhel4     -> Rpm_build
+  | Cent4     -> Rpm_build
+  | Cent5     -> Rpm_build
+  | Fedora10  -> Rpm_build
+  | Alt       -> Rpm_build
+  | Solaris8  -> Pkg_trans
+  | Solaris9  -> Pkg_trans
+  | Solaris10 -> Pkg_trans
 
 let string_of_platform = function
   | Rhel3     -> "rhel3"
   | Rhel4     -> "rhel4"
   | Cent4     -> "cent4"
   | Cent5     -> "cent5"
-  | Fedora10     -> "f10"
+  | Fedora10  -> "f10"
   | Alt       -> "alt"
   | Solaris8  -> "sol8"
   | Solaris9  -> "sol9"
   | Solaris10 -> "sol10"
 
-let platform_mapping = [
-  "/etc/redhat-release",
+let os () =
+  match System.uname () with
+    | "linux" -> Linux
+    | "sunos" -> SunOS
+    | s -> log_error (sprintf "Unsupported OS (%s)" s)
+
+let linux_platform_mapping =
   [
-    "^Red Hat Enterprise.*?release 3",Rhel3;
-    "^Red Hat Enterprise.*?release 4",Rhel4;
-    "^CentOS.*?release 4",Cent4;
-    "^CentOS.*?release 5",Cent5;
-    "^Fedora.*?release 10",Fedora10;
-    "^ALT Linux",Alt
+    "/etc/redhat-release",
+    [
+      "^Red Hat Enterprise.*?release 3",Rhel3;
+      "^Red Hat Enterprise.*?release 4",Rhel4;
+      "^CentOS.*?release 4",Cent4;
+      "^CentOS.*?release 5",Cent5;
+      "^Fedora.*?release 10",Fedora10;
+      "^ALT Linux",Alt
+    ]
   ]
-]
+    
+let rec select_platforms acc = function
+  | [] -> acc
+  | (file,mapping)::tl ->
+      if Sys.file_exists file then
+	begin
+	  let s = System.read_file ~file in
+	  let l = 
+	    List.filter
+	      (fun (pat,_) -> Pcre.pmatch ~pat s) mapping in
+	  (match l with
+	    | (_,platform)::_ -> 
+		select_platforms (acc @ [platform]) tl
+	    | _ -> 
+		select_platforms acc tl)
+	end
+      else select_platforms acc tl
+
+let sunos_platfrom () =
+  match System.uname ~flag:'r' () with
+    | "5.8"  -> Solaris8
+    | "5.9"  -> Solaris9
+    | "5.10" -> Solaris10
+    |  s     ->	log_error (sprintf "Unsupported SunOS (%s)" s)
+
+let with_platform (f : os -> platform -> unit) =
+  let os = os () in
+  match os with
+    | Linux ->
+	let platform =
+	  (match select_platforms [] linux_platform_mapping with
+	    | [] -> log_error "unknown or unsupported platform"
+	    | p::_ -> p)
+	in f os platform
+    | SunOS->
+	f os (sunos_platfrom ())
 
 let check_rh_build_env () =
   System.check_commands ["rpmbuild"]
@@ -506,12 +568,13 @@ let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
   with End_of_file -> close_in ch
 
 exception Invalid_specdir_format
+exception Unsupported_specdir_version of string
 
-let check_version v file =
+let get_version file =
   let s = System.read_file file in
   try
-    v = String.sub s 0 (String.index s '\n')
-  with Not_found -> v = s
+    String.sub s 0 (String.index s '\n')
+  with Not_found -> s
 
 let specdir_format_v1 specdir =
   let flist = ["rh.spec";"rh.files";"rh.req";"version"] in
@@ -521,70 +584,52 @@ let specdir_format_v1 specdir =
       Sys.file_exists (Filename.concat specdir s))
     flist
   then
-    if check_version "1.0" (Filename.concat specdir "version") then
-      List.map 
-	(if String.length specdir > 0 && specdir.[0] = '/' then
-	  Filename.concat specdir
-	else
-	  Filename.concat (Filename.concat (Sys.getcwd()) specdir)) flist
-    else
-      raise Invalid_specdir_format
+    List.map (Filename.concat specdir) flist
   else raise Invalid_specdir_format
 
-let build_rh_package platform args =
+let build_package_impl os platform args =
   match args with
     | [specdir;version;release] ->
-	(match specdir_format_v1 specdir with
-	    [spec;files;findreq;pack_version] ->
-	      let top_dir = Params.get_param "top-dir" in
-	      check_rh_build_env ();
-	      log_command "chmod" ["+x";findreq];
-	      copy_to_buildroot ~top_dir files;
-	      let (location,fullname) =
-		rpmbuild
-		  ~top_dir
-		  ~pkgname:(Filename.basename specdir)
-		  ~platform ~version ~release
-		  ~spec ~files ~findreq ()
-	      in
-	      let hooks =
-		Filename.concat specdir "hooks.scm" in
-	      if Sys.file_exists hooks then
-		begin
-		  Scheme.eval_file hooks;
-		  Scheme.eval_code (fun _ -> ())
-		    (sprintf "(after-build \"%s\" \"%s\" \"%s\")"
-		      (System.hostname ()) location fullname)
-		end
-	  | _-> assert false)
+	let abs_specdir =
+	  if String.length specdir > 0 && specdir.[0] = '/' then
+	    specdir
+	  else
+	    Filename.concat (Sys.getcwd()) specdir
+	in	
+	(match get_version (Filename.concat abs_specdir "version") with
+	  | "1.0" ->
+	      (match specdir_format_v1 specdir with
+		  [spec;files;findreq;pack_version] ->
+		    let top_dir = Params.get_param "top-dir" in
+		    check_rh_build_env ();
+		    log_command "chmod" ["+x";findreq];
+		    copy_to_buildroot ~top_dir files;
+		    let (location,fullname) =
+		      rpmbuild
+			~top_dir
+			~pkgname:(Filename.basename specdir)
+			~platform ~version ~release
+			~spec ~files ~findreq ()
+		    in
+		    let hooks =
+		      Filename.concat specdir "hooks.scm" in
+		    if Sys.file_exists hooks then
+		      begin
+			Scheme.eval_file hooks;
+			Scheme.eval_code (fun _ -> ())
+			  (sprintf "(after-build \"%s\" \"%s\" \"%s\")"
+			    (System.hostname ()) location fullname)
+		      end
+		| _-> assert false)
+	  | "2.0" -> ()
+	  | version -> 
+	      raise (Unsupported_specdir_version version))
     | _ -> log_error "build_rh_package: wrong arguments"
 
-let build_linux_package args =
-  List.iter
-    (fun (f,m) ->
-      if Sys.file_exists f then
-	let s = System.read_file ~file:f in
-	let l = List.filter (fun (pat,_) -> Pcre.pmatch ~pat s) m in
-	match l with
-	  | (_,platform)::_ ->
-	      (match platform with
-		| Rhel3 -> build_rh_package platform args
-		| Rhel4 -> build_rh_package platform args
-		| Cent4 -> build_rh_package platform args
-		| Cent5 -> build_rh_package platform args
-		| Fedora10 -> build_rh_package platform args
-		| Alt   -> build_rh_package platform args
-		| _     -> log_error "unknown or unsupported platform")
-	  | _ -> log_error "unknown or unsupported platform")
-    platform_mapping
-
-let build_sunos_package args = ()
-
 let build_package args =
-  match System.uname () with
-    | "linux" -> build_linux_package args
-    |  s      -> log_error (sprintf "Unsupport platform (%s) by build package" s)
-
+  with_platform
+    (fun os platfrom ->
+      build_package_impl os platfrom args)
 
 (* Log wizor *)
 
@@ -601,3 +646,10 @@ let log_wizor dir =
 	{ mtime = st.Unix.st_mtime; lname = dir })
     (System.list_of_directory dir)
   in ()
+
+
+
+
+
+
+

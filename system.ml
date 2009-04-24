@@ -130,8 +130,11 @@ let copy_dir dir dest =
   
   transfer_dir dir dest
   
-let uname () =
-  let ch = Unix.open_process_in "uname" in
+let uname ?flag () =
+  let ch = Unix.open_process_in 
+    (match flag with 
+      | Some c -> sprintf "uname -%c" c
+      | None   -> "uname") in
   let name = String.lowercase (input_line ch) in
   close_in ch; name
 
