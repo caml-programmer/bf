@@ -324,7 +324,7 @@ let status_component ?(max_component_length=0) ?(max_label_length=0) component =
     (Printf.sprintf "=> component (%s%s%s%s[%s]%s b:%b\ti:%b\ts: %s)"
       component.name component_suffix label_type label_type_suffix label label_suffix build install status);
   if not composite_mode then
-    List.iter log_message !changes    
+    List.iter log_message !changes
 
 let rec max_value f cur = function
   | [] -> cur

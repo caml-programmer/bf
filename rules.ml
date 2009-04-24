@@ -247,11 +247,25 @@ let move_file src dir =
 
 exception Cannot_create_directory of string
 
+let make_directory_r ?(mode=0o755) s =
+  let rec make rest s =
+    let dir = Filename.dirname s in
+    if System.is_directory dir then
+      begin
+	Unix.mkdir s mode;
+	List.iter
+	  (fun s -> Unix.mkdir s mode)
+	  rest
+      end
+    else
+      make (s::rest) dir
+  in make [] s
+
 let make_directory dirs =
   List.iter
     (fun dir ->
       if not (Sys.file_exists dir) then
-	Unix.mkdir dir 0o755
+	make_directory_r ~mode:0o755 dir
       else if System.is_directory dir then
 	log_message (sprintf "warning: directory (%s) already exists!" dir)
       else
