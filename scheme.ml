@@ -63,39 +63,41 @@ let eval_sval s =
 let component_of_sval s =
   match s with
     | Spair v ->
+	let fst = function
+	  | Spair v -> v.car
+	  | x -> error x
+	in
 	let name =
 	  (match v.car with
 	    | Ssymbol s -> s
-	    | sval -> error sval)
+	    | x -> error x)
 	in
-	let label =
-	  (match v.cdr with
-	    | Snull -> Current
-	    | Spair v2 ->
-		(match v2.car with
-		  | Spair v3 ->
-		      (match v3.car with 
-			| Ssymbol "branch" ->
-			    Branch
-			      (match v3.cdr with
-				| Spair v4 ->
-				    (match v4.car with
-					Sstring s -> s
-				      | sval -> error sval)
-				| sval -> error sval)
-			| Ssymbol "tag" ->
-			    Tag
-			      (match v3.cdr with
-				| Spair v4 ->
-				    (match v4.car with
-					Sstring s -> s
-				      | sval -> error sval)
-				| sval -> error sval)
-			| sval -> error sval)
-		  | sval -> error sval)
-	    | sval -> error sval)
-	in { name = name ; label = label }
-    | sval -> error sval
+	let pkg = ref None in
+	let label = ref Current in
+	let rec scan = function
+	  | Spair v ->
+	      (match v.car with
+		| Spair x ->
+		    (match x.car with
+		      | Ssymbol "branch" ->
+			  label := Branch (match fst x.cdr with Sstring s -> s | x -> error x)
+		      | Ssymbol "tag" ->
+			  label := Tag (match fst x.cdr with Sstring s ->  s | x -> error x)
+		      | Ssymbol "package" ->
+			  pkg := Some (match fst x.cdr with Sstring s ->  s | x -> error x)
+		      | x -> error x)
+		| Snull -> ()
+		| x -> error x);
+	      scan v.cdr;
+	  | Snull -> ()
+	  | _ -> assert false
+	in scan v.cdr;
+	{ 
+	  name = name; 
+	  label = !label;
+	  pkg = !pkg;
+	}
+    | x -> error x
  
 let components_of_sval_array v =
   List.map component_of_sval (Array.to_list v)

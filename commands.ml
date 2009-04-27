@@ -424,75 +424,62 @@ let make_review since components =
     ~contents:(List.rev !chunks)
     (Params.get_param "smtp-notify-email")
 
-let components_of_composite composite =
-  let composite = Rules.load_composite composite in
-  let rec iter acc = function
-    | Snull -> acc
-    | Spair v ->
-	(match v.cdr with
-	  | Snull -> acc @ [Scheme.component_of_sval v.car]
-	  | Spair v2 ->
-	      iter (acc @ [Scheme.component_of_sval v.car]) (Spair v2)
-	  | _ -> log_error "invalid composition")
-    | _ -> log_error "invalid composition"
-  in iter [] composite
-
 let with_tag tag components =
   match tag with
     | None -> components
     | Some tag_name ->
 	List.map
 	  (fun component ->
-	    { name = component.name; label = Tag tag_name})
+	    { name = component.name; label = Tag tag_name; pkg = component.pkg })
 	  components
 
 let prepare_composite ?tag composite =
   log_message ("=> prepare-composite " ^ composite);
-  prepare (with_tag tag (components_of_composite composite))
+  prepare (with_tag tag (Rules.components_of_composite composite))
 
 let update_composite ?tag composite =
   log_message ("=> update-composite " ^ composite);
-  update (with_tag tag (components_of_composite composite))
+  update (with_tag tag (Rules.components_of_composite composite))
 
 let forward_composite ?tag composite =
   log_message ("=> forward-composite " ^ composite);
-  forward (with_tag tag (components_of_composite composite))
+  forward (with_tag tag (Rules.components_of_composite composite))
   
 let build_composite ?tag composite =
   log_message ("=> build-composite " ^ composite);
-  build (with_tag tag (components_of_composite composite))
+  build (with_tag tag (Rules.components_of_composite composite))
 
 let rebuild_composite ?tag composite =
   log_message ("=> rebuild-composite " ^ composite);
-  rebuild (with_tag tag (components_of_composite composite))
+  rebuild (with_tag tag (Rules.components_of_composite composite))
 
 let install_composite ?tag composite =
   log_message ("=> install-composite " ^ composite);
-  install (with_tag tag (components_of_composite composite))
+  install (with_tag tag (Rules.components_of_composite composite))
 
 let reinstall_composite ?tag composite =
   log_message ("=> reinstall-composite " ^ composite);
-  reinstall (with_tag tag (components_of_composite composite))
+  reinstall (with_tag tag (Rules.components_of_composite composite))
 
 let status_composite ?tag composite =
   log_message ("=> status-composite " ^ composite);
-  status (with_tag tag (components_of_composite composite))
+  status (with_tag tag (Rules.components_of_composite composite))
 
 let tag_composite composite tag =
   log_message ("=> tag-composite " ^ composite ^ " " ^ tag);
-  make_tag tag (components_of_composite composite)
+  make_tag tag (Rules.components_of_composite composite)
 
 let review_composite composite since =
   log_message ("=> review-composite " ^ composite ^ " " ^ since);
-  make_review since (components_of_composite composite)
+  make_review since (Rules.components_of_composite composite)
 
 let diff_composite composite tag_a tag_b =
   log_message ("=> diff-composite " ^ composite ^ " " ^ tag_a ^ ":" ^ tag_b);
-  make_diff tag_a tag_b (components_of_composite composite)
+  make_diff tag_a tag_b (Rules.components_of_composite composite)
 
 let changelog_composite composite tag_a tag_b =
   log_message ("=> changelog-composite " ^ composite ^ " " ^ tag_a ^ ":" ^ tag_b);
-  make_changelog tag_a tag_b (components_of_composite composite)
+  make_changelog tag_a tag_b (Rules.components_of_composite composite)
 
 ;;
 

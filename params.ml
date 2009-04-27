@@ -4,8 +4,20 @@ open Ocs_types
 
 exception Unknown_parameter of string
 
-let read_params () =
+let read_from_file filename =
   let params = Hashtbl.create 32 in
+  let rex = Pcre.regexp "^([^\\s]+)\\s+(.*)$" in
+  let ch = open_in filename in
+  List.iter
+    (fun s ->
+      if Pcre.pmatch ~rex s then
+	let a =
+	  Pcre.extract ~rex s
+	in Hashtbl.replace params a.(1) a.(2))
+    (list_of_channel ch);
+  params  
+
+let read_params () =
   let filename =
     if Sys.file_exists ".bf-params" then
       Some ".bf-params"
@@ -13,18 +25,9 @@ let read_params () =
       if Sys.file_exists "/etc/bf-params"
       then Some "/etc/bf-params" else None
   in match filename with
-    | None -> params
+    | None ->  Hashtbl.create 32
     | Some filename ->
-	let rex = Pcre.regexp "^([^\\s]+)\\s+(.*)$" in
-	let ch = open_in filename in
-	List.iter
-	  (fun s ->
-	    if Pcre.pmatch ~rex s then
-	      let a =
-		Pcre.extract ~rex s
-	      in Hashtbl.replace params a.(1) a.(2))
-	  (list_of_channel ch);
-	params
+	read_from_file filename
 ;;
 
 let user_params = 

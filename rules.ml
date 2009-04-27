@@ -1,3 +1,6 @@
+open Types
+open Ocs_env
+open Ocs_types
 open Logger
 open Printf
 
@@ -76,6 +79,19 @@ let load_composite file =
     | None -> log_error "composite handler is not called"
     | Some v -> v
   
+let components_of_composite composite =
+  let composite = load_composite composite in
+  let rec iter acc = function
+    | Snull -> acc
+    | Spair v ->
+	(match v.cdr with
+	  | Snull -> acc @ [Scheme.component_of_sval v.car]
+	  | Spair v2 ->
+	      iter (acc @ [Scheme.component_of_sval v.car]) (Spair v2)
+	  | _ -> log_error "invalid composition")
+    | _ -> log_error "invalid composition"
+  in iter [] composite
+
 let build_rules () =
   load_plugins ();
   Env.prepare ();
@@ -319,6 +335,7 @@ type platform =
   | Cent5
   | Fedora10
   | Alt
+  | Arch
   | Solaris8
   | Solaris9
   | Solaris10
@@ -333,6 +350,7 @@ let engine_of_platform = function
   | Cent5     -> Rpm_build
   | Fedora10  -> Rpm_build
   | Alt       -> Rpm_build
+  | Arch      -> Rpm_build
   | Solaris8  -> Pkg_trans
   | Solaris9  -> Pkg_trans
   | Solaris10 -> Pkg_trans
@@ -344,9 +362,23 @@ let string_of_platform = function
   | Cent5     -> "cent5"
   | Fedora10  -> "f10"
   | Alt       -> "alt"
+  | Arch      -> "arch"
   | Solaris8  -> "sol8"
   | Solaris9  -> "sol9"
   | Solaris10 -> "sol10"
+
+let platform_of_string = function
+  | "rhel3" -> Rhel3
+  | "rhel4" -> Rhel4
+  | "cent4" -> Cent4
+  | "cent5" -> Cent5
+  | "f10"   -> Fedora10
+  | "alt"   -> Alt
+  | "arch"  -> Arch
+  | "sol8"  -> Solaris8
+  | "sol9"  -> Solaris9
+  | "sol10" -> Solaris10
+  |  s -> log_error (sprintf "Unsupported platform (%s)" s)
 
 let os () =
   match System.uname () with
@@ -364,7 +396,8 @@ let linux_platform_mapping =
       "^CentOS.*?release 5",Cent5;
       "^Fedora.*?release 10",Fedora10;
       "^ALT Linux",Alt
-    ]
+    ];
+    "/etc/arch-release", ["^.*",Arch]
   ]
     
 let rec select_platforms acc = function
@@ -576,7 +609,7 @@ let get_version file =
     String.sub s 0 (String.index s '\n')
   with Not_found -> s
 
-let specdir_format_v1 specdir =
+let spec_from_v1 specdir =
   let flist = ["rh.spec";"rh.files";"rh.req";"version"] in
   if System.is_directory specdir &&
     List.for_all
@@ -586,6 +619,103 @@ let specdir_format_v1 specdir =
   then
     List.map (Filename.concat specdir) flist
   else raise Invalid_specdir_format
+
+type pkg_name = string
+type pkg_desc = string
+type pkg_ver = string
+type pkg_op =
+  | Pkg_le
+  | Pkg_lt
+  | Pkg_eq
+  | Pkg_ge
+  | Pkg_gt
+    
+type depend =
+    (pkg_name * pkg_op * pkg_ver * pkg_desc) list
+
+type reject =
+    string (* pcre pattern *)
+
+type spec = {
+  depends : depend list;
+  rejects : reject list;
+  components : component list;
+  pre_install : string option;
+  pre_uninstall : string option;
+  post_install : string option;
+  params : (string,string) Hashtbl.t;
+  hooks : string option;
+}
+
+let spec_from_v2 specdir =
+  let f = Filename.concat specdir in
+  let load s =
+    if Sys.file_exists s then
+      let ch = open_in s in
+      let content =
+	System.string_of_channel ch in
+      close_in ch; 
+      Some content
+    else
+      None
+  in
+  let depends =
+    let n = f "depends" in
+    if Sys.file_exists n then
+      begin
+	let v =
+	  Ocs_read.read_from_port 
+	    (Ocs_port.open_input_port n) in
+	Scheme.error v
+      end
+    else []
+  in
+  let rejects =
+    let n = f "rejects" in
+    if Sys.file_exists n then
+      begin
+	let ch = open_in n in
+	let patterns = 
+	  System.list_of_channel ch in
+	close_in ch; patterns
+      end
+    else []
+  in
+  let components =
+    components_of_composite (f "composite") in
+  let pre_install =
+    load (f "pre-install") in
+  let pre_uninstall =
+    load (f "pre-uninstall") in
+  let post_install =
+    load (f "post-install") in
+  let params =
+    let n = f "params" in
+    if Sys.file_exists n then
+      Params.read_from_file n
+    else Hashtbl.create 0
+  in
+  let hooks =
+    let n = f "hooks.scm" in
+    if Sys.file_exists n then
+      Some n
+    else
+      let parent = Filename.dirname specdir in
+      let pn = Filename.concat parent "hooks.scm" in
+      if Sys.file_exists pn then
+	Some pn
+      else None
+  in
+  {
+    depends = depends;
+    rejects = rejects;
+    components = components;
+    pre_install = pre_install;
+    pre_uninstall = pre_uninstall;
+    post_install = post_install;
+    params = params;
+    hooks = hooks;
+  }
 
 let build_package_impl os platform args =
   match args with
@@ -598,7 +728,7 @@ let build_package_impl os platform args =
 	in	
 	(match get_version (Filename.concat abs_specdir "version") with
 	  | "1.0" ->
-	      (match specdir_format_v1 specdir with
+	      (match spec_from_v1 abs_specdir with
 		  [spec;files;findreq;pack_version] ->
 		    let top_dir = Params.get_param "top-dir" in
 		    check_rh_build_env ();
@@ -621,7 +751,9 @@ let build_package_impl os platform args =
 			    (System.hostname ()) location fullname)
 		      end
 		| _-> assert false)
-	  | "2.0" -> ()
+	  | "2.0" ->
+	      let spec = spec_from_v2 abs_specdir in
+	      ()
 	  | version -> 
 	      raise (Unsupported_specdir_version version))
     | _ -> log_error "build_rh_package: wrong arguments"

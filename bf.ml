@@ -20,7 +20,7 @@ let usage () =
   exit 1
 
 let make_component s =
-  { name = s; label = Current }
+  { name = s; label = Current; pkg = None }
 
 let analyze_arguments () =
   match Array.length Sys.argv with
@@ -45,10 +45,10 @@ let analyze_arguments () =
 	(match  Sys.argv.(3) with
 	  | "branch" ->
 	      Is_component_with_label
-		{ name = Sys.argv.(2); label = (Branch Sys.argv.(4))}
+		{ name = Sys.argv.(2); label = (Branch Sys.argv.(4)); pkg = None }
 	  | "tag" ->
 	      Is_component_with_label
-		{ name = Sys.argv.(2); label = (Tag Sys.argv.(4))}
+		{ name = Sys.argv.(2); label = (Tag Sys.argv.(4)); pkg = None }
 	  |  _ ->
 	       Is_components
 		[ 

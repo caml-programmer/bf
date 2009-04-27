@@ -3,6 +3,7 @@ type label = Tag of string | Branch of string | Current
 type component = {
   name  : string;
   label : label;
+  pkg : string option;
 }
 
 let string_of_label = function
