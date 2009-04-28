@@ -12,6 +12,12 @@ let output_scheme_value ch v =
   Ocs_print.print port false v;
   Ocs_port.flush port
 
+let print v =
+  let p = Ocs_port.output_port stdout in
+  Ocs_print.print p false v;
+  Ocs_port.flush p;
+  print_newline ()
+
 let error sval =
   print_endline "Error: invalid scheme value:\n";
   output_scheme_value stdout sval; exit 4
@@ -59,14 +65,18 @@ let eval_sval s =
 	    | None -> error s
 	    | Some sval -> sval
 	end
+	  
+let fst = function
+  | Spair v -> v.car
+  | x -> error x
+
+let snd = function
+  | Spair v -> v.cdr
+  | x -> error x
 
 let component_of_sval s =
   match s with
     | Spair v ->
-	let fst = function
-	  | Spair v -> v.car
-	  | x -> error x
-	in
 	let name =
 	  (match v.car with
 	    | Ssymbol s -> s
@@ -207,9 +217,53 @@ let string_handler_of_sval v =
 	    | None -> error v
 	    | Some sval -> ())
       | sval -> error sval)
-  
 
+let unpair = function
+  | Spair v -> v
+  | _ -> raise Not_found
 
+let make_string = function
+  | Sstring s -> s
+  | Ssymbol s -> s
+  | _ -> raise Not_found
+
+let make_int = function
+  | Sint n -> n
+  | Sstring s -> int_of_string s
+  | _ -> raise Not_found
+
+let make_bool = function
+  | Strue -> true
+  | Sfalse -> false
+  | _ -> raise Not_found
+
+let rec iter f = function
+  | Spair x -> f x.car; iter f x.cdr
+  | _ -> ()
+
+let rec map f = function
+  | Spair x ->
+      let r = f x.car in
+      r :: (map f x.cdr)
+  | _ -> []
+
+let condrun name f = function
+  | Spair x ->
+      if x.car = Ssymbol name then
+	f x.cdr
+  | _ -> ()
+
+let rec parse m = function
+  | Spair x ->
+      (match x.car with
+	| Ssymbol s ->
+	    (try
+	      (List.assoc s m) x.cdr
+	    with Not_found -> ())
+	| Spair _ as y -> parse m y
+	| _ -> ());
+      parse m x.cdr
+  | _ -> ()
 
 
 

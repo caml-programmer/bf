@@ -380,11 +380,13 @@ let platform_of_string = function
   | "sol10" -> Solaris10
   |  s -> log_error (sprintf "Unsupported platform (%s)" s)
 
+let os_of_string = function
+  | "linux" -> Linux
+  | "sunos" -> SunOS
+  | s -> log_error (sprintf "Unsupported OS (%s)" s)
+      
 let os () =
-  match System.uname () with
-    | "linux" -> Linux
-    | "sunos" -> SunOS
-    | s -> log_error (sprintf "Unsupported OS (%s)" s)
+  os_of_string (System.uname ())
 
 let linux_platform_mapping =
   [
@@ -610,7 +612,7 @@ let get_version file =
   with Not_found -> s
 
 let spec_from_v1 specdir =
-  let flist = ["rh.spec";"rh.files";"rh.req";"version"] in
+  let flist = ["rh.spec";"rh.files";"rh.req"] in
   if System.is_directory specdir &&
     List.for_all
     (fun s ->
@@ -630,13 +632,14 @@ type pkg_op =
   | Pkg_ge
   | Pkg_gt
     
-type depend =
-    (pkg_name * pkg_op * pkg_ver * pkg_desc) list
+type depend = 
+    pkg_name * (pkg_op * pkg_ver) option * pkg_desc option
 
 type reject =
     string (* pcre pattern *)
 
 type spec = {
+  pkgname : pkg_name;
   depends : depend list;
   rejects : reject list;
   components : component list;
@@ -647,6 +650,13 @@ type spec = {
   hooks : string option;
 }
 
+let string_of_pkg_op = function
+  | Pkg_le -> "<="
+  | Pkg_lt -> "<"
+  | Pkg_eq -> "="
+  | Pkg_ge -> ">="
+  | Pkg_gt -> ">"
+
 let spec_from_v2 specdir =
   let f = Filename.concat specdir in
   let load s =
@@ -654,19 +664,101 @@ let spec_from_v2 specdir =
       let ch = open_in s in
       let content =
 	System.string_of_channel ch in
-      close_in ch; 
+      close_in ch;
       Some content
     else
       None
   in
   let depends =
+    let acc = ref ([] : depend list) in
+    let add_depend v = acc := v::!acc in
+    let add_package v =
+      let v2 = Scheme.map (fun v -> v) v in
+      try
+	let name_v = List.hd v2 in
+	let op_ver_v = try Some (List.nth v2 1) with _ -> None in
+	let desc_v = try Some (List.nth v2 2) with _ -> None in
+	
+	let pkg_name = ref None in
+	let pkg_op = ref None in
+	let pkg_ver = ref None in
+	let pkg_desc = ref None in
+	    
+	let add_op op v =
+	  let ver =
+	    Scheme.make_string (Scheme.fst v) in
+	  pkg_ver := Some ver;
+	  pkg_op  := Some op;
+	in
+	
+	(match name_v with
+	  | Ssymbol s -> pkg_name := Some s
+	  | _ -> ());
+	(match op_ver_v with
+	  | None -> ()
+	  | Some op_ver ->
+	      Scheme.parse
+		[
+		  "=",add_op Pkg_eq;
+		  ">",add_op Pkg_gt;
+		  "<",add_op Pkg_lt;
+		  ">=", add_op Pkg_ge;
+		  "<=", add_op Pkg_le;
+		] op_ver);
+	(match desc_v with
+	  | None -> ()
+	  | Some desc ->
+	      Scheme.parse
+		[ "desc", (fun v -> 
+		  pkg_desc := Some (Scheme.make_string (Scheme.fst v))) ] desc);
+	
+	(match (!pkg_name : pkg_name option) with
+	  | Some name ->
+	      (match !pkg_op, !pkg_ver with
+		| Some op, Some ver ->
+		    add_depend (name,(Some (op,ver)),!pkg_desc)
+		| _ ->
+		    add_depend (name,None,!pkg_desc))
+	  | None -> raise Not_found)
+      with _ ->
+	log_message "Package value:";
+	Scheme.print v;
+	log_error "Cannot add package"
+    in
+    let make_platforms v =
+      try
+	Scheme.map
+	  (fun x ->
+	    platform_of_string
+	    (Scheme.make_string x)) v
+      with Not_found ->
+	log_message "Platforms value:";
+	Scheme.print v;
+	log_error "Cannot parse platform value";
+    in
+    let platform_filter v =
+      with_platform (fun os platform ->
+	let platforms = make_platforms (Scheme.fst v) in
+	if platforms = [] || List.mem platform platforms then
+	  Scheme.iter add_package (Scheme.snd v))
+    in
+    let add_os =
+      Scheme.parse
+	(List.filter
+	  (fun v -> (os_of_string (fst v)) = (os ()))
+	  [
+	    "linux", platform_filter;
+	    "sunos", platform_filter;
+	  ])
+    in
     let n = f "depends" in
     if Sys.file_exists n then
       begin
-	let v =
-	  Ocs_read.read_from_port 
-	    (Ocs_port.open_input_port n) in
-	Scheme.error v
+	Scheme.parse
+	  ["depends",(Scheme.iter add_os)]
+	  (Ocs_read.read_from_port
+	    (Ocs_port.open_input_port n));
+	!acc
       end
     else []
   in
@@ -707,6 +799,7 @@ let spec_from_v2 specdir =
       else None
   in
   {
+    pkgname = (Filename.basename (Filename.dirname specdir));
     depends = depends;
     rejects = rejects;
     components = components;
@@ -717,6 +810,38 @@ let spec_from_v2 specdir =
     hooks = hooks;
   }
 
+let print_depends depends =
+  print_endline "Use depends:";
+  List.iter
+    (fun (pkg_name, ov_opt, pkg_desc) ->
+      print_endline (sprintf "  - pkg-name(%s), pkg-op(%s), pkg-ver(%s), pkg-desc(%s)" pkg_name
+	(match ov_opt with Some ov -> string_of_pkg_op (fst ov) | None -> "")
+	(match ov_opt with Some ov -> snd ov | None -> "")
+	(match pkg_desc with Some s -> s | None -> "")))
+    depends
+
+let build_over_rpmbuild params =
+  let (pkgname,platform,specdir,version,release,spec,files,findreq) = params in
+  let top_dir = Params.get_param "top-dir" in
+  check_rh_build_env ();
+  log_command "chmod" ["+x";findreq];
+  copy_to_buildroot ~top_dir files;
+  let (location,fullname) =
+    rpmbuild
+      ~top_dir 
+      ~pkgname ~platform ~version ~release
+      ~spec ~files ~findreq ()
+  in
+  let hooks =
+    Filename.concat specdir "hooks.scm" in
+  if Sys.file_exists hooks then
+    begin
+      Scheme.eval_file hooks;
+      Scheme.eval_code (fun _ -> ())
+	(sprintf "(after-build \"%s\" \"%s\" \"%s\")"
+	  (System.hostname ()) location fullname)
+    end
+      
 let build_package_impl os platform args =
   match args with
     | [specdir;version;release] ->
@@ -725,36 +850,168 @@ let build_package_impl os platform args =
 	    specdir
 	  else
 	    Filename.concat (Sys.getcwd()) specdir
-	in	
-	(match get_version (Filename.concat abs_specdir "version") with
+	in
+	let with_specdir = Filename.concat abs_specdir in
+	let with_out s f =
+	  let n = with_specdir s in
+	  let ch = open_out n in
+	  f (output_string ch);
+	  close_out ch; n
+	in
+	(match get_version (with_specdir "version") with
 	  | "1.0" ->
 	      (match spec_from_v1 abs_specdir with
-		  [spec;files;findreq;pack_version] ->
-		    let top_dir = Params.get_param "top-dir" in
-		    check_rh_build_env ();
-		    log_command "chmod" ["+x";findreq];
-		    copy_to_buildroot ~top_dir files;
-		    let (location,fullname) =
-		      rpmbuild
-			~top_dir
-			~pkgname:(Filename.basename specdir)
-			~platform ~version ~release
-			~spec ~files ~findreq ()
-		    in
-		    let hooks =
-		      Filename.concat specdir "hooks.scm" in
-		    if Sys.file_exists hooks then
-		      begin
-			Scheme.eval_file hooks;
-			Scheme.eval_code (fun _ -> ())
-			  (sprintf "(after-build \"%s\" \"%s\" \"%s\")"
-			    (System.hostname ()) location fullname)
-		      end
+		  [spec;files;findreq] ->
+		    let pkgname = 
+		      Filename.basename specdir in
+		    build_over_rpmbuild
+		      (pkgname,platform,specdir,version,release,spec,files,findreq)
 		| _-> assert false)
 	  | "2.0" ->
 	      let spec = spec_from_v2 abs_specdir in
-	      ()
-	  | version -> 
+	      print_depends spec.depends;
+	      (match engine_of_platform platform with
+		| Rpm_build ->
+		    let files =
+		      with_out "rpmbuild.files"
+			(fun out ->
+			  let add_bf_list file =
+			    let ch = open_in file in
+			    let rec read () =
+			      try
+				let s = input_line ch in
+				let l = String.length s in
+				if l > 2 then
+				  (match s.[0] with
+				    | 'd' ->
+					out (sprintf "%%dir %s" (String.sub s 2 (l - 2)))
+				    | 'f' -> 
+					out (sprintf "%s" (String.sub s 2 (l - 2)))
+				    | _ -> ())
+			      with End_of_file -> close_in ch
+			    in read ()
+			  in
+			  List.iter
+			    (fun c ->
+			      let name = c.name in
+			      let bf_list = 
+				Filename.concat name ".bf-list" in
+			      if Sys.file_exists bf_list then
+				add_bf_list bf_list
+			      else
+				log_error
+				  (sprintf "bf list is not found (%s)" bf_list))
+			    (List.filter 
+			      (fun c -> c.pkg = None)
+			      spec.components))
+		    in
+		    let findreq =
+		      with_out "rpmbuild.findreq"
+			(fun out -> 
+			  out "#!/bin/sh\n";
+			  List.iter 
+			    (fun (pkg_name,ov_opt,_) ->
+			      (match ov_opt with
+				| Some (op,ver) ->
+				    out (sprintf "echo %s %s %s\n"
+				      pkg_name (string_of_pkg_op op) ver)
+				| None ->
+				    out (sprintf "echo %s\n" pkg_name)))
+			    spec.depends;
+			  let freq =
+			    "/usr/lib/rpm/find-requires" in
+			  if Sys.file_exists freq then
+			    begin
+			      out "/usr/lib/rpm/find-requires";
+			      List.iter
+				(fun reject ->
+				  out (sprintf "\\\n| sed -e 's#%s##'" reject))
+				spec.rejects
+			    end
+			  else
+			    log_message (sprintf "warning: %s is not found" freq))
+		    in
+		    let specfile =
+		      let rpm_key_format s =
+			let l = String.length s in
+			if l > 0 then
+			  let r = String.sub s 0 l in
+			  r.[0] <- Char.uppercase r.[0]; r
+			else s
+		      in
+		      with_out "rpmbuild.spec"
+			(fun out ->
+			  let find_value = function
+			    | "topdir" -> Params.get_param "top-dir"
+			    | "name" -> spec.pkgname
+			    | "version" -> version
+			    | "release" -> release
+			    | "buildroot" -> "buildroot"
+			    | k -> Hashtbl.find spec.params k
+			  in
+			  let gen_param k =
+			    (try
+			      out (sprintf "%s: %s\n" (rpm_key_format k) (find_value k))
+			    with Not_found -> ())
+			  in
+			  gen_param "summary";
+			  gen_param "name";
+			  gen_param "version";
+			  gen_param "realase";
+			  gen_param "license";
+			  gen_param "vendor";
+			  gen_param "group";
+			  gen_param "url";
+			  gen_param "buildroot";
+			  
+			  out "%define _use_internal_dependency_generator 0\n";
+			  out "%define __find_requires %findreq\n";
+			  out "%description\n";
+			  out "%files\n";
+			  out "%include %filelist\n";
+
+			  let resolve_params s =
+			    Pcre.substitute
+			      ~pat:"%{.*?}"
+			      ~subst:(fun s ->
+				let l = String.length s in
+				let k = String.sub s 2 (l - 3) in
+				(try 
+				  find_value k
+				with Not_found -> s))
+			      s
+			  in
+
+			  let oo s = out (resolve_params s); out "\n" in
+			  
+			  (match spec.pre_install with
+			    | None -> ()
+			    | Some pre ->
+				out "%pre\n";
+				let ch = open_in pre in
+				List.iter oo (System.list_of_channel ch);
+				close_in ch);
+			  (match spec.post_install with
+			    | None -> ()
+			    | Some post ->
+				out "%post\n";
+				let ch = open_in post in
+				List.iter oo (System.list_of_channel ch);
+				close_in ch);			  
+			  (match spec.pre_uninstall with
+			    | None -> ()
+			    | Some preun ->
+				out "%preun\n";
+				let ch = open_in preun in
+				List.iter oo (System.list_of_channel ch);
+				close_in ch))		      
+		    in
+		    
+		    build_over_rpmbuild 
+		      (spec.pkgname,platform,specdir,version,release,specfile,files,findreq)
+		| Pkg_trans ->
+		    log_error "pkgtrans engine is not impelented")
+	  | version ->
 	      raise (Unsupported_specdir_version version))
     | _ -> log_error "build_rh_package: wrong arguments"
 
