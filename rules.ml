@@ -960,7 +960,7 @@ let build_package_impl os platform args =
 			  gen_param "summary";
 			  gen_param "name";
 			  gen_param "version";
-			  gen_param "realase";
+			  gen_param "release";
 			  gen_param "license";
 			  gen_param "vendor";
 			  gen_param "group";
