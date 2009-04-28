@@ -875,6 +875,9 @@ let build_package_impl os platform args =
 		    let files =
 		      with_out "rpmbuild.files"
 			(fun out ->
+			  let bf_table = Hashtbl.create 32 in
+			  let reg k =
+			    if Hashtbl.mem bf_table k then "" else k in
 			  let add_bf_list file =
 			    let ch = open_in file in
 			    let rec read () =
@@ -884,9 +887,9 @@ let build_package_impl os platform args =
 				if l > 2 then
 				  (match s.[0] with
 				    | 'd' ->
-					out (sprintf "%%dir %s\n" (String.sub s 2 (l - 2)))
+					out (reg (sprintf "%%dir %s\n" (String.sub s 2 (l - 2))))
 				    | 'f' -> 
-					out (sprintf "%s\n" (String.sub s 2 (l - 2)))
+					out (reg (sprintf "%s\n" (String.sub s 2 (l - 2))))
 				    | _ -> ())
 			      with End_of_file -> close_in ch
 			    in read ()
@@ -988,23 +991,17 @@ let build_package_impl os platform args =
 			    | None -> ()
 			    | Some pre ->
 				out "%pre\n";
-				let ch = open_in pre in
-				List.iter oo (System.list_of_channel ch);
-				close_in ch);
+				oo pre);
 			  (match spec.post_install with
 			    | None -> ()
-			    | Some post ->
+			    | Some post ->				
 				out "%post\n";
-				let ch = open_in post in
-				List.iter oo (System.list_of_channel ch);
-				close_in ch);			  
+				oo post);
 			  (match spec.pre_uninstall with
 			    | None -> ()
 			    | Some preun ->
 				out "%preun\n";
-				let ch = open_in preun in
-				List.iter oo (System.list_of_channel ch);
-				close_in ch))
+				oo preun))
 		    in
 		    
 		    build_over_rpmbuild 
