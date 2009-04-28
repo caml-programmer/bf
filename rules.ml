@@ -884,9 +884,9 @@ let build_package_impl os platform args =
 				if l > 2 then
 				  (match s.[0] with
 				    | 'd' ->
-					out (sprintf "%%dir %s" (String.sub s 2 (l - 2)))
+					out (sprintf "%%dir %s\n" (String.sub s 2 (l - 2)))
 				    | 'f' -> 
-					out (sprintf "%s" (String.sub s 2 (l - 2)))
+					out (sprintf "%s\n" (String.sub s 2 (l - 2)))
 				    | _ -> ())
 			      with End_of_file -> close_in ch
 			    in read ()
@@ -968,8 +968,8 @@ let build_package_impl os platform args =
 			  out "%define __find_requires %findreq\n";
 			  out "%description\n";
 			  out "%files\n";
-			  out "%include %filelist\n";
-
+			  out (sprintf "%%include %s\n" files);
+			  
 			  let resolve_params s =
 			    Pcre.substitute
 			      ~pat:"%{.*?}"
@@ -1004,7 +1004,7 @@ let build_package_impl os platform args =
 				out "%preun\n";
 				let ch = open_in preun in
 				List.iter oo (System.list_of_channel ch);
-				close_in ch))		      
+				close_in ch))
 		    in
 		    
 		    build_over_rpmbuild 
