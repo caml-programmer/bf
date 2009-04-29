@@ -877,7 +877,13 @@ let build_package_impl os platform args =
 			(fun out ->
 			  let bf_table = Hashtbl.create 32 in
 			  let reg k =
-			    if Hashtbl.mem bf_table k then "" else k in
+			    if Hashtbl.mem bf_table k then "" 
+			    else 
+			      begin
+				Hashtbl.add bf_table k false;
+				k
+			      end
+			  in
 			  let add_bf_list file =
 			    let ch = open_in file in
 			    let rec read () =
