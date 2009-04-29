@@ -877,22 +877,38 @@ let build_package_impl os platform args =
 		| _-> assert false)
 	  | "2.0" ->
 	      let spec = spec_from_v2 abs_specdir in
+	      let bf_table = Hashtbl.create 32 in
+	      let reg k =
+		if Hashtbl.mem bf_table k then "" 
+		else 
+		  begin
+		    Hashtbl.add bf_table k false;
+		    k
+		  end
+	      in
+	      let accumulate_lists add out =
+		List.iter
+		  (fun c ->
+		    let name = c.name in
+		    let bf_list = 
+		      Filename.concat name ".bf-list" in
+		    if Sys.file_exists bf_list then
+		      add out bf_list
+		    else
+		      log_error
+			(sprintf "bf list is not found (%s)" bf_list))
+		  (List.filter 
+		    (fun c -> c.pkg = None)
+		    spec.components)
+	      in
+	      
 	      print_depends spec.depends;
 	      (match engine_of_platform platform with
 		| Rpm_build ->
 		    let files =
 		      with_out "rpmbuild.files"
 			(fun out ->
-			  let bf_table = Hashtbl.create 32 in
-			  let reg k =
-			    if Hashtbl.mem bf_table k then "" 
-			    else 
-			      begin
-				Hashtbl.add bf_table k false;
-				k
-			      end
-			  in
-			  let add_bf_list file =
+			  let add_bf_list out file =
 			    let ch = open_in file in
 			    let rec read () =
 			      try
@@ -908,20 +924,7 @@ let build_package_impl os platform args =
 				read ()
 			      with End_of_file -> close_in ch
 			    in read ()
-			  in
-			  List.iter
-			    (fun c ->
-			      let name = c.name in
-			      let bf_list = 
-				Filename.concat name ".bf-list" in
-			      if Sys.file_exists bf_list then
-				add_bf_list bf_list
-			      else
-				log_error
-				  (sprintf "bf list is not found (%s)" bf_list))
-			    (List.filter 
-			      (fun c -> c.pkg = None)
-			      spec.components))
+			  in accumulate_lists add_bf_list out)
 		    in
 		    let findreq =
 		      with_out "rpmbuild.findreq"
@@ -1021,8 +1024,106 @@ let build_package_impl os platform args =
 		    
 		    build_over_rpmbuild 
 		      (spec.pkgname,platform,specdir,version,release,specfile,files,findreq)
+		      
 		| Pkg_trans ->
-		    log_error "pkgtrans engine is not impelented")
+		    let pkgtrans_key_format = String.uppercase in
+		    let find_value = function
+		      | "topdir" -> Params.get_param "top-dir"
+		      | "pkg" -> spec.pkgname
+		      | "arch" -> (System.arch ())
+		      | "version" -> sprintf "%s-%s" version release
+		      | "catgory" -> Hashtbl.find spec.params "group"
+		      | "name" -> Hashtbl.find spec.params "summary"
+		      | k -> Hashtbl.find spec.params k
+		    in
+		    let pkginfo =
+		      with_out "pkginfo"
+			(fun out -> 
+			  let gen_param k =
+			    (try
+			      out (sprintf "%s=%s\n" (pkgtrans_key_format k) (find_value k))
+			    with Not_found -> ())
+			  in
+			  gen_param "pkg";
+			  gen_param "arch";
+			  gen_param "name";
+			  gen_param "version";
+			  gen_param "vendor";
+			  gen_param "category";
+			  gen_param "email")
+		    in
+		    let prototype =
+		      with_out "prototype"
+			(fun out ->
+			  let add_bf_list out file =
+			    let ch = open_in file in
+			    let rec read () =
+			      try
+				let s = input_line ch in
+				let l = String.length s in
+				if l > 2 then
+				  (match s.[0] with
+				    | 'd' ->
+					out (reg (sprintf "d none %s 0755 root root\n" (String.sub s 2 (l - 2))))
+				    | 'f' -> 
+					out (reg (sprintf "f none %s 644 root root\n" (String.sub s 2 (l - 2))))
+				    | _ -> ());
+				read ()
+			      with End_of_file -> close_in ch
+			    in read ()
+			  in			  
+			  let resolve_params s =
+			    Pcre.substitute
+			      ~pat:"%\\(.*?\\)"
+			      ~subst:(fun s ->
+				let l = String.length s in
+				let k = String.sub s 2 (l - 3) in
+				(try
+				  find_value k
+				with Not_found -> s))
+			      s
+			  in
+			  let script_location =
+			    let loc = 
+			      Filename.concat 
+				(Params.get_param "top-dir") (find_value "pkg") in
+			    make_directory [loc]; loc
+			  in
+			  let write_content name content =
+			    let file =
+			      Filename.concat script_location name in
+			    out (sprintf "i %s=%s\n" name file);
+			    System.write_string
+			      ~file ~string:(resolve_params content)
+			  in
+
+			  out (sprintf "i pkginfo=%s/pkginfo" (Sys.getcwd()));
+			  
+			  (match spec.pre_install with
+			    | None -> ()
+			    | Some content ->
+				write_content "preinstall" content);
+			  (match spec.post_install with
+			    | None -> ()
+			    | Some content ->
+				write_content "postinstall" content);
+			  (match spec.pre_uninstall with
+			    | None -> ()
+			    | Some content ->
+				write_content "preremove" content);
+			  accumulate_lists add_bf_list out)
+		    in
+		    let pkg_spool = "/var/spool/pkg/" in
+		    let pkg_file =
+		      sprintf "%s-%s" (find_value "pkg") (find_value "version") in
+		    let pkg_file_abs =
+		      Filename.concat pkg_spool pkg_file in
+		    let pkg_file_bz2 = pkg_file ^ ".bz2" in
+		    log_command "pkgmk" ["-o";"-r";"/"];
+		    log_command "pkgtrans" [ "-o";"-s";pkg_spool; pkg_file; (find_value "pkg") ];
+		    log_command "mv" ["-f";pkg_file_abs;"./"];
+		    (try Sys.remove pkg_file_bz2 with _ -> ());
+		    log_command "bzip2" [pkg_file])
 	  | version ->
 	      raise (Unsupported_specdir_version version))
     | _ -> log_error "build_rh_package: wrong arguments"
