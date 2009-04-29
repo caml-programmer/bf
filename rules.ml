@@ -880,18 +880,15 @@ let build_package_impl os platform args =
 			    if Hashtbl.mem bf_table k then "" 
 			    else 
 			      begin
-				log_message ("add " ^ k);
 				Hashtbl.add bf_table k false;
 				k
 			      end
 			  in
 			  let add_bf_list file =
-			    log_message ("add file " ^ file);
 			    let ch = open_in file in
 			    let rec read () =
 			      try
 				let s = input_line ch in
-				log_message ("input " ^ s);				
 				let l = String.length s in
 				if l > 2 then
 				  (match s.[0] with
@@ -899,7 +896,8 @@ let build_package_impl os platform args =
 					out (reg (sprintf "%%dir %s\n" (String.sub s 2 (l - 2))))
 				    | 'f' -> 
 					out (reg (sprintf "%s\n" (String.sub s 2 (l - 2))))
-				    | _ -> ())
+				    | _ -> ());
+				read ()
 			      with End_of_file -> close_in ch
 			    in read ()
 			  in
