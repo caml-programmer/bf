@@ -6,8 +6,8 @@ ARCHIVE   = archive.cma
 XARCHIVE  = $(ARCHIVE:.cma=.cmxa)
 REQUIRES  = pcre shell ocs smtp
 
-ifeq ($(OS),"SunOS")
-CCOPTS="-lposix4"
+ifeq ($(OS),SunOS)
+CCOPTS=-lrt
 endif
 
 all: $(ARCHIVE)
