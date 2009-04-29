@@ -572,23 +572,35 @@ let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
       let raw = input_line ch in
       match parse_line raw with
 	| `File s ->
-	    let dname =
-	      Filename.concat buildroot (Filename.dirname s) in
-	    let src = "/" ^ s in
-	    let dst = Filename.concat buildroot s in
-	    System.create_directory_r dname;
-	    System.copy_file src dst
+	    (try
+	      let dname =
+		Filename.concat buildroot (Filename.dirname s) in
+	      let src = "/" ^ s in
+	      let dst = Filename.concat buildroot s in
+	      System.create_directory_r dname;
+	      System.copy_file src dst
+	    with exn ->
+	      log_message ("f " ^ s);
+	      raise exn)
 	| `Dir s ->
-	    let dname =
-	      Filename.concat buildroot (Filename.dirname s) in
-	    let src = "/" ^ s in
-	    let dst = Filename.concat buildroot s in
-	    System.create_directory_r dname;
-	    remove_directory (Filename.concat buildroot s);
-	    System.copy_dir src dst;
+	    (try
+	      let dname =
+		Filename.concat buildroot (Filename.dirname s) in
+	      let src = "/" ^ s in
+	      let dst = Filename.concat buildroot s in
+	      System.create_directory_r dname;
+	      remove_directory (Filename.concat buildroot s);
+	      System.copy_dir src dst;
+	    with exn ->
+	      log_message ("d " ^ s);
+	      raise exn)
 	| `Empty_dir s ->
-	    let dst = Filename.concat buildroot s in
-	    System.create_directory_r dst
+	    (try
+	      let dst = Filename.concat buildroot s in
+	      System.create_directory_r dst
+	    with exn ->
+	      log_message ("e " ^ s);
+	      raise exn)
 	| `None ->
 	    log_message 
 	      (sprintf "copy_to_buildroot: skipped %s" raw)
@@ -791,6 +803,9 @@ let spec_from_v2 specdir =
 	Some pn
       else None
   in
+  
+  (* todo: check depends by pkg component field *)
+ 
   {
     pkgname = (Filename.basename (Filename.dirname specdir));
     depends = depends;
