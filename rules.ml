@@ -1032,7 +1032,7 @@ let build_package_impl os platform args =
 		      | "pkg" -> spec.pkgname
 		      | "arch" -> (System.arch ())
 		      | "version" -> sprintf "%s-%s" version release
-		      | "catgory" -> Hashtbl.find spec.params "group"
+		      | "category" -> Hashtbl.find spec.params "group"
 		      | "name" -> Hashtbl.find spec.params "summary"
 		      | k -> Hashtbl.find spec.params k
 		    in
