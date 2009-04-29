@@ -1113,15 +1113,19 @@ let build_package_impl os platform args =
 				write_content "preremove" content);
 			  accumulate_lists add_bf_list out)
 		    in
+			
 		    let pkg_spool = "/var/spool/pkg/" in
-		    let pkg_file =
-		      sprintf "%s-%s" (find_value "pkg") (find_value "version") in
-		    let pkg_file_abs =
-		      Filename.concat pkg_spool pkg_file in
+		    let pkg_file = sprintf "%s-%s" (find_value "pkg") (find_value "version") in
+		    let pkg_file_abs = Filename.concat pkg_spool pkg_file in
 		    let pkg_file_bz2 = pkg_file ^ ".bz2" in
-		    log_command "pkgmk"
-		      ["-o";"-r";"/";"-f";(Filename.concat abs_specdir "prototype")];
-		    log_command "pkgtrans" [ "-o";"-s";pkg_spool; pkg_file; (find_value "pkg") ];
+		    
+		    with_dir abs_specdir
+		      (fun () ->
+			log_command "pkgmk"
+			  ["-o";"-r";"/"];
+			log_command "pkgtrans" 
+			  ["-o";"-s";pkg_spool; pkg_file; (find_value "pkg")]);
+		    
 		    log_command "mv" ["-f";pkg_file_abs;"./"];
 		    (try Sys.remove pkg_file_bz2 with _ -> ());
 		    log_command "bzip2" [pkg_file])
