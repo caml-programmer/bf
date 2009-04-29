@@ -21,7 +21,9 @@ let string_of_channel ch =
   let b = Buffer.create 32 in
   let rec read () =
     try
-      read (Buffer.add_string b (input_line ch))
+      Buffer.add_string b (input_line ch);
+      Buffer.add_char b '\n';
+      read ()
     with End_of_file -> Buffer.contents b
   in read ()
 
