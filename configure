@@ -4,10 +4,13 @@
 #
 
 OS=`uname`
+PLATFORM=`uname -r`
 CONFIG=Makefile.config
 
 make_prefix_configuration () {
     printf "PREFIX=%s\n" $1 > $CONFIG
+    printf "OS=$OS\n" >> $CONFIG
+    printf "PLATFORM=$PLATFORM\n" >> $CONFIG
 }
 
 usage () {

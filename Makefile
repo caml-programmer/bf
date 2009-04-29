@@ -6,11 +6,15 @@ ARCHIVE   = archive.cma
 XARCHIVE  = $(ARCHIVE:.cma=.cmxa)
 REQUIRES  = pcre shell ocs smtp
 
+ifeq ($(OS),"SunOS")
+CCOPTS="-lposix4"
+endif
+
 all: $(ARCHIVE)
-	$(OCAMLC) -o bf -custom toplevellib.cma $(ARCHIVE) bf.ml -linkpkg
+	$(OCAMLC) -ccopt "$(CCOPTS)" -o bf -custom toplevellib.cma $(ARCHIVE) bf.ml -linkpkg
 
 opt: $(XARCHIVE)
-	$(OCAMLOPT) -o bf $(XARCHIVE) bf.ml -linkpkg
+	$(OCAMLOPT) -ccopt "$(CCOPTS)" -o bf $(XARCHIVE) bf.ml -linkpkg
 
 $(ARCHIVE): $(OBJECTS)
 	$(OCAMLC) -a -o $(ARCHIVE) $(OBJECTS)
