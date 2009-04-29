@@ -975,7 +975,7 @@ let build_package_impl os platform args =
 			  
 			  let resolve_params s =
 			    Pcre.substitute
-			      ~pat:"%{.*?}"
+			      ~pat:"%\\(.*?\\)"
 			      ~subst:(fun s ->
 				let l = String.length s in
 				let k = String.sub s 2 (l - 3) in
