@@ -880,17 +880,18 @@ let build_package_impl os platform args =
 			    if Hashtbl.mem bf_table k then "" 
 			    else 
 			      begin
-				print_endline ("add " ^ k);
+				log_message ("add " ^ k);
 				Hashtbl.add bf_table k false;
 				k
 			      end
 			  in
 			  let add_bf_list file =
-			    print_endline ("add file " ^ file);
+			    log_message ("add file " ^ file);
 			    let ch = open_in file in
 			    let rec read () =
 			      try
 				let s = input_line ch in
+				log_message ("input " ^ s);				
 				let l = String.length s in
 				if l > 2 then
 				  (match s.[0] with
