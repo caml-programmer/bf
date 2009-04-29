@@ -1097,7 +1097,7 @@ let build_package_impl os platform args =
 			      ~file ~string:(resolve_params content)
 			  in
 
-			  out (sprintf "i pkginfo=%s/pkginfo" (Sys.getcwd()));
+			  out (sprintf "i pkginfo=%s/pkginfo\n" (Sys.getcwd()));
 			  
 			  (match spec.pre_install with
 			    | None -> ()
@@ -1119,7 +1119,8 @@ let build_package_impl os platform args =
 		    let pkg_file_abs =
 		      Filename.concat pkg_spool pkg_file in
 		    let pkg_file_bz2 = pkg_file ^ ".bz2" in
-		    log_command "pkgmk" ["-o";"-r";"/"];
+		    log_command "pkgmk"
+		      ["-o";"-r";"/";"-f";(Filename.concat abs_specdir "prototype")];
 		    log_command "pkgtrans" [ "-o";"-s";pkg_spool; pkg_file; (find_value "pkg") ];
 		    log_command "mv" ["-f";pkg_file_abs;"./"];
 		    (try Sys.remove pkg_file_bz2 with _ -> ());
