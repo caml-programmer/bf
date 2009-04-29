@@ -1097,7 +1097,7 @@ let build_package_impl os platform args =
 			      ~file ~string:(resolve_params content)
 			  in
 
-			  out (sprintf "i pkginfo=%s/pkginfo\n" (Sys.getcwd()));
+			  out (sprintf "i pkginfo=%s/pkginfo\n" abs_specdir);
 			  
 			  (match spec.pre_install with
 			    | None -> ()
