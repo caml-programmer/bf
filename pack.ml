@@ -735,7 +735,7 @@ let build_package_impl os platform args =
 		    let find_value = function
 		      | "topdir" -> Params.get_param "top-dir"
 		      | "pkg" -> pkgtrans_name_format spec.pkgname
-		      | "arch" -> (System.arch ())
+		      | "arch" -> (System.uname ~flag:'p' ())
 		      | "version" -> sprintf "%s-%s" version release
 		      | "category" -> Hashtbl.find spec.params "group"
 		      | "name" -> Hashtbl.find spec.params "summary"
@@ -835,7 +835,7 @@ let build_package_impl os platform args =
 		    let pkg_file = sprintf "%s-%s.%s.%s" 
 		      (find_value "pkg") (find_value "version")
 		      (string_of_platform platform)
-		      (System.uname ~flag:'p' ())
+		      (find_value "arch")
 		    in
 		    let pkg_file_abs = Filename.concat pkg_spool pkg_file in
 		    let pkg_file_gz = pkg_file ^ ".gz" in
