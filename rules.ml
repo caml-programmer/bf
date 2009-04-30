@@ -698,6 +698,7 @@ let spec_from_v2 specdir =
 	
 	(match name_v with
 	  | Ssymbol s -> pkg_name := Some s
+	  | Sstring s -> pkg_name := Some s
 	  | _ -> ());
 	(match op_ver_v with
 	  | None -> ()
@@ -1102,7 +1103,7 @@ let build_package_impl os platform args =
 			  in
 			  let make_depends depends =
 			    let b = Buffer.create 32 in
-			    let out = Buffer.add_string b in			    
+			    let out = Buffer.add_string b in
 			    List.iter 
 			      (fun (pkg_name,_,pkg_desc_opt) ->
 				let pkg_desc =
@@ -1139,7 +1140,7 @@ let build_package_impl os platform args =
 		    let pkg_spool = "/var/spool/pkg/" in
 		    let pkg_file = sprintf "%s-%s" (find_value "pkg") (find_value "version") in
 		    let pkg_file_abs = Filename.concat pkg_spool pkg_file in
-		    let pkg_file_bz2 = pkg_file ^ ".bz2" in
+		    let pkg_file_gz = pkg_file ^ ".gz" in
 		    
 		    with_dir abs_specdir
 		      (fun () ->
@@ -1149,8 +1150,8 @@ let build_package_impl os platform args =
 			  ["-o";"-s";pkg_spool; pkg_file; (find_value "pkg")]);
 		    
 		    log_command "mv" ["-f";pkg_file_abs;"./"];
-		    (try Sys.remove pkg_file_bz2 with _ -> ());
-		    log_command "bzip2" [pkg_file])
+		    (try Sys.remove pkg_file_gz with _ -> ());
+		    log_command "gzip" [pkg_file])
 	  | version ->
 	      raise (Unsupported_specdir_version version))
     | _ -> log_error "build_rh_package: wrong arguments"
