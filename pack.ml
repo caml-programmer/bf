@@ -832,7 +832,11 @@ let build_package_impl os platform args =
 		    in
 			
 		    let pkg_spool = "/var/spool/pkg/" in
-		    let pkg_file = sprintf "%s-%s" (find_value "pkg") (find_value "version") in
+		    let pkg_file = sprintf "%s-%s.%s.%s" 
+		      (find_value "pkg") (find_value "version")
+		      (string_of_platform platform)
+		      (System.uname ~flag:'p' ())
+		    in
 		    let pkg_file_abs = Filename.concat pkg_spool pkg_file in
 		    let pkg_file_gz = pkg_file ^ ".gz" in
 		    
