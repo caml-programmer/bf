@@ -1,7 +1,6 @@
 open Git
 open Rules
 open Logger
-open Ocs_env
 open Ocs_types
 open Printf
 open Types
@@ -158,7 +157,7 @@ let build_component_native component =
   else
     begin
       log_message ("building " ^ component.name);
-      build_rules ();
+      Rules.build_rules ();
       log_message (component.name ^ " built");
       let ch = open_out ".bf-build" in
       output_string ch (string_of_float (Unix.gettimeofday ()));
@@ -264,7 +263,7 @@ let install_component component =
 	  log_message ("installing " ^ component.name);
 	  let state = 
 	    create_top_state () in
-	  install_rules ();
+	  Rules.install_rules ();
 	  generate_changes
 	    state (create_top_state ());
 	  log_message (component.name ^ " installed");
@@ -699,6 +698,8 @@ let scm_substring templ s =
   else Sfalse
 
 ;;
+
+(* Register global functions *)
 
 Ocs_env.set_pfn Scheme.env scm_prepare "prepare-components";;
 Ocs_env.set_pfn Scheme.env scm_build   "build-components";;

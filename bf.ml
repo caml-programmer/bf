@@ -70,7 +70,7 @@ let main () =
 	      let specdir = Sys.argv.(2) in
 	      let version = Sys.argv.(3) in
 	      let release = Sys.argv.(4) in
-	      Rules.build_package
+	      Pack.build_package
 		[specdir;version;release]
 	    else usage ()
 	| "log" ->
