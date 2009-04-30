@@ -1027,9 +1027,19 @@ let build_package_impl os platform args =
 		      
 		| Pkg_trans ->
 		    let pkgtrans_key_format = String.uppercase in
+		    let pkgtrans_name_format s =
+		      try
+			let pos = String.index s '-' in
+			let r = String.sub s 0 (String.length s) in
+			r.[pos] <- 'D';
+			for i=0 to pos do
+			  r.[i] <- Char.uppercase r.[i]
+			done; r
+		      with Not_found -> s
+		    in
 		    let find_value = function
 		      | "topdir" -> Params.get_param "top-dir"
-		      | "pkg" -> spec.pkgname
+		      | "pkg" -> pkgtrans_name_format spec.pkgname
 		      | "arch" -> (System.arch ())
 		      | "version" -> sprintf "%s-%s" version release
 		      | "category" -> Hashtbl.find spec.params "group"
@@ -1083,20 +1093,27 @@ let build_package_impl os platform args =
 				with Not_found -> s))
 			      s
 			  in
-			  let script_location =
-			    let loc = 
-			      Filename.concat 
-				(Params.get_param "top-dir") (find_value "pkg") in
-			    make_directory [loc]; loc
-			  in
 			  let write_content name content =
 			    let file =
-			      Filename.concat script_location name in
+			      Filename.concat abs_specdir name in
 			    out (sprintf "i %s=%s\n" name file);
 			    System.write_string
 			      ~file ~string:(resolve_params content)
 			  in
-
+			  let make_depends depends =
+			    let b = Buffer.create 32 in
+			    let out = Buffer.add_string b in			    
+			    List.iter 
+			      (fun (pkg_name,_,pkg_desc_opt) ->
+				let pkg_desc =
+				  match pkg_desc_opt with
+				    | None -> pkg_name
+				    | Some s -> s
+				in out (sprintf "P %s %s\n" pkg_name pkg_desc))
+			      depends;
+			    Buffer.contents b
+			  in
+			  
 			  out (sprintf "i pkginfo=%s/pkginfo\n" abs_specdir);
 			  
 			  (match spec.pre_install with
@@ -1110,7 +1127,12 @@ let build_package_impl os platform args =
 			  (match spec.pre_uninstall with
 			    | None -> ()
 			    | Some content ->
-				write_content "preremove" content);
+				write_content "preremove" content);			  
+			  (match spec.depends with
+			    | [] ->  ()
+			    | list ->
+				write_content "depend" (make_depends list));
+			  
 			  accumulate_lists add_bf_list out)
 		    in
 			
