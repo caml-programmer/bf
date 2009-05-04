@@ -145,7 +145,7 @@ let rpmbuild
       | Cent5 ->
 	  "/usr/src/redhat/RPMS/" ^ arch
       | _ ->
-	  Sys.getcwd ()       
+	  Sys.getcwd ()
   in
   let rhsys = string_of_platform platform in
   add "-bb";
@@ -517,8 +517,14 @@ let print_depends depends =
 	(match pkg_desc with Some s -> s | None -> "")))
     depends
 
+let call_after_build ~location ~fullname file =
+  Scheme.eval_file file;
+  Scheme.eval_code (fun _ -> ())
+    (sprintf "(after-build \"%s\" \"%s\" \"%s\")"
+      (System.hostname ()) location fullname)
+
 let build_over_rpmbuild params =
-  let (pkgname,platform,specdir,version,release,spec,files,findreq) = params in
+  let (pkgname,platform,version,release,spec,files,findreq,hooks) = params in
   let top_dir = Params.get_param "top-dir" in
   check_rh_build_env ();
   log_command "chmod" ["+x";findreq];
@@ -528,17 +534,11 @@ let build_over_rpmbuild params =
       ~top_dir 
       ~pkgname ~platform ~version ~release
       ~spec ~files ~findreq ()
-  in
-  let hooks =
-    Filename.concat specdir "hooks.scm" in
-  if Sys.file_exists hooks then
-    begin
-      Scheme.eval_file hooks;
-      Scheme.eval_code (fun _ -> ())
-	(sprintf "(after-build \"%s\" \"%s\" \"%s\")"
-	  (System.hostname ()) location fullname)
-    end
-      
+  in match hooks with
+    | None -> ()
+    | Some file ->
+	call_after_build ~location ~fullname file
+
 let build_package_impl os platform args =
   match args with
     | [specdir;version;release] ->
@@ -561,8 +561,14 @@ let build_package_impl os platform args =
 		  [spec;files;findreq] ->
 		    let pkgname = 
 		      Filename.basename specdir in
-		    build_over_rpmbuild
-		      (pkgname,platform,specdir,version,release,spec,files,findreq)
+		    let hookfile =
+		      Filename.concat abs_specdir "hooks.scm" in		    
+		    let hooks =
+		      if Sys.file_exists hookfile then
+			Some hookfile
+		      else None
+		    in build_over_rpmbuild
+			 (pkgname,platform,version,release,spec,files,findreq,hooks)
 		| _-> assert false)
 	  | "2.0" ->
 	      let spec = spec_from_v2 abs_specdir in
@@ -718,7 +724,7 @@ let build_package_impl os platform args =
 		    in
 		    
 		    build_over_rpmbuild 
-		      (spec.pkgname,platform,specdir,version,release,specfile,files,findreq)
+		      (spec.pkgname,platform,version,release,specfile,files,findreq,spec.hooks)
 		      
 		| Pkg_trans ->
 		    let pkgtrans_key_format = String.uppercase in
@@ -852,7 +858,14 @@ let build_package_impl os platform args =
 		    
 		    log_command "mv" ["-f";pkg_file_abs;"./"];
 		    (try Sys.remove pkg_file_gz with _ -> ());
-		    log_command "gzip" [pkg_file])
+		    log_command "gzip" [pkg_file];
+
+		    match spec.hooks with
+		      | None -> ()
+		      | Some file ->
+			  call_after_build 
+			    ~location:(Sys.getcwd ()) 
+			    ~fullname:pkg_file_gz file)
 	  | version ->
 	      raise (Unsupported_specdir_version version))
     | _ -> log_error "build_rh_package: wrong arguments"
