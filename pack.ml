@@ -539,6 +539,39 @@ let build_over_rpmbuild params =
     | Some file ->
 	call_after_build ~location ~fullname file
 
+let check_composite_depends spec =
+  let composite_depends =
+    List.map
+      (fun c ->
+	match c.pkg with
+	  | Some pkg -> pkg
+	  | None -> assert false)
+      (List.filter
+	(fun c -> c.pkg <> None)
+	spec.components)
+  in
+  let spec_depends =
+    List.map 
+      (fun (pkg_name,_,_) -> pkg_name) spec.depends
+  in
+  let rec make acc = function
+    | [] -> acc
+    | hd::tl ->
+	if not (List.mem hd spec_depends) then
+	  make (hd::acc) tl
+	else
+	  make acc tl
+  in
+  let missings = make [] composite_depends in
+  if missings <> [] then
+    begin
+      List.iter 
+	(fun pkg ->
+	  log_message (sprintf "package (%s) is missing in depends file" pkg))
+	missings;
+      log_error "you must correct depends or composite files"
+    end
+
 let build_package_impl os platform args =
   match args with
     | [specdir;version;release] ->
@@ -562,7 +595,7 @@ let build_package_impl os platform args =
 		    let pkgname = 
 		      Filename.basename specdir in
 		    let hookfile =
-		      Filename.concat abs_specdir "hooks.scm" in		    
+		      Filename.concat abs_specdir "hooks.scm" in
 		    let hooks =
 		      if Sys.file_exists hookfile then
 			Some hookfile
@@ -602,8 +635,10 @@ let build_package_impl os platform args =
 		    (fun c -> c.pkg = None)
 		    spec.components)
 	      in
-	      
+
 	      print_depends spec.depends;
+	      check_composite_depends spec;
+
 	      (match engine_of_platform platform with
 		| Rpm_build ->
 		    let files =
@@ -777,7 +812,7 @@ let build_package_impl os platform args =
 				    | 'd' ->
 					out (reg (sprintf "d none %s 0755 root root\n" (String.sub s 2 (l - 2))))
 				    | 'f' -> 
-					out (reg (sprintf "f none %s 644 root root\n" (String.sub s 2 (l - 2))))
+					out (reg (sprintf "f none %s 0644 root root\n" (String.sub s 2 (l - 2))))
 				    | _ -> ());
 				read ()
 			      with End_of_file -> close_in ch
