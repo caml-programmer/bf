@@ -832,20 +832,23 @@ let build_package_impl os platform args =
 		    in
 			
 		    let pkg_spool = "/var/spool/pkg/" in
+		    let pkg_name = find_value "pkg" in
 		    let pkg_file = sprintf "%s-%s.%s.%s" 
-		      (find_value "pkg") (find_value "version")
+		      pkg_name (find_value "version")
 		      (string_of_platform platform)
 		      (find_value "arch")
 		    in
 		    let pkg_file_abs = Filename.concat pkg_spool pkg_file in
 		    let pkg_file_gz = pkg_file ^ ".gz" in
 		    
+		    Rules.remove_directory (Filename.concat pkg_spool pkg_name);
+
 		    with_dir abs_specdir
 		      (fun () ->
 			log_command "pkgmk"
 			  ["-o";"-r";"/"];
 			log_command "pkgtrans" 
-			  ["-o";"-s";pkg_spool; pkg_file; (find_value "pkg")]);
+			  ["-o";"-s";pkg_spool; pkg_file; pkg_name]);
 		    
 		    log_command "mv" ["-f";pkg_file_abs;"./"];
 		    (try Sys.remove pkg_file_gz with _ -> ());
