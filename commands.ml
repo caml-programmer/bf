@@ -552,6 +552,10 @@ let scm_log_message v =
   let l = Scheme.string_list_of_sval_array v in
   Logger.log_message (String.concat "" l); Snull
 
+let scm_log_error v =
+  let l = Scheme.string_list_of_sval_array v in
+  Logger.log_error (String.concat "" l)
+
 let scm_install_file file dir =
   Rules.install_file
     (Scheme.string_of_sval file)
@@ -718,6 +722,7 @@ Ocs_env.set_pf1 Scheme.env scm_update_make_params "ml-update-make-params";;
 
 Ocs_env.set_pfn Scheme.env scm_log_command "log-command";;
 Ocs_env.set_pfn Scheme.env scm_log_message "log-message";;
+Ocs_env.set_pfn Scheme.env scm_log_error "log-error";;
 Ocs_env.set_pfn Scheme.env scm_path_concat "path-concat";;
 Ocs_env.set_pfn Scheme.env scm_string_concat "string-concat";;
 Ocs_env.set_pf2 Scheme.env scm_install_file "install-file";;
