@@ -492,8 +492,6 @@ let spec_from_v2 specdir =
 	Some pn
       else None
   in
-  
-  (* todo: check depends by pkg component field *)
  
   {
     pkgname = (Filename.basename (Filename.dirname specdir));
@@ -758,8 +756,13 @@ let build_package_impl os platform args =
 				oo preun))
 		    in
 		    
+		    let release_with_platform =
+		      release ^ "." ^ (string_of_platform platform) in
+
 		    build_over_rpmbuild 
-		      (spec.pkgname,platform,version,release,specfile,files,findreq,spec.hooks)
+		      (spec.pkgname,platform,version,
+		      release_with_platform,specfile,
+		      files,findreq,spec.hooks)
 		      
 		| Pkg_trans ->
 		    let pkgtrans_key_format = String.uppercase in
