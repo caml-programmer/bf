@@ -627,7 +627,7 @@ let build_package_impl os platform args =
 			begin
 			  log_message 
 			    (sprintf "bf list for (%s) is not found -> need installing" name);
-			  install_component c;
+			  reinstall_component c;
 			  add_with_check ()
 			end
 		    in add_with_check ())
