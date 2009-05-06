@@ -466,7 +466,9 @@ let status_composite ?tag composite =
 
 let tag_composite composite tag =
   log_message ("=> tag-composite " ^ composite ^ " " ^ tag);
-  make_tag tag (Rules.components_of_composite composite)
+  make_tag tag 
+    (List.filter (fun c -> c.pkg <> None)
+      (Rules.components_of_composite composite))
 
 let review_composite composite since =
   log_message ("=> review-composite " ^ composite ^ " " ^ since);
