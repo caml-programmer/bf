@@ -254,24 +254,31 @@ let generate_changes a b =
 let install_component component =
   with_component_dir ~strict:false component
     (fun () ->
-      if Sys.file_exists ".bf-install" then
-	log_message (component.name ^ " already installed, noting to do")
-      else
-	begin
-	  if not (Sys.file_exists ".bf-build") then
-	    build_component_native component;
-	  log_message ("installing " ^ component.name);
-	  let state = 
-	    create_top_state () in
-	  Rules.install_rules ();
-	  generate_changes
-	    state (create_top_state ());
-	  log_message (component.name ^ " installed");
-	  let ch = open_out ".bf-install" in
-	  output_string ch (string_of_float (Unix.gettimeofday ()));
-	  output_string ch "\n";
-	  close_out ch
-	end)
+      match component.label, component.pkg with
+	| Tag _, Some pkg ->
+	    log_message 
+	      (component.name ^ (sprintf " must be installed by package (%s), noting to do" pkg))
+	| _ ->
+	    begin
+	      if Sys.file_exists ".bf-install" then
+		log_message (component.name ^ " already installed, noting to do")
+	      else
+		begin
+		  if not (Sys.file_exists ".bf-build") then
+		    build_component_native component;
+		  log_message ("installing " ^ component.name);
+		  let state = 
+		    create_top_state () in
+		  Rules.install_rules ();
+		  generate_changes
+		    state (create_top_state ());
+		  log_message (component.name ^ " installed");
+		  let ch = open_out ".bf-install" in
+		  output_string ch (string_of_float (Unix.gettimeofday ()));
+		  output_string ch "\n";
+		  close_out ch
+		end
+	    end)
 
 let install components =
   non_empty_iter install_component components
