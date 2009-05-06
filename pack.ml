@@ -331,9 +331,13 @@ type depend =
 type reject =
     string (* pcre pattern *)
 
+type provide =
+    string (* string symbol *)
+
 type spec = {
   pkgname : pkg_name;
   depends : depend list;
+  provides : provide list;
   rejects : reject list;
   components : component list;
   pre_install : string option;
@@ -467,6 +471,17 @@ let spec_from_v2 specdir =
       end
     else []
   in
+  let provides =
+    let n = f "provides" in
+    if Sys.file_exists n then
+      begin
+	let ch = open_in n in
+	let symbols =
+	  System.list_of_channel ch in
+	close_in ch; symbols
+      end
+    else []
+  in
   let components =
     components_of_composite (f "composite") in
   let pre_install =
@@ -496,6 +511,7 @@ let spec_from_v2 specdir =
   {
     pkgname = (Filename.basename (Filename.dirname specdir));
     depends = depends;
+    provides = provides;
     rejects = rejects;
     components = components;
     pre_install = pre_install;
@@ -702,6 +718,8 @@ let build_package_impl os platform args =
 			    | "version" -> version
 			    | "release" -> release ^ "." ^ (string_of_platform platform)
 			    | "buildroot" -> "buildroot"
+			    | "provides" ->
+				String.concat ", " (spec.pkgname::spec.provides)
 			    | k -> Hashtbl.find spec.params k
 			  in
 			  let gen_param k =
@@ -718,6 +736,8 @@ let build_package_impl os platform args =
 			  gen_param "group";
 			  gen_param "url";
 			  gen_param "buildroot";
+			  if spec.provides <> [] then
+			    gen_param "provides";
 			  
 			  out "%define _use_internal_dependency_generator 0\n";
 			  out "%define __find_requires %findreq\n";
