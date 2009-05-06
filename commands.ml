@@ -432,6 +432,10 @@ let with_tag tag components =
 	    { name = component.name; label = Tag tag_name; pkg = component.pkg })
 	  components
 
+let only_local components =
+  List.filter
+    (fun c -> c.pkg = None) components
+
 let prepare_composite ?tag composite =
   log_message ("=> prepare-composite " ^ composite);
   prepare (with_tag tag (Rules.components_of_composite composite))
@@ -467,7 +471,7 @@ let status_composite ?tag composite =
 let tag_composite composite tag =
   log_message ("=> tag-composite " ^ composite ^ " " ^ tag);
   make_tag tag 
-    (List.filter (fun c -> c.pkg <> None)
+    (only_local
       (Rules.components_of_composite composite))
 
 let review_composite composite since =
@@ -476,11 +480,13 @@ let review_composite composite since =
 
 let diff_composite composite tag_a tag_b =
   log_message ("=> diff-composite " ^ composite ^ " " ^ tag_a ^ ":" ^ tag_b);
-  make_diff tag_a tag_b (Rules.components_of_composite composite)
+  make_diff tag_a tag_b 
+    (only_local (Rules.components_of_composite composite))
 
 let changelog_composite composite tag_a tag_b =
   log_message ("=> changelog-composite " ^ composite ^ " " ^ tag_a ^ ":" ^ tag_b);
-  make_changelog tag_a tag_b (Rules.components_of_composite composite)
+  make_changelog tag_a tag_b
+    (only_local (Rules.components_of_composite composite))
 
 ;;
 
