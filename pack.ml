@@ -935,6 +935,9 @@ exception Cannot_find_pkgver of string
 exception Cannot_find_pkgrev of string
 exception Revision_must_be_digital of string
 
+let pkgname_of_specdir specdir =
+  Filename.basename (Filename.dirname specdir)
+    
 let map_pkg f specdir =
   try
     with_platform
@@ -942,10 +945,10 @@ let map_pkg f specdir =
 	let pkgname =
 	  match engine_of_platform platform with
 	    | Rpm_build -> 
-		Filename.basename specdir
+		pkgname_of_specdir specdir
 	    | Pkg_trans ->
 		pkgtrans_name_format
-		  (Filename.basename specdir)
+		  (pkgname_of_specdir specdir)
 	in
 	let pat = pkgname ^ "-([^-]+)-(\\d+)\\."
 	  ^ (string_of_platform platform) ^ "\\."
@@ -1000,7 +1003,7 @@ let update ~specdir ?(ver=None) ?(rev=None) () =
       | None -> find_pkg_revision specdir version
   in
   let pkgname =
-    Filename.basename specdir in
+    pkgname_of_specdir specdir in
   
   let composite =
     Filename.concat specdir "composite" in
