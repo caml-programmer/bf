@@ -73,8 +73,10 @@ let os_of_string = function
   | "sunos" -> SunOS
   | s -> log_error (sprintf "Unsupported OS (%s)" s)
       
+let os_as_string = System.uname
+
 let os () =
-  os_of_string (System.uname ())
+  os_of_string (os_as_string ())
 
 let linux_platform_mapping =
   [
@@ -114,7 +116,7 @@ let sunos_platfrom () =
     | "5.10" -> Solaris10
     |  s     ->	log_error (sprintf "Unsupported SunOS (%s)" s)
 
-let with_platform (f : os -> platform -> unit) =
+let with_platform (f : os -> platform -> 'a) =
   let os = os () in
   match os with
     | Linux ->
@@ -585,6 +587,16 @@ let check_composite_depends spec =
 	missings;
       log_error "you must correct depends or composite files"
     end
+      
+let pkgtrans_name_format s =
+  try
+    let pos = String.index s '-' in
+    let r = String.sub s 0 (String.length s) in
+    r.[pos] <- 'D';
+    for i=0 to pos do
+      r.[i] <- Char.uppercase r.[i]
+    done; r
+  with Not_found -> s
 
 let build_package_impl os platform args =
   match args with
@@ -781,20 +793,10 @@ let build_package_impl os platform args =
 		      
 		| Pkg_trans ->
 		    let pkgtrans_key_format = String.uppercase in
-		    let pkgtrans_name_format s =
-		      try
-			let pos = String.index s '-' in
-			let r = String.sub s 0 (String.length s) in
-			r.[pos] <- 'D';
-			for i=0 to pos do
-			  r.[i] <- Char.uppercase r.[i]
-			done; r
-		      with Not_found -> s
-		    in
 		    let find_value = function
 		      | "topdir" -> Params.get_param "top-dir"
 		      | "pkg" -> pkgtrans_name_format spec.pkgname
-		      | "arch" -> (System.uname ~flag:'p' ())
+		      | "arch" -> System.arch ()
 		      | "version" -> sprintf "%s-%s" version release
 		      | "category" -> Hashtbl.find spec.params "group"
 		      | "name" -> Hashtbl.find spec.params "summary"
@@ -927,3 +929,98 @@ let build_package args =
   with_platform
     (fun os platfrom ->
       build_package_impl os platfrom args)
+
+exception Broken_pkg_iteration of string
+exception Cannot_find_pkgver of string
+exception Cannot_find_pkgrev of string
+exception Revision_must_be_digital of string
+
+let map_pkg f specdir =
+  try
+    with_platform
+      (fun os platform ->
+	let pkgname =
+	  match engine_of_platform platform with
+	    | Rpm_build -> 
+		Filename.basename specdir
+	    | Pkg_trans ->
+		pkgtrans_name_format
+		  (Filename.basename specdir)
+	in
+	let pat = pkgname ^ "-([^-]+)-(\\d+)\\."
+	  ^ (string_of_platform platform) ^ "\\."
+	  ^ (System.arch ()) ^ "\\." in
+	let rex = Pcre.regexp pat in
+	let ff acc s =
+	  if Pcre.pmatch ~rex s then
+	    let a = Pcre.extract ~rex s in
+	    if Array.length a > 2 then
+	      (a.(1),int_of_string a.(2))::acc
+	    else acc
+	  else acc
+	in
+	List.map f
+	  (List.fold_left ff []
+	    (System.list_of_directory (Sys.getcwd ()))))
+  with exn ->
+    raise (Broken_pkg_iteration (Printexc.to_string exn))
+
+let find_pkg_version specdir =
+  try
+    (match
+      List.sort 
+	(fun a b -> compare b a)
+	(map_pkg fst specdir)
+    with [] -> raise Not_found
+      | hd::tl -> hd)
+  with exn ->
+    raise (Cannot_find_pkgver (Printexc.to_string exn))
+
+let find_pkg_revision specdir version =
+  try
+    (match
+      List.sort
+	(fun a b -> compare b a)
+	(map_pkg snd specdir)
+    with [] -> raise Not_found
+      | hd::tl -> succ hd)
+  with exn ->
+    raise (Cannot_find_pkgrev (Printexc.to_string exn))
+
+let update ~specdir ?(ver=None) ?(rev=None) () =
+  let specdir = System.path_strip_directory specdir in
+  let version =
+    match ver with
+      | Some v -> v
+      | None -> find_pkg_version specdir
+  in
+  let revision =
+    match rev with
+      | Some r -> (try int_of_string r with _ -> raise (Revision_must_be_digital r))
+      | None -> find_pkg_revision specdir version
+  in
+  let pkgname =
+    Filename.basename specdir in
+  
+  let composite =
+    Filename.concat specdir "composite" in
+
+  let tag =
+    sprintf "%s/%s-%d" pkgname version revision in
+  
+  let old_tag =
+    if  revision > 0 then
+      Some (sprintf "%s/%s-%d" pkgname version (pred revision))
+    else None
+  in
+
+  update_composite composite;
+  install_composite composite;
+  tag_composite composite tag;
+  install_composite ~tag composite;
+  build_package [specdir;version;string_of_int revision];
+  
+  match old_tag with
+    | Some old -> 
+	changelog_composite composite old tag
+    | None -> ()

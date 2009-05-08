@@ -141,9 +141,13 @@ let uname ?flag () =
   close_in ch; name
 
 let arch () =
-  let ch = Unix.open_process_in "arch" in
-  let name = input_line ch in
-  close_in ch; name
+  match uname () with
+    | "SunOS" ->
+	uname ~flag:'p' ()
+    | _ ->
+	let ch = Unix.open_process_in "arch" in
+	let name = input_line ch in
+	close_in ch; name
 
 let hostname () =
   let ch = Unix.open_process_in "hostname" in

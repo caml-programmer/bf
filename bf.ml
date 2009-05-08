@@ -15,6 +15,7 @@ let usage () =
   print_endline "   or: bf (diff|changelog) <composite> <tag-a> <tag-b>";
   print_endline "   or: bf review <composite> <since-date>";
   print_endline "   or: bf pack <specdir> <version> <release>";
+  print_endline "   or: bf update <specdir> [version] [release]";
   print_endline "   or: bf tag <composite> <tag>";
   print_endline "   or: bf log <logdir>";
   exit 1
@@ -64,7 +65,55 @@ let main () =
   let len = Array.length Sys.argv in
     if len > 1 then
       let action = Sys.argv.(1) in
-      match action with
+      let analyze () =
+	match analyze_arguments () with
+	  | Is_components components ->
+	      (match action with
+		| "prepare"   -> Commands.prepare   components
+		| "build"     -> Commands.build     components
+		| "rebuild"   -> Commands.rebuild   components
+		| "install"   -> Commands.install   components
+		| "reinstall" -> Commands.reinstall components
+		| "update"    -> Commands.update    components
+		| "forward"   -> Commands.forward   components
+		| "status"    -> Commands.status    components
+		| _           -> usage ())
+	  | Is_component_with_label component ->
+	      (match action with
+		| "prepare"   -> Commands.prepare   [component]
+		| "build"     -> Commands.build     [component]
+		| "rebuild"   -> Commands.rebuild   [component]
+		| "install"   -> Commands.install   [component]
+		| "reinstall" -> Commands.reinstall [component]
+		| "update"    -> Commands.update    [component]
+		| "forward"   -> Commands.forward   [component]
+		| "status"    -> Commands.status    [component]
+		| _           -> usage ())
+	  | Is_composite composite ->
+	      Params.set_composite_mode ();
+	      (match action with
+		| "prepare"   -> Commands.prepare_composite   composite
+		| "build"     -> Commands.build_composite     composite
+		| "rebuild"   -> Commands.rebuild_composite   composite
+		| "install"   -> Commands.install_composite   composite
+		| "reinstall" -> Commands.reinstall_composite composite
+		| "update"    -> Commands.update_composite    composite
+		| "forward"   -> Commands.forward_composite   composite
+		| "status"    -> Commands.status_composite    composite
+		| _           -> usage ())
+	  | Is_composite_with_tag (composite,tag) ->
+	      Params.set_composite_mode ();
+	      (match action with
+		| "prepare"   -> Commands.prepare_composite   ~tag composite
+		| "build"     -> Commands.build_composite     ~tag composite
+		| "rebuild"   -> Commands.rebuild_composite   ~tag composite
+		| "install"   -> Commands.install_composite   ~tag composite
+		| "reinstall" -> Commands.reinstall_composite ~tag composite
+		| "update"    -> Commands.update_composite	  ~tag composite
+		| "forward"   -> Commands.forward_composite   ~tag composite
+		| "status"    -> Commands.status_composite    ~tag composite
+		| _           -> usage ())
+      in match action with
 	| "pack" ->
 	    if len = 5 then
 	      let specdir = Sys.argv.(2) in
@@ -73,6 +122,26 @@ let main () =
 	      Pack.build_package
 		[specdir;version;release]
 	    else usage ()
+	| "update" ->
+	    if len > 2 then
+	      let specdir = Sys.argv.(2) in
+	      let version = Filename.concat specdir "version" in
+	      let ver =
+		if len > 3 then
+		  Some Sys.argv.(3)
+		else None
+	      in
+	      let rev =
+		if len > 4 then
+		  Some Sys.argv.(4)
+		else None
+	      in
+	      if Sys.file_exists version then
+		Pack.update ~specdir ~ver ~rev ()
+	      else
+		analyze ()
+	    else
+	      analyze ()
 	| "log" ->
 	    if len = 2 then
 	      Rules.log_wizor Sys.argv.(2)
@@ -94,53 +163,7 @@ let main () =
 	      Commands.changelog_composite Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	    else usage ()
 	| _ ->
-	    (match analyze_arguments () with
-	      | Is_components components ->
-		  (match action with
-		    | "prepare"   -> Commands.prepare   components
-		    | "build"     -> Commands.build     components
-		    | "rebuild"   -> Commands.rebuild   components
-		    | "install"   -> Commands.install   components
-		    | "reinstall" -> Commands.reinstall components
-		    | "update"    -> Commands.update    components
-		    | "forward"   -> Commands.forward   components
-		    | "status"    -> Commands.status    components
-		    | _           -> usage ())
-	      | Is_component_with_label component ->
-		  (match action with
-		    | "prepare"   -> Commands.prepare   [component]
-		    | "build"     -> Commands.build     [component]
-		    | "rebuild"   -> Commands.rebuild   [component]
-		    | "install"   -> Commands.install   [component]
-		    | "reinstall" -> Commands.reinstall [component]
-		    | "update"    -> Commands.update    [component]
-		    | "forward"   -> Commands.forward   [component]
-		    | "status"    -> Commands.status    [component]
-		    | _           -> usage ())
-	      | Is_composite composite ->
-		  Params.set_composite_mode ();
-		  (match action with
-		    | "prepare"   -> Commands.prepare_composite   composite
-		    | "build"     -> Commands.build_composite     composite
-		    | "rebuild"   -> Commands.rebuild_composite   composite
-		    | "install"   -> Commands.install_composite   composite
-		    | "reinstall" -> Commands.reinstall_composite composite
-		    | "update"    -> Commands.update_composite    composite
-		    | "forward"   -> Commands.forward_composite   composite
-		    | "status"    -> Commands.status_composite    composite
-		    | _           -> usage ())
-	      | Is_composite_with_tag (composite,tag) ->
-		  Params.set_composite_mode ();
-		  (match action with
-		    | "prepare"   -> Commands.prepare_composite   ~tag composite
-		    | "build"     -> Commands.build_composite     ~tag composite
-		    | "rebuild"   -> Commands.rebuild_composite   ~tag composite
-		    | "install"   -> Commands.install_composite   ~tag composite
-		    | "reinstall" -> Commands.reinstall_composite ~tag composite
-		    | "update"    -> Commands.update_composite	  ~tag composite
-		    | "forward"   -> Commands.forward_composite   ~tag composite
-		    | "status"    -> Commands.status_composite    ~tag composite
-		    | _           -> usage ()))
+	    analyze ()
     else usage ()
       
 let teleport f =
