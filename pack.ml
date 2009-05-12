@@ -598,6 +598,9 @@ let pkgtrans_name_format s =
     done; r
   with Not_found -> s
 
+let pkgname_of_specdir specdir =
+  Filename.basename (Filename.dirname specdir)    
+
 let build_package_impl os platform args =
   match args with
     | [specdir;version;release] ->
@@ -651,9 +654,23 @@ let build_package_impl os platform args =
 			add out bf_list
 		      else
 			begin
-			  log_message 
+			  log_message
 			    (sprintf "bf list for (%s) is not found -> need installing" name);
-			  reinstall_component c;
+			  let tag =
+			    let k =
+			      sprintf "%s/%s-%s"
+				(pkgname_of_specdir specdir)
+				version release
+			    in
+			    let tag_exists = ref false in
+			    with_component_dir ~strict:false c
+			      (fun () -> 
+				tag_exists := List.mem k (Git.git_tag_list ()));
+			    if !tag_exists then
+			      Some k
+			    else None
+			  in
+			  reinstall (with_tag tag [c]);
 			  add_with_check ()
 			end
 		    in add_with_check ())
@@ -935,9 +952,6 @@ exception Cannot_find_pkgver of string
 exception Cannot_find_pkgrev of string
 exception Revision_must_be_digital of string
 
-let pkgname_of_specdir specdir =
-  Filename.basename (Filename.dirname specdir)
-    
 let map_pkg f specdir =
   try
     with_platform
@@ -1021,6 +1035,7 @@ let update ~specdir ?(ver=None) ?(rev=None) () =
   install_composite composite;
   tag_composite composite tag;
   install_composite ~tag composite;
+  (* todo: build package by tag *)
   build_package [specdir;version;string_of_int revision];
   
   match old_tag with
