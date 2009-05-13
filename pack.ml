@@ -343,6 +343,7 @@ type spec = {
   rejects : reject list;
   components : component list;
   pre_install : string option;
+  pre_update : string option;
   pre_uninstall : string option;
   post_install : string option;
   params : (string,string) Hashtbl.t;
@@ -488,6 +489,8 @@ let spec_from_v2 specdir =
     components_of_composite (f "composite") in
   let pre_install =
     load (f "pre-install") in
+  let pre_update =
+    load (f "pre-update") in
   let pre_uninstall =
     load (f "pre-uninstall") in
   let post_install =
@@ -517,6 +520,7 @@ let spec_from_v2 specdir =
     rejects = rejects;
     components = components;
     pre_install = pre_install;
+    pre_update = pre_update;
     pre_uninstall = pre_uninstall;
     post_install = post_install;
     params = params;
@@ -792,7 +796,15 @@ let build_package_impl os platform args =
 			    | None -> ()
 			    | Some pre ->
 				out "%pre\n";
-				oo pre);
+				out "if [ \"$1\" = \"1\" ] ; then\n";
+				oo pre;
+				out "fi\n";
+				(match spec.pre_update with
+				  | None -> ()
+				  | Some preup ->
+				      out "if [ \"$1\" = \"2\" ] ; then\n";
+				      oo preup;
+				      out "fi\n"));
 			  (match spec.post_install with
 			    | None -> ()
 			    | Some post ->				
@@ -802,7 +814,9 @@ let build_package_impl os platform args =
 			    | None -> ()
 			    | Some preun ->
 				out "%preun\n";
-				oo preun))
+				out "if [ \"$1\" = \"0\" ] ; then\n";
+				oo preun;
+				out "fi\n"))
 		    in
 		    
 		    build_over_rpmbuild 
@@ -892,7 +906,12 @@ let build_package_impl os platform args =
 			  (match spec.pre_install with
 			    | None -> ()
 			    | Some content ->
-				write_content "preinstall" content);
+				(match spec.pre_update with
+				  | None ->
+				      write_content "preinstall" content
+				  | Some upd ->
+				      write_content "preinstall"
+					(content ^ "\n" ^  upd)));
 			  (match spec.post_install with
 			    | None -> ()
 			    | Some content ->
