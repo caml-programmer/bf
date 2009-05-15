@@ -627,6 +627,11 @@ let resolve_params find s =
       (try find k with Not_found -> s))
     s
 
+let fix_debian_arch = function
+  | "i686" -> "i386"
+  | "i586" -> "i386"
+  | s -> s
+
 let build_package_impl os platform args =
   match args with
     | [specdir;version;release] ->
@@ -950,11 +955,6 @@ let build_package_impl os platform args =
 			    ~location:(Sys.getcwd ())
 			    ~fullname:pkg_file_gz file)
 		| Deb_pkg ->
-		    let fix_arch = function
-		      | "i686" -> "i386"
-		      | "i586" -> "i386"
-		      | s -> s
-		    in
 		    let make_debian_depends deps =
 		      let b = Buffer.create 32 in
 		      let add s =
@@ -982,7 +982,7 @@ let build_package_impl os platform args =
 		      | "package" -> spec.pkgname
 		      | "priority" -> "low"
 		      | "maintainer" -> Hashtbl.find spec.params "email"
-		      | "architecture" -> fix_arch (System.arch ())
+		      | "architecture" -> fix_debian_arch (System.arch ())
 		      | "version" -> sprintf "%s-%s" version release
 		      | "section" -> Hashtbl.find spec.params "group"
 		      | "description" -> Hashtbl.find spec.params "summary"
@@ -1148,7 +1148,7 @@ let build_package_impl os platform args =
 		    
 		    let pkgfile =
 		      sprintf "%s-%s-%s.%s.deb" 
-			spec.pkgname version release (fix_arch (System.arch ())) in
+			spec.pkgname version release (fix_debian_arch (System.arch ())) in
 		    log_command
 		      "mv" [(Filename.concat abs_specdir "debian.deb");pkgfile])
 	  | version ->
@@ -1178,9 +1178,16 @@ let map_pkg f specdir =
 		pkgtrans_name_format
 		  (pkgname_of_specdir specdir)
 	in
-	let pat = pkgname ^ "-([^-]+)-(\\d+)\\."
-	  ^ (string_of_platform platform) ^ "\\."
-	  ^ (System.arch ()) ^ "\\." in
+	let pat =
+	  match platform with
+	    | Debian ->
+		pkgname ^ "-([^-]+)-(\\d+)\\."
+		^ (fix_debian_arch (System.arch ())) ^ "\\.deb"
+	    | _ ->
+		pkgname ^ "-([^-]+)-(\\d+)\\."
+		^ (string_of_platform platform) ^ "\\."
+		^ (System.arch ()) ^ "\\."
+	in
 	let rex = Pcre.regexp pat in
 	let ff acc s =
 	  if Pcre.pmatch ~rex s then
