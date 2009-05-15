@@ -1008,6 +1008,14 @@ let build_package_impl os platform args =
 		    in
 		    
 		    let add_bf_list out file =
+		      let without_root s =
+			let len = String.length s in
+			if len > 0 then
+			  if s.[0] = '/' then
+			    String.sub s 1 (pred len)
+			  else s
+			else s
+		      in
 		      let ch = open_in file in
 		      let rec read () =
 			try
@@ -1019,10 +1027,10 @@ let build_package_impl os platform args =
 				  let dir =
 				    Filename.concat 
 				      (Filename.concat abs_specdir "debian")
-				      (String.sub s 2 (l - 2)) in
+				      (without_root (String.sub s 2 (l - 2))) in
 				  make_directory [dir];
 			      | 'f' ->
-				  let src = String.sub s 2 (l - 2) in
+				  let src = without_root (String.sub s 2 (l - 2)) in
 				  let dst = Filename.concat 
 				    (Filename.concat abs_specdir "debian") src in
 				  System.copy_file src dst
