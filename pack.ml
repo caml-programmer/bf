@@ -975,7 +975,7 @@ let build_package_impl os platform args =
 			    Buffer.add_string b s
 			  end
 		      in
-		      List.iter 
+		      List.iter
 			(fun (pkgname, ov_opt, _) ->
 			  match ov_opt with
 			    | Some (op,ver) ->
@@ -998,22 +998,7 @@ let build_package_impl os platform args =
 		      | "depends" -> make_debian_depends spec.depends
 		      | k -> Hashtbl.find spec.params k
 		    in
-		    let doc_location =
-		      sprintf "debian/usr/share/doc/%s" spec.pkgname in
-		    make_directory [
-		      "debian/DEBIAN";
-		      "debian/usr/share/man/man1";
-		      doc_location;
-		    ];
-		    
-		    with_dir doc_location
-		      (fun () ->
-			let copyright =
-			  with_out "copyright"
-			    (fun out ->
-			      out (find_value "email"))
-			in ());
-
+		    			
 		    let make_date () =
 		      let tm = Unix.localtime (Unix.time ()) in
 		      sprintf "%04d-%02d-%02d" 
@@ -1022,85 +1007,114 @@ let build_package_impl os platform args =
 			(tm.Unix.tm_mday)
 		    in
 
-		    let manpage =
-		      with_out
-			("debian/usr/share/man/man1/" ^ spec.pkgname)
-			(fun out ->
-			  out (sprintf ".TH %s SECTION \"%s\"\n" spec.pkgname (make_date ()));
-			  out ".SH NAME\n";
-			  out (sprintf "%s - debian package\n" spec.pkgname);
-			  out ".SH DESCRIPTION\n";
-			  out (find_value "description");
-			  out "\n";
-			  out ".SH AUTHOR\n";
-			  out (find_value "email");
-			  out "\n")
-		    in
-		    
-		    log_command "gzip" [manpage];
- 		    
-		    with_dir "debian/DEBIAN" (fun () ->
-		      let control =
-			with_out "control"
-			  (fun out -> 
-			    let gen_param k =
-			      (try
-				out (sprintf "%s: %s\n" (rpm_key_format k) (find_value k))
-			      with Not_found -> ())
-			    in
-			    gen_param "source";
-			    gen_param "section";
-			    gen_param "priority";
-			    gen_param "maintainer";
-			    gen_param "standarts-Version";
-			    gen_param "package";
-			    gen_param "architecture";
-			    gen_param "depends";
-			    gen_param "description";
-			    out
-			      (" " ^ (find_value "description") ^ "\n"))
-		      in
-		      let changelog =
-			with_out "changelog"
-			  (fun out ->
-			    out (sprintf "%s (%s-%s) unstable; urgency=low\n" spec.pkgname version release);
-			    out "\n";
-			    out " * Current Release.\n";
-			    out "\n";
-			    out 
-			      (sprintf "-- %s %s\n" 
-				(find_value "email")
-				(List.hd (System.read_lines "date -R"))))
-		      in ());
-		    		    
-		    let add_bf_list out file =
-		      let ch = open_in file in
-		      let rec read () =
-			try
-			  let s = input_line ch in
-			  let l = String.length s in
-			  if l > 2 then
-			    (match s.[0] with
-			      | 'd' ->
-				  let dir = 
-				    Filename.concat "debian"
-				      (String.sub s 2 (l - 2)) in
-				  make_directory [dir];
-			      | 'f' ->
-				  let src = String.sub s 2 (l - 2) in
-				  let dst = Filename.concat "debian" src in
-				  System.copy_file src dst
-			      | _ -> ());
-			  read ()
-			with End_of_file -> close_in ch
-		      in read ()
-		    in accumulate_lists add_bf_list (fun _ -> ());		    
+		    with_dir abs_specdir
+		      (fun () ->
+			let doc_location =
+			  sprintf "debian/usr/share/doc/%s" spec.pkgname in
+			let man_location =
+			  sprintf "debian/usr/share/man/man1" in
+			remove_directory "debian";			
+			make_directory [
+			  "debian/DEBIAN";
+			  man_location;
+			  doc_location;
+			];			
+			let copyright =
+			  with_out (Filename.concat doc_location "copyright")
+			    (fun out ->
+			      out (find_value "email"))
+			in			
+			let manpage =
+			  with_out
+			    (Filename.concat man_location spec.pkgname)
+			    (fun out ->
+			      out (sprintf ".TH %s SECTION \"%s\"\n" spec.pkgname (make_date ()));
+			      out ".SH NAME\n";
+			      out (sprintf "%s - debian package\n" spec.pkgname);
+			      out ".SH DESCRIPTION\n";
+			      out (find_value "description");
+			      out "\n";
+			      out ".SH AUTHOR\n";
+			      out (find_value "email");
+			      out "\n")
+			in
+			let control =
+			  with_out "debian/DEBIAN/control"
+			    (fun out ->
+			      let gen_param k =
+				(try
+				  out (sprintf "%s: %s\n" (rpm_key_format k) (find_value k))
+				with Not_found -> ())
+			      in
+			      gen_param "source";
+			      gen_param "section";
+			      gen_param "priority";
+			      gen_param "maintainer";
+			      gen_param "standarts-Version";
+			      gen_param "package";
+			      gen_param "architecture";
+			      gen_param "depends";
+			      gen_param "description";
+			      out
+				(" " ^ (find_value "description") ^ "\n"))
+			in
+			let changelog =
+			  with_out "debian/DEBIAN/changelog"
+			    (fun out ->
+			      out (sprintf "%s (%s-%s) unstable; urgency=low\n" spec.pkgname version release);
+			      out "\n";
+			      out " * Current Release.\n";
+			      out "\n";
+			      out
+				(sprintf "-- %s %s\n" 
+				  (find_value "email")
+				  (List.hd (System.read_lines "date -R"))))
+			in
+			let changelog_deb =
+			  with_out "debian/DEBIAN/changelog.Debian"
+			    (fun out ->
+			      out (sprintf "%s (%s-%s) unstable; urgency=low\n" spec.pkgname version release);
+			      out "\n";
+			      out " * Current Release.\n";
+			      out "\n";
+			      out
+				(sprintf "-- %s %s\n"
+				  (find_value "email")
+				  (List.hd (System.read_lines "date -R"))))
+			in
+			
+			log_command "gzip" [manpage];
+		    	log_command "gzip" ["debian/DEBIAN/changelog"];
+			log_command "gzip" ["debian/DEBIAN/changelog.Debian"];
+			
+			let add_bf_list out file =
+			  let ch = open_in file in
+			  let rec read () =
+			    try
+			      let s = input_line ch in
+			      let l = String.length s in
+			      if l > 2 then
+				(match s.[0] with
+				  | 'd' ->
+				      let dir =
+					Filename.concat "debian"
+					  (String.sub s 2 (l - 2)) in
+				      make_directory [dir];
+				  | 'f' ->
+				      let src = String.sub s 2 (l - 2) in
+				      let dst = Filename.concat "debian" src in
+				      System.copy_file src dst
+				  | _ -> ());
+			      read ()
+			    with End_of_file -> close_in ch
+			  in read ()
+			in accumulate_lists add_bf_list (fun _ -> ());
+			log_command
+			  "fakeroot" ["dpkg-deb";"--build";"debian"]);
 		    let pkgfile =
-		      sprintf "%s-%s-%s.%s.deb" spec.pkgname version release (System.arch ()) in
+		      sprintf "%s-%s-%s.%s.deb" spec.pkgname version release (System.arch ()) in		    
 		    log_command
-		      "fakeroot" ["dpkg-deb";"--build";"debian"];
-		    log_command
-		      "mv" ["debian.deb";pkgfile])
+		      "mv" [(Filename.concat abs_specdir "debian.deb");pkgfile])
 	  | version ->
 	      raise (Unsupported_specdir_version version))
     | _ -> log_error "build_rh_package: wrong arguments"
