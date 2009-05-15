@@ -1086,7 +1086,7 @@ let build_package_impl os platform args =
 			  with_out
 			    (Filename.concat man_location (spec.pkgname ^ ".1"))
 			    (fun out ->
-			      out (sprintf ".TH %s SECTION \"%s\"\n" spec.pkgname (make_date ()));
+			      out (sprintf ".TH %s 1 \"%s\"\n" spec.pkgname (make_date ()));
 			      out ".SH NAME\n";
 			      out (sprintf "%s - debian package\n" spec.pkgname);
 			      out ".SH DESCRIPTION\n";
