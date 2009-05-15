@@ -617,6 +617,15 @@ let pkgtrans_name_format s =
 
 let pkgname_of_specdir specdir =
   Filename.basename (Filename.dirname specdir)    
+    
+let resolve_params find s =
+  Pcre.substitute
+    ~pat:"%\\(.*?\\)"
+    ~subst:(fun s ->
+      let l = String.length s in
+      let k = String.sub s 2 (l - 3) in
+      (try find k with Not_found -> s))
+    s
 
 let build_package_impl os platform args =
   match args with
@@ -783,20 +792,8 @@ let build_package_impl os platform args =
 			  out "%description\n";
 			  out "%files\n";
 			  out (sprintf "%%include %s\n" files);
-			  
-			  let resolve_params s =
-			    Pcre.substitute
-			      ~pat:"%\\(.*?\\)"
-			      ~subst:(fun s ->
-				let l = String.length s in
-				let k = String.sub s 2 (l - 3) in
-				(try 
-				  find_value k
-				with Not_found -> s))
-			      s
-			  in
 
-			  let oo s = out (resolve_params s); out "\n" in
+			  let oo s = out (resolve_params find_value s); out "\n" in
 			  
 			  (match spec.pre_install with
 			    | None -> ()
@@ -874,24 +871,13 @@ let build_package_impl os platform args =
 				read ()
 			      with End_of_file -> close_in ch
 			    in read ()
-			  in			  
-			  let resolve_params s =
-			    Pcre.substitute
-			      ~pat:"%\\(.*?\\)"
-			      ~subst:(fun s ->
-				let l = String.length s in
-				let k = String.sub s 2 (l - 3) in
-				(try
-				  find_value k
-				with Not_found -> s))
-			      s
 			  in
 			  let write_content name content =
 			    let file =
 			      Filename.concat abs_specdir name in
 			    out (sprintf "i %s=%s\n" name file);
 			    System.write_string
-			      ~file ~string:(resolve_params content)
+			      ~file ~string:(resolve_params find_value content)
 			  in
 			  let make_depends depends =
 			    let b = Buffer.create 32 in
@@ -964,6 +950,11 @@ let build_package_impl os platform args =
 			    ~location:(Sys.getcwd ())
 			    ~fullname:pkg_file_gz file)
 		| Deb_pkg ->
+		    let fix_arch = function
+		      | "i686" -> "i386"
+		      | "i586" -> "i386"
+		      | s -> s
+		    in
 		    let make_debian_depends deps =
 		      let b = Buffer.create 32 in
 		      let add s =
@@ -991,7 +982,7 @@ let build_package_impl os platform args =
 		      | "package" -> spec.pkgname
 		      | "priority" -> "low"
 		      | "maintainer" -> Hashtbl.find spec.params "email"
-		      | "architecture" -> System.arch ()
+		      | "architecture" -> fix_arch (System.arch ())
 		      | "version" -> sprintf "%s-%s" version release
 		      | "section" -> Hashtbl.find spec.params "group"
 		      | "description" -> Hashtbl.find spec.params "summary"
@@ -1046,7 +1037,15 @@ let build_package_impl os platform args =
 		    remove_directory debian_home;
 		    make_directory [debian_home];		    
 		    accumulate_lists add_bf_list (fun _ -> ());
-		    
+		    		    
+		    let write_script name content =
+		      let file =
+			Filename.concat 
+			  (Filename.concat abs_specdir "debian/DEBIAN") name in
+		      System.write_string
+			~file ~string:(resolve_params find_value content)
+		    in
+
 		    with_dir abs_specdir
 		      (fun () ->
 			let doc_location =
@@ -1059,6 +1058,25 @@ let build_package_impl os platform args =
 			  man_location;
 			  doc_location;
 			];			
+			
+			(match spec.pre_install with
+			  | None -> ()
+			  | Some content ->
+			      (match spec.pre_update with
+				| None ->
+				    write_script "preinst" content
+				| Some upd ->
+				    write_script "preinst"
+				      (content ^ "\n" ^  upd)));
+			(match spec.post_install with
+			  | None -> ()
+			  | Some content ->
+			      write_script "postinst" content);
+			(match spec.pre_uninstall with
+			  | None -> ()
+			  | Some content ->
+			      write_script "prerm" content);
+
 			let copyright =
 			  with_out (Filename.concat doc_location "copyright")
 			    (fun out ->
@@ -1129,7 +1147,8 @@ let build_package_impl os platform args =
 			log_command "fakeroot" ["dpkg-deb";"--build";"debian"]);
 		    
 		    let pkgfile =
-		      sprintf "%s-%s-%s.%s.deb" spec.pkgname version release (System.arch ()) in
+		      sprintf "%s-%s-%s.%s.deb" 
+			spec.pkgname version release (fix_arch (System.arch ())) in
 		    log_command
 		      "mv" [(Filename.concat abs_specdir "debian.deb");pkgfile])
 	  | version ->
