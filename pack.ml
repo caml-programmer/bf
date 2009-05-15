@@ -991,8 +991,8 @@ let build_package_impl os platform args =
 		      | "package" -> spec.pkgname
 		      | "priority" -> "low"
 		      | "maintainer" -> Hashtbl.find spec.params "email"
-		      | "architecture" -> "any"
-		      | "standarts-Version" -> sprintf "%s-%s" version release
+		      | "architecture" -> System.arch ()
+		      | "version" -> sprintf "%s-%s" version release
 		      | "section" -> Hashtbl.find spec.params "group"
 		      | "description" -> Hashtbl.find spec.params "summary"
 		      | "depends" -> make_debian_depends spec.depends
@@ -1066,7 +1066,7 @@ let build_package_impl os platform args =
 			in			
 			let manpage =
 			  with_out
-			    (Filename.concat man_location spec.pkgname)
+			    (Filename.concat man_location (spec.pkgname ^ ".1"))
 			    (fun out ->
 			      out (sprintf ".TH %s SECTION \"%s\"\n" spec.pkgname (make_date ()));
 			      out ".SH NAME\n";
@@ -1090,7 +1090,7 @@ let build_package_impl os platform args =
 			      gen_param "section";
 			      gen_param "priority";
 			      gen_param "maintainer";
-			      gen_param "standarts-Version";
+			      gen_param "version";
 			      gen_param "package";
 			      gen_param "architecture";
 			      gen_param "depends";
@@ -1099,7 +1099,7 @@ let build_package_impl os platform args =
 				(" " ^ (find_value "description") ^ "\n"))
 			in
 			let changelog =
-			  with_out "debian/DEBIAN/changelog"
+			  with_out (Filename.concat doc_location "changelog")
 			    (fun out ->
 			      out (sprintf "%s (%s-%s) unstable; urgency=low\n" spec.pkgname version release);
 			      out "\n";
@@ -1111,7 +1111,7 @@ let build_package_impl os platform args =
 				  (List.hd (System.read_lines "date -R"))))
 			in
 			let changelog_deb =
-			  with_out "debian/DEBIAN/changelog.Debian"
+			  with_out (Filename.concat doc_location "changelog.Debian")
 			    (fun out ->
 			      out (sprintf "%s (%s-%s) unstable; urgency=low\n" spec.pkgname version release);
 			      out "\n";
@@ -1123,10 +1123,10 @@ let build_package_impl os platform args =
 				  (List.hd (System.read_lines "date -R"))))
 			in
 			
-			log_command "gzip" [manpage];
-		    	log_command "gzip" ["debian/DEBIAN/changelog"];
-			log_command "gzip" ["debian/DEBIAN/changelog.Debian"];
-			log_command "fakeroot" ["dpkg-deb";"--build";"debian"]);		    
+			log_command "gzip" ["--best";manpage];
+		    	log_command "gzip" ["--best";changelog];
+			log_command "gzip" ["--best";changelog_deb];
+			log_command "fakeroot" ["dpkg-deb";"--build";"debian"]);
 		    
 		    let pkgfile =
 		      sprintf "%s-%s-%s.%s.deb" spec.pkgname version release (System.arch ()) in
