@@ -15,6 +15,7 @@ type os =
 type pkg_engine =
   | Rpm_build
   | Pkg_trans
+  | Deb_pkg
 
 type platform =
   | Rhel3
@@ -27,6 +28,7 @@ type platform =
   | Solaris8
   | Solaris9
   | Solaris10
+  | Debian
 
 type platform_mapping =
     (string * ((string * platform) list)) list
@@ -42,6 +44,7 @@ let engine_of_platform = function
   | Solaris8  -> Pkg_trans
   | Solaris9  -> Pkg_trans
   | Solaris10 -> Pkg_trans
+  | Debian    -> Deb_pkg
 
 let string_of_platform = function
   | Rhel3     -> "rhel3"
@@ -54,7 +57,8 @@ let string_of_platform = function
   | Solaris8  -> "sol8"
   | Solaris9  -> "sol9"
   | Solaris10 -> "sol10"
-
+  | Debian    -> "deb"
+     
 let platform_of_string = function
   | "rhel3" -> Rhel3
   | "rhel4" -> Rhel4
@@ -66,6 +70,7 @@ let platform_of_string = function
   | "sol8"  -> Solaris8
   | "sol9"  -> Solaris9
   | "sol10" -> Solaris10
+  | "deb"   -> Debian
   |  s -> log_error (sprintf "Unsupported platform (%s)" s)
 
 let os_of_string = function
@@ -89,7 +94,8 @@ let linux_platform_mapping =
       "^Fedora.*?release 10",Fedora10;
       "^ALT Linux",Alt
     ];
-    "/etc/arch-release", ["^.*",Arch]
+    "/etc/arch-release", ["^.*",Arch];
+    "/etc/debian_version",["^.*",Debian];
   ]
     
 let rec select_platforms acc = function
@@ -591,6 +597,13 @@ let check_composite_depends spec =
 	missings;
       log_error "you must correct depends or composite files"
     end
+
+let rpm_key_format s =
+  let l = String.length s in
+  if l > 0 then
+    let r = String.sub s 0 l in
+    r.[0] <- Char.uppercase r.[0]; r
+  else s
       
 let pkgtrans_name_format s =
   try
@@ -736,13 +749,6 @@ let build_package_impl os platform args =
 			    log_message (sprintf "warning: %s is not found" freq))
 		    in
 		    let specfile =
-		      let rpm_key_format s =
-			let l = String.length s in
-			if l > 0 then
-			  let r = String.sub s 0 l in
-			  r.[0] <- Char.uppercase r.[0]; r
-			else s
-		      in
 		      with_out "rpmbuild.spec"
 			(fun out ->
 			  let find_value = function
@@ -919,7 +925,7 @@ let build_package_impl os platform args =
 			  (match spec.pre_uninstall with
 			    | None -> ()
 			    | Some content ->
-				write_content "preremove" content);			  
+				write_content "preremove" content);
 			  (match spec.depends with
 			    | [] ->  ()
 			    | list ->
@@ -951,12 +957,150 @@ let build_package_impl os platform args =
 		    (try Sys.remove pkg_file_gz with _ -> ());
 		    log_command "gzip" [pkg_file];
 
-		    match spec.hooks with
+		    (match spec.hooks with
 		      | None -> ()
 		      | Some file ->
 			  call_after_build 
-			    ~location:(Sys.getcwd ()) 
+			    ~location:(Sys.getcwd ())
 			    ~fullname:pkg_file_gz file)
+		| Deb_pkg ->
+		    let make_debian_depends deps =
+		      let b = Buffer.create 32 in
+		      let add s =
+			if Buffer.length b = 0 then
+			  Buffer.add_string b s
+			else
+			  begin
+			    Buffer.add_string b ", ";
+			    Buffer.add_string b s
+			  end
+		      in
+		      List.iter 
+			(fun (pkgname, ov_opt, _) ->
+			  match ov_opt with
+			    | Some (op,ver) ->
+				add (sprintf "%s (%s %s)" pkgname (string_of_pkg_op op) ver)
+			    | None ->
+				add pkgname)
+			deps;
+		      Buffer.contents b
+		    in
+		    let find_value = function
+		      | "topdir" -> Params.get_param "top-dir"
+		      | "source" -> spec.pkgname
+		      | "package" -> spec.pkgname
+		      | "priority" -> "low"
+		      | "maintainer" -> Hashtbl.find spec.params "email"
+		      | "architecture" -> "any"
+		      | "standarts-Version" -> sprintf "%s-%s" version release
+		      | "section" -> Hashtbl.find spec.params "group"
+		      | "description" -> Hashtbl.find spec.params "summary"
+		      | "depends" -> make_debian_depends spec.depends
+		      | k -> Hashtbl.find spec.params k
+		    in
+		    let doc_location =
+		      sprintf "debian/usr/share/doc/%s" spec.pkgname in
+		    make_directory [
+		      "debian/DEBIAN";
+		      "debian/usr/share/man/man1";
+		      doc_location;
+		    ];
+		    
+		    with_dir doc_location
+		      (fun () ->
+			let copyright =
+			  with_out "copyright"
+			    (fun out ->
+			      out (find_value "email"))
+			in ());
+
+		    let make_date () =
+		      let tm = Unix.localtime (Unix.time ()) in
+		      sprintf "%04d-%02d-%02d" 
+			(tm.Unix.tm_year + 1900)
+			(tm.Unix.tm_mon + 1)
+			(tm.Unix.tm_mday)
+		    in
+
+		    let manpage =
+		      with_out
+			("debian/usr/share/man/man1/" ^ spec.pkgname)
+			(fun out ->
+			  out (sprintf ".TH %s SECTION \"%s\"\n" spec.pkgname (make_date ()));
+			  out ".SH NAME\n";
+			  out (sprintf "%s - debian package\n" spec.pkgname);
+			  out ".SH DESCRIPTION\n";
+			  out (find_value "description");
+			  out "\n";
+			  out ".SH AUTHOR\n";
+			  out (find_value "email");
+			  out "\n")
+		    in
+		    
+		    log_command "gzip" [manpage];
+ 		    
+		    with_dir "debian/DEBIAN" (fun () ->
+		      let control =
+			with_out "control"
+			  (fun out -> 
+			    let gen_param k =
+			      (try
+				out (sprintf "%s: %s\n" (rpm_key_format k) (find_value k))
+			      with Not_found -> ())
+			    in
+			    gen_param "source";
+			    gen_param "section";
+			    gen_param "priority";
+			    gen_param "maintainer";
+			    gen_param "standarts-Version";
+			    gen_param "package";
+			    gen_param "architecture";
+			    gen_param "depends";
+			    gen_param "description";
+			    out
+			      (" " ^ (find_value "description") ^ "\n"))
+		      in
+		      let changelog =
+			with_out "changelog"
+			  (fun out ->
+			    out (sprintf "%s (%s-%s) unstable; urgency=low\n" spec.pkgname version release);
+			    out "\n";
+			    out " * Current Release.\n";
+			    out "\n";
+			    out 
+			      (sprintf "-- %s %s\n" 
+				(find_value "email")
+				(List.hd (System.read_lines "date -R"))))
+		      in ());
+		    		    
+		    let add_bf_list out file =
+		      let ch = open_in file in
+		      let rec read () =
+			try
+			  let s = input_line ch in
+			  let l = String.length s in
+			  if l > 2 then
+			    (match s.[0] with
+			      | 'd' ->
+				  let dir = 
+				    Filename.concat "debian"
+				      (String.sub s 2 (l - 2)) in
+				  make_directory [dir];
+			      | 'f' ->
+				  let src = String.sub s 2 (l - 2) in
+				  let dst = Filename.concat "debian" src in
+				  System.copy_file src dst
+			      | _ -> ());
+			  read ()
+			with End_of_file -> close_in ch
+		      in read ()
+		    in accumulate_lists add_bf_list (fun _ -> ());		    
+		    let pkgfile =
+		      sprintf "%s-%s-%s.%s.deb" spec.pkgname version release (System.arch ()) in
+		    log_command
+		      "fakeroot" ["dpkg-deb";"--build";"debian"];
+		    log_command
+		      "mv" ["debian.deb";pkgfile])
 	  | version ->
 	      raise (Unsupported_specdir_version version))
     | _ -> log_error "build_rh_package: wrong arguments"
@@ -977,7 +1121,8 @@ let map_pkg f specdir =
       (fun os platform ->
 	let pkgname =
 	  match engine_of_platform platform with
-	    | Rpm_build -> 
+	    | Rpm_build 
+	    | Deb_pkg ->
 		pkgname_of_specdir specdir
 	    | Pkg_trans ->
 		pkgtrans_name_format
