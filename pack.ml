@@ -1030,9 +1030,10 @@ let build_package_impl os platform args =
 				      (without_root (String.sub s 2 (l - 2))) in
 				  make_directory [dir];
 			      | 'f' ->
-				  let src = without_root (String.sub s 2 (l - 2)) in
+				  let src = String.sub s 2 (l - 2) in
 				  let dst = Filename.concat 
-				    (Filename.concat abs_specdir "debian") src in
+				    (Filename.concat abs_specdir "debian") 
+				    (without_root src) in
 				  System.copy_file src dst
 			      | _ -> ());
 			  read ()
