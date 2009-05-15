@@ -980,7 +980,7 @@ let build_package_impl os platform args =
 		      | "topdir" -> Params.get_param "top-dir"
 		      | "source" -> spec.pkgname
 		      | "package" -> spec.pkgname
-		      | "priority" -> "low"
+		      | "priority" -> "optional"
 		      | "maintainer" -> Hashtbl.find spec.params "email"
 		      | "architecture" -> fix_debian_arch (System.arch ())
 		      | "version" -> sprintf "%s-%s" version release
