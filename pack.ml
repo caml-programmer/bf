@@ -1006,14 +1006,45 @@ let build_package_impl os platform args =
 			(tm.Unix.tm_mon + 1)
 			(tm.Unix.tm_mday)
 		    in
+		    
+		    let add_bf_list out file =
+		      let ch = open_in file in
+		      let rec read () =
+			try
+			  let s = input_line ch in
+			  let l = String.length s in
+			  if l > 2 then
+			    (match s.[0] with
+			      | 'd' ->
+				  let dir =
+				    Filename.concat 
+				      (Filename.concat abs_specdir "debian")
+				      (String.sub s 2 (l - 2)) in
+				  make_directory [dir];
+			      | 'f' ->
+				  let src = String.sub s 2 (l - 2) in
+				  let dst = Filename.concat 
+				    (Filename.concat abs_specdir "debian") src in
+				  System.copy_file src dst
+			      | _ -> ());
+			  read ()
+			with End_of_file -> close_in ch
+		      in read ()
+		    in 
 
+		    let debian_home =
+		      Filename.concat abs_specdir "debian" in
+		    remove_directory debian_home;
+		    make_directory [debian_home];		    
+		    accumulate_lists add_bf_list (fun _ -> ());
+		    
 		    with_dir abs_specdir
 		      (fun () ->
 			let doc_location =
 			  sprintf "debian/usr/share/doc/%s" spec.pkgname in
 			let man_location =
 			  sprintf "debian/usr/share/man/man1" in
-			remove_directory "debian";			
+			
 			make_directory [
 			  "debian/DEBIAN";
 			  man_location;
@@ -1086,33 +1117,10 @@ let build_package_impl os platform args =
 			log_command "gzip" [manpage];
 		    	log_command "gzip" ["debian/DEBIAN/changelog"];
 			log_command "gzip" ["debian/DEBIAN/changelog.Debian"];
-			
-			let add_bf_list out file =
-			  let ch = open_in file in
-			  let rec read () =
-			    try
-			      let s = input_line ch in
-			      let l = String.length s in
-			      if l > 2 then
-				(match s.[0] with
-				  | 'd' ->
-				      let dir =
-					Filename.concat "debian"
-					  (String.sub s 2 (l - 2)) in
-				      make_directory [dir];
-				  | 'f' ->
-				      let src = String.sub s 2 (l - 2) in
-				      let dst = Filename.concat "debian" src in
-				      System.copy_file src dst
-				  | _ -> ());
-			      read ()
-			    with End_of_file -> close_in ch
-			  in read ()
-			in accumulate_lists add_bf_list (fun _ -> ());
-			log_command
-			  "fakeroot" ["dpkg-deb";"--build";"debian"]);
+			log_command "fakeroot" ["dpkg-deb";"--build";"debian"]);		    
+		    
 		    let pkgfile =
-		      sprintf "%s-%s-%s.%s.deb" spec.pkgname version release (System.arch ()) in		    
+		      sprintf "%s-%s-%s.%s.deb" spec.pkgname version release (System.arch ()) in
 		    log_command
 		      "mv" [(Filename.concat abs_specdir "debian.deb");pkgfile])
 	  | version ->
