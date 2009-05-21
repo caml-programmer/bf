@@ -275,45 +275,45 @@ let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
       match parse_line raw with
 	| `File s ->
 	    (try
-	      let s =
-		match dest_dir () with 
-		  | Some d -> Filename.concat d s 
+	      let ns =
+		match dest_dir () with
+		  | Some d -> Filename.concat d (System.strip_root s)
 		  | None   -> s in
 	      let dname =
 		Filename.concat buildroot (Filename.dirname s) in
-	      let src = "/" ^ s in
+	      let src = "/" ^ ns in
 	      let dst = Filename.concat buildroot s in
 	      System.create_directory_r dname;
 	      System.copy_file src dst
 	    with exn ->
-	      log_message ("f " ^ s);
+	      log_message ("f " ^ ns);
 	      raise exn)
 	| `Dir s ->
 	    (try
-	      let s =
+	      let ns =
 		match dest_dir () with 
-		  | Some d -> Filename.concat d s 
+		  | Some d -> Filename.concat d (System.strip_root s)
 		  | None   -> s in
 	      let dname =
 		Filename.concat buildroot (Filename.dirname s) in
-	      let src = "/" ^ s in
+	      let src = "/" ^ ns in
 	      let dst = Filename.concat buildroot s in
 	      System.create_directory_r dname;
 	      remove_directory (Filename.concat buildroot s);
 	      System.copy_dir src dst;
 	    with exn ->
-	      log_message ("d " ^ s);
+	      log_message ("d " ^ ns);
 	      raise exn)
 	| `Empty_dir s ->
 	    (try
-	      let s =
-		match dest_dir () with 
-		  | Some d -> Filename.concat d s 
+	      let ns =
+		match dest_dir () with
+		  | Some d -> Filename.concat d (System.strip_root s)
 		  | None   -> s in
 	      let dst = Filename.concat buildroot s in
 	      System.create_directory_r dst
 	    with exn ->
-	      log_message ("e " ^ s);
+	      log_message ("e " ^ ns);
 	      raise exn)
 	| `None ->
 	    log_message 
@@ -1021,14 +1021,6 @@ let build_package_impl os platform args =
 		    in
 		    
 		    let add_bf_list out file =
-		      let without_root s =
-			let len = String.length s in
-			if len > 0 then
-			  if s.[0] = '/' then
-			    String.sub s 1 (pred len)
-			  else s
-			else s
-		      in
 		      let ch = open_in file in
 		      let rec read () =
 			try
@@ -1040,13 +1032,13 @@ let build_package_impl os platform args =
 				  let dir =
 				    Filename.concat 
 				      (Filename.concat abs_specdir "debian")
-				      (without_root (String.sub s 2 (l - 2))) in
+				      (System.strip_root (String.sub s 2 (l - 2))) in
 				  make_directory [dir];
 			      | 'f' ->
 				  let src = String.sub s 2 (l - 2) in
 				  let dst = Filename.concat 
 				    (Filename.concat abs_specdir "debian") 
-				    (without_root src) in
+				    (System.strip_root src) in
 				  System.copy_file 
 				    (match dest_dir () with
 				      | Some d -> Filename.concat d src

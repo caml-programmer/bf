@@ -58,6 +58,14 @@ let path_strip_directory file =
     else file
   else file
 
+let strip_root s =
+  let len = String.length s in
+  if len > 0 then
+    if s.[0] = '/' then
+      String.sub s 1 (pred len)
+    else s
+  else s
+
 exception Cannot_create_directory of string
 
 let create_directory_r dir =
