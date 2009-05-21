@@ -54,8 +54,8 @@ let get_param s =
 ;;
 
 let update_param name value =
-  Ocs_env.bind_name Scheme.env (Ssymbol name)
-    (Ocs_env.get_var Scheme.env (Ssymbol value));
+  Ocs_env.set_glob Scheme.env
+    (Ssymbol name) (Sstring value);
   Hashtbl.replace user_params name value
 ;;
 
