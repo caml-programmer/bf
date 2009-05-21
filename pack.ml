@@ -286,7 +286,7 @@ let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
 	      System.create_directory_r dname;
 	      System.copy_file src dst
 	    with exn ->
-	      log_message ("f " ^ ns);
+	      log_message ("f " ^ s);
 	      raise exn)
 	| `Dir s ->
 	    (try
@@ -302,18 +302,14 @@ let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
 	      remove_directory (Filename.concat buildroot s);
 	      System.copy_dir src dst;
 	    with exn ->
-	      log_message ("d " ^ ns);
+	      log_message ("d " ^ s);
 	      raise exn)
 	| `Empty_dir s ->
 	    (try
-	      let ns =
-		match dest_dir () with
-		  | Some d -> Filename.concat d (System.strip_root s)
-		  | None   -> s in
 	      let dst = Filename.concat buildroot s in
 	      System.create_directory_r dst
 	    with exn ->
-	      log_message ("e " ^ ns);
+	      log_message ("e " ^ s);
 	      raise exn)
 	| `None ->
 	    log_message 
