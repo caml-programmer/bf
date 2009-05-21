@@ -275,6 +275,8 @@ let install_component component =
 		if not (Sys.file_exists ".bf-build") then
 		  build_component_native component;
 		log_message ("installing " ^ component.name);
+		let top_dir =
+		  Params.get_param "top-dir" in
 		let dest_dir =
 		  Params.get_param "dest-dir" in
 		let real_dir =
@@ -283,8 +285,12 @@ let install_component component =
 		let state =
 		  create_top_state real_dir in
 		if dest_dir <> "" then
-		  Env.update "DESTDIR" dest_dir;
+		  begin
+		    Env.update "DESTDIR" dest_dir;
+		    Params.update_param "top-dir" real_dir;
+		  end;
 		Rules.install_rules ();
+		Params.update_param "top-dir" top_dir;
 		generate_changes
 		  state (create_top_state real_dir);
 		log_message (component.name ^ " installed");
