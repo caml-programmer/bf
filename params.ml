@@ -72,6 +72,7 @@ let used_composite_mode () =
 
 set_param ~default:(Sys.getcwd()) "top-dir";;
 set_param ~default:(Sys.getcwd()) "dev-dir";;
+set_param ~default:"" "dest-dir";;
 set_param ~default:"logs" "log-dir";;
 set_param ~default:"git://localhost/" "git-url";;
 set_param ~default:"bf" "component";;

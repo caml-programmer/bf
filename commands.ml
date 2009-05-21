@@ -205,17 +205,26 @@ let rec scan_entry f dir =
 	  f (File abs,last))
     (read [])
 
-let create_top_state () =
+let create_top_state dir =
   match Params.get_param "autopkg" with
     | "true" -> 
 	let t = Hashtbl.create 32 in
 	scan_entry 
 	  (fun (entry,last) ->
 	    Hashtbl.add t entry last)
-	  (Params.get_param "top-dir");
+	  dir;
 	t
     | _ -> (Hashtbl.create 0 : fs_state)
     
+let strip_destdir s =
+  let dest_dir = Params.get_param "dest-dir" in
+  if dest_dir <> "" then
+    let len = String.length dest_dir in
+    if String.sub s 0 len = dest_dir then
+      String.sub s len (String.length s - len)
+    else s
+  else s
+   
 let generate_changes a b =
   let string_of_fs_entry = function
     | File s -> "f " ^ s
@@ -245,7 +254,7 @@ let generate_changes a b =
 	let ch = open_out ".bf-list" in
 	List.iter
 	  (fun e ->
-	    output_string ch (string_of_fs_entry e);
+	    output_string ch (strip_destdir (string_of_fs_entry e));
 	    output_string ch "\n")
 	  (List.sort entry_compare !acc);
 	close_out ch
@@ -254,11 +263,11 @@ let generate_changes a b =
 let install_component component =
   match component.label, component.pkg with
     | Tag _, Some pkg ->
-	log_message 
+	log_message
 	  (component.name ^ (sprintf " must be installed by package (%s), noting to do" pkg))
     | _ ->
 	with_component_dir ~strict:false component
-	  (fun () ->	    
+	  (fun () ->
 	    if Sys.file_exists ".bf-install" then
 	      log_message (component.name ^ " already installed, noting to do")
 	    else
@@ -266,11 +275,18 @@ let install_component component =
 		if not (Sys.file_exists ".bf-build") then
 		  build_component_native component;
 		log_message ("installing " ^ component.name);
-		let state = 
-		  create_top_state () in
+		let dest_dir =
+		  Params.get_param "dest-dir" in
+		let real_dir =
+		  Filename.concat dest_dir
+		    (Params.get_param "top-dir") in
+		let state =
+		  create_top_state real_dir in
+		if dest_dir <> "" then
+		  Env.update "DESTDIR" dest_dir;
 		Rules.install_rules ();
 		generate_changes
-		  state (create_top_state ());
+		  state (create_top_state real_dir);
 		log_message (component.name ^ " installed");
 		let ch = open_out ".bf-install" in
 		output_string ch (string_of_float (Unix.gettimeofday ()));

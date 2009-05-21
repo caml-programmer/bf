@@ -224,6 +224,12 @@ type content =
     | `None
     ]
 
+let dest_dir () =
+  let dest_dir = Params.get_param "dest-dir" in
+  if dest_dir <> "" then
+    Some dest_dir
+  else None  
+
 let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot")) ~top_dir files =
   remove_directory buildroot;
   make_directory [buildroot];
@@ -269,6 +275,10 @@ let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
       match parse_line raw with
 	| `File s ->
 	    (try
+	      let s =
+		match dest_dir () with 
+		  | Some d -> Filename.concat d s 
+		  | None   -> s in
 	      let dname =
 		Filename.concat buildroot (Filename.dirname s) in
 	      let src = "/" ^ s in
@@ -280,6 +290,10 @@ let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
 	      raise exn)
 	| `Dir s ->
 	    (try
+	      let s =
+		match dest_dir () with 
+		  | Some d -> Filename.concat d s 
+		  | None   -> s in
 	      let dname =
 		Filename.concat buildroot (Filename.dirname s) in
 	      let src = "/" ^ s in
@@ -292,6 +306,10 @@ let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
 	      raise exn)
 	| `Empty_dir s ->
 	    (try
+	      let s =
+		match dest_dir () with 
+		  | Some d -> Filename.concat d s 
+		  | None   -> s in
 	      let dst = Filename.concat buildroot s in
 	      System.create_directory_r dst
 	    with exn ->
@@ -939,8 +957,12 @@ let build_package_impl os platform args =
 
 		    with_dir abs_specdir
 		      (fun () ->
+			let root =
+			  match dest_dir () with
+			    | Some d -> d
+			    | None -> "/" in
 			log_command "pkgmk"
-			  ["-o";"-r";"/"];
+			  ["-o";"-r";root];
 			log_command "pkgtrans" 
 			  ["-o";"-s";pkg_spool; pkg_file; pkg_name]);
 		    
@@ -1025,7 +1047,10 @@ let build_package_impl os platform args =
 				  let dst = Filename.concat 
 				    (Filename.concat abs_specdir "debian") 
 				    (without_root src) in
-				  System.copy_file src dst
+				  System.copy_file 
+				    (match dest_dir () with
+				      | Some d -> Filename.concat d src
+				      | None -> src) dst
 			      | _ -> ());
 			  read ()
 			with End_of_file -> close_in ch
