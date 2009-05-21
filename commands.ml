@@ -227,8 +227,8 @@ let strip_destdir s =
    
 let generate_changes a b =
   let string_of_fs_entry = function
-    | File s -> "f " ^ s
-    | Dir s  -> "d " ^ s
+    | File s -> "f " ^ (strip_destdir s)
+    | Dir s  -> "d " ^ (strip_destdir s)
   in
   let entry_compare a b =
     match a, b with
@@ -254,7 +254,7 @@ let generate_changes a b =
 	let ch = open_out ".bf-list" in
 	List.iter
 	  (fun e ->
-	    output_string ch (strip_destdir (string_of_fs_entry e));
+	    output_string ch (string_of_fs_entry e);
 	    output_string ch "\n")
 	  (List.sort entry_compare !acc);
 	close_out ch
