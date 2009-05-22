@@ -280,8 +280,12 @@ let install_component component =
 		let dest_dir =
 		  Params.get_param "dest-dir" in
 		let real_dir =
-		  Filename.concat dest_dir
-		    (System.strip_root (Params.get_param "top-dir")) in
+		  if dest_dir = "" then
+		    top_dir
+		  else
+		    Filename.concat dest_dir 
+		      (System.strip_root top_dir)
+		in
 		let state =
 		  create_top_state real_dir in
 		if dest_dir <> "" then
