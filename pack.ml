@@ -150,10 +150,8 @@ let rpmbuild
   let arch = System.arch () in
   let location = 
     match platform with
-      | Cent5 ->
-	  "/usr/src/redhat/RPMS/" ^ arch
-      | _ ->
-	  Sys.getcwd ()
+      | Cent5 -> Sys.getcwd () (* old variant: "/usr/src/redhat/RPMS/" ^ arch *)
+      | _ -> Sys.getcwd ()
   in
   let rhsys = string_of_platform platform in
   add "-bb";
