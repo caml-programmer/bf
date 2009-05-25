@@ -289,10 +289,7 @@ let install_component component =
 		let state =
 		  create_top_state real_dir in
 		if dest_dir <> "" then
-		  begin
-		    Env.update "DESTDIR" dest_dir;
-		    Params.update_param "top-dir" real_dir;
-		  end;
+		  Params.update_param "top-dir" real_dir;
 		Rules.install_rules ();
 		Params.update_param "top-dir" top_dir;
 		generate_changes
