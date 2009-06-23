@@ -817,17 +817,19 @@ let build_package_impl os platform args =
 			    | Some pre ->
 				out "%pre\n";
 				out "if [ \"$1\" = \"1\" ] ; then\n";
+				out "echo -n\n";
 				oo pre;
 				out "fi\n";
 				(match spec.pre_update with
 				  | None -> ()
 				  | Some preup ->
 				      out "if [ \"$1\" = \"2\" ] ; then\n";
+				      out "echo -n\n";
 				      oo preup;
 				      out "fi\n"));
 			  (match spec.post_install with
 			    | None -> ()
-			    | Some post ->				
+			    | Some post ->
 				out "%post\n";
 				oo post);
 			  (match spec.pre_uninstall with
@@ -835,6 +837,7 @@ let build_package_impl os platform args =
 			    | Some preun ->
 				out "%preun\n";
 				out "if [ \"$1\" = \"0\" ] ; then\n";
+				out "echo -n\n";
 				oo preun;
 				out "fi\n"))
 		    in
