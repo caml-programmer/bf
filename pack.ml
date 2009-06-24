@@ -335,6 +335,92 @@ let spec_from_v1 specdir =
     List.map (Filename.concat specdir) flist
   else raise Invalid_specdir_format
 
+(* Pkg search *)
+   
+exception Broken_pkg_iteration of string
+exception Cannot_find_pkgver of string
+exception Cannot_find_pkgrev of string
+exception Revision_must_be_digital of string
+
+let pkgname_of_specdir specdir =
+  Filename.basename (Filename.dirname specdir)
+      
+let pkgtrans_name_format s =
+  try
+    let pos = String.index s '-' in
+    let r = String.sub s 0 (String.length s) in
+    r.[pos] <- 'D';
+    for i=0 to pos do
+      r.[i] <- Char.uppercase r.[i]
+    done; r
+  with Not_found -> s
+
+let fix_debian_arch = function
+  | "i686" -> "i386"
+  | "i586" -> "i386"
+  | s -> s
+
+let map_pkg f specdir =
+  try
+    with_platform
+      (fun os platform ->
+	let pkgname =
+	  match engine_of_platform platform with
+	    | Rpm_build 
+	    | Deb_pkg ->
+		pkgname_of_specdir specdir
+	    | Pkg_trans ->
+		pkgtrans_name_format
+		  (pkgname_of_specdir specdir)
+	in
+	let pat =
+	  match platform with
+	    | Debian ->
+		pkgname ^ "-([^-]+)-(\\d+)\\."
+		^ (fix_debian_arch (System.arch ())) ^ "\\.deb"
+	    | _ ->
+		pkgname ^ "-([^-]+)-(\\d+)\\."
+		^ (string_of_platform platform) ^ "\\."
+		^ (System.arch ()) ^ "\\."
+	in
+	let rex = Pcre.regexp pat in
+	let ff acc s =
+	  if Pcre.pmatch ~rex s then
+	    let a = Pcre.extract ~rex s in
+	    if Array.length a > 2 then
+	      (a.(1),int_of_string a.(2))::acc
+	    else acc
+	  else acc
+	in
+	List.map f
+	  (List.fold_left ff []
+	    (System.list_of_directory (Sys.getcwd ()))))
+  with exn ->
+    raise (Broken_pkg_iteration (Printexc.to_string exn))
+
+let find_pkg_version specdir =
+  try
+    (match
+      List.sort 
+	(fun a b -> compare b a)
+	(map_pkg fst specdir)
+    with [] -> raise Not_found
+      | hd::tl -> hd)
+  with exn ->
+    raise (Cannot_find_pkgver (Printexc.to_string exn))
+
+let find_pkg_revision specdir version =
+  try
+    (match
+      List.sort
+	(fun a b -> compare b a)
+	(map_pkg snd specdir)
+    with [] -> raise Not_found
+      | hd::tl -> hd)
+  with exn ->
+    raise (Cannot_find_pkgrev (Printexc.to_string exn))
+
+
 type pkg_name = string
 type pkg_desc = string
 type pkg_ver = string
@@ -344,6 +430,7 @@ type pkg_op =
   | Pkg_eq
   | Pkg_ge
   | Pkg_gt
+  | Pkg_last
     
 type depend = 
     pkg_name * (pkg_op * pkg_ver) option * pkg_desc option
@@ -374,6 +461,7 @@ let string_of_pkg_op = function
   | Pkg_eq -> "="
   | Pkg_ge -> ">="
   | Pkg_gt -> ">"
+  | Pkg_last -> "="
 
 let spec_from_v2 specdir =
   let f = Filename.concat specdir in
@@ -405,8 +493,12 @@ let spec_from_v2 specdir =
 	let add_op op v =
 	  let ver =
 	    Scheme.make_string (Scheme.fst v) in
-	  pkg_ver := Some ver;
 	  pkg_op  := Some op;
+	  (match op with
+	    | Pkg_last ->
+		pkg_ver := Some (sprintf "%s-%d" ver (find_pkg_revision specdir ver))
+	    | _ ->
+		pkg_ver := Some ver)
 	in
 	
 	(match name_v with
@@ -423,6 +515,7 @@ let spec_from_v2 specdir =
 		  "<",add_op Pkg_lt;
 		  ">=", add_op Pkg_ge;
 		  "<=", add_op Pkg_le;
+		  "last", add_op Pkg_last;
 		] op_ver);
 	(match desc_v with
 	  | None -> ()
@@ -616,19 +709,6 @@ let rpm_key_format s =
     let r = String.sub s 0 l in
     r.[0] <- Char.uppercase r.[0]; r
   else s
-      
-let pkgtrans_name_format s =
-  try
-    let pos = String.index s '-' in
-    let r = String.sub s 0 (String.length s) in
-    r.[pos] <- 'D';
-    for i=0 to pos do
-      r.[i] <- Char.uppercase r.[i]
-    done; r
-  with Not_found -> s
-
-let pkgname_of_specdir specdir =
-  Filename.basename (Filename.dirname specdir)    
     
 let resolve_params find s =
   Pcre.substitute
@@ -638,11 +718,6 @@ let resolve_params find s =
       let k = String.sub s 2 (l - 3) in
       (try find k with Not_found -> s))
     s
-
-let fix_debian_arch = function
-  | "i686" -> "i386"
-  | "i586" -> "i386"
-  | s -> s
 
 let build_package_impl os platform args =
   match args with
@@ -1174,70 +1249,6 @@ let build_package args =
     (fun os platfrom ->
       build_package_impl os platfrom args)
 
-exception Broken_pkg_iteration of string
-exception Cannot_find_pkgver of string
-exception Cannot_find_pkgrev of string
-exception Revision_must_be_digital of string
-
-let map_pkg f specdir =
-  try
-    with_platform
-      (fun os platform ->
-	let pkgname =
-	  match engine_of_platform platform with
-	    | Rpm_build 
-	    | Deb_pkg ->
-		pkgname_of_specdir specdir
-	    | Pkg_trans ->
-		pkgtrans_name_format
-		  (pkgname_of_specdir specdir)
-	in
-	let pat =
-	  match platform with
-	    | Debian ->
-		pkgname ^ "-([^-]+)-(\\d+)\\."
-		^ (fix_debian_arch (System.arch ())) ^ "\\.deb"
-	    | _ ->
-		pkgname ^ "-([^-]+)-(\\d+)\\."
-		^ (string_of_platform platform) ^ "\\."
-		^ (System.arch ()) ^ "\\."
-	in
-	let rex = Pcre.regexp pat in
-	let ff acc s =
-	  if Pcre.pmatch ~rex s then
-	    let a = Pcre.extract ~rex s in
-	    if Array.length a > 2 then
-	      (a.(1),int_of_string a.(2))::acc
-	    else acc
-	  else acc
-	in
-	List.map f
-	  (List.fold_left ff []
-	    (System.list_of_directory (Sys.getcwd ()))))
-  with exn ->
-    raise (Broken_pkg_iteration (Printexc.to_string exn))
-
-let find_pkg_version specdir =
-  try
-    (match
-      List.sort 
-	(fun a b -> compare b a)
-	(map_pkg fst specdir)
-    with [] -> raise Not_found
-      | hd::tl -> hd)
-  with exn ->
-    raise (Cannot_find_pkgver (Printexc.to_string exn))
-
-let find_pkg_revision specdir version =
-  try
-    (match
-      List.sort
-	(fun a b -> compare b a)
-	(map_pkg snd specdir)
-    with [] -> raise Not_found
-      | hd::tl -> succ hd)
-  with exn ->
-    raise (Cannot_find_pkgrev (Printexc.to_string exn))
 
 let update ~specdir ?(ver=None) ?(rev=None) () =
   let specdir = System.path_strip_directory specdir in
@@ -1249,7 +1260,7 @@ let update ~specdir ?(ver=None) ?(rev=None) () =
   let revision =
     match rev with
       | Some r -> (try int_of_string r with _ -> raise (Revision_must_be_digital r))
-      | None -> find_pkg_revision specdir version
+      | None -> succ (find_pkg_revision specdir version)
   in
   let pkgname =
     pkgname_of_specdir specdir in
