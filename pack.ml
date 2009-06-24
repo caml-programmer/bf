@@ -360,18 +360,15 @@ let fix_debian_arch = function
   | "i586" -> "i386"
   | s -> s
 
-let map_pkg f specdir =
+let map_pkg f pkgname =
   try
     with_platform
       (fun os platform ->
 	let pkgname =
 	  match engine_of_platform platform with
 	    | Rpm_build 
-	    | Deb_pkg ->
-		pkgname_of_specdir specdir
-	    | Pkg_trans ->
-		pkgtrans_name_format
-		  (pkgname_of_specdir specdir)
+	    | Deb_pkg   -> pkgname
+	    | Pkg_trans -> pkgtrans_name_format pkgname
 	in
 	let pat =
 	  match platform with
@@ -398,23 +395,23 @@ let map_pkg f specdir =
   with exn ->
     raise (Broken_pkg_iteration (Printexc.to_string exn))
 
-let find_pkg_version specdir =
+let find_pkg_version pkgname =
   try
     (match
       List.sort 
 	(fun a b -> compare b a)
-	(map_pkg fst specdir)
+	(map_pkg fst pkgname)
     with [] -> raise Not_found
       | hd::tl -> hd)
   with exn ->
     raise (Cannot_find_pkgver (Printexc.to_string exn))
 
-let find_pkg_revision specdir version =
+let find_pkg_revision pkgname version =
   try
     (match
       List.sort
 	(fun a b -> compare b a)
-	(map_pkg snd specdir)
+	(map_pkg snd pkgname)
     with [] -> raise Not_found
       | hd::tl -> hd)
   with exn ->
@@ -496,7 +493,10 @@ let spec_from_v2 specdir =
 	  pkg_op  := Some op;
 	  (match op with
 	    | Pkg_last ->
-		pkg_ver := Some (sprintf "%s-%d" ver (find_pkg_revision specdir ver))
+		pkg_ver := Some (sprintf "%s-%d" ver
+		  (find_pkg_revision 
+		    (match !pkg_name with Some s -> s | None -> raise Not_found)
+		    ver))
 	    | _ ->
 		pkg_ver := Some ver)
 	in
@@ -1252,15 +1252,16 @@ let build_package args =
 
 let update ~specdir ?(ver=None) ?(rev=None) () =
   let specdir = System.path_strip_directory specdir in
+  let pkgname = pkgname_of_specdir specdir in
   let version =
     match ver with
       | Some v -> v
-      | None -> find_pkg_version specdir
+      | None -> find_pkg_version pkgname
   in
   let revision =
     match rev with
       | Some r -> (try int_of_string r with _ -> raise (Revision_must_be_digital r))
-      | None -> succ (find_pkg_revision specdir version)
+      | None -> succ (find_pkg_revision pkgname version)
   in
   let pkgname =
     pkgname_of_specdir specdir in
