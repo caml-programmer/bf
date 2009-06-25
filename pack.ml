@@ -493,10 +493,13 @@ let spec_from_v2 specdir =
 	  pkg_op  := Some op;
 	  (match op with
 	    | Pkg_last ->
-		pkg_ver := Some (sprintf "%s-%d" ver
-		  (find_pkg_revision 
-		    (match !pkg_name with Some s -> s | None -> raise Not_found)
-		    ver))
+		with_platform 
+		  (fun os platform ->
+		    pkg_ver := Some (sprintf "%s-%d.%s" ver
+		      (find_pkg_revision 
+			(match !pkg_name with Some s -> s | None -> raise Not_found)
+			ver)
+		      (string_of_platform platform)))
 	    | _ ->
 		pkg_ver := Some ver)
 	in
