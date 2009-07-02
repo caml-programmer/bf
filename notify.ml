@@ -3,6 +3,8 @@
 open Printf
 open Netchannels
 
+exception Host_not_found of string
+
 let error_message s =
   prerr_endline s
 
@@ -168,7 +170,11 @@ let send_message
   message (sprintf "Connect to %s:%d" smtp_server smtp_port);
   message (sprintf "Subject: %s" subject);
   try
-    let host = Unix.gethostbyname smtp_server in
+    let host = 
+      try
+	Unix.gethostbyname smtp_server 
+      with Not_found -> raise (Host_not_found smtp_server)
+    in
     let (in_channel,out_channel) =
       let rec make () =
 	(try

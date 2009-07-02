@@ -148,15 +148,10 @@ let rpmbuild
     add "--define"; add (sprintf "%s %s" n v)
   in
   let arch = System.arch () in
-  let location = 
-    match platform with
-      | Cent5 -> Sys.getcwd () (* old variant: "/usr/src/redhat/RPMS/" ^ arch *)
-      | _ -> Sys.getcwd ()
-  in
+  let location = Sys.getcwd () in
   let rhsys = string_of_platform platform in
   add "-bb";
-  if platform <> Cent5 then
-    add ("--target=" ^ arch);
+  add ("--target=" ^ arch);
   add spec;
   define "_rpmdir" location;
   define "fileslist" files; (* must be absolute *)

@@ -2,7 +2,7 @@
 #
 # Shell script for GODI installation.
 #
-# Usage: godi-setup http://www.ocaml-programming.de/packages/godi-bootstrap-20080118.tar.gz
+# Usage: godi-setup http://download.camlcity.org/download/godi-rocketboost-20080630.tar.gz
 #
 
 H=/opt/godi
@@ -10,8 +10,9 @@ G=$1
 
 wget -O godi.tar.gz $G
 tar -zxvf godi.tar.gz
-cd godi-bootstrap*
+cd godi-rocketboost*
 ./bootstrap --prefix $H
+mkdir -p /etc/profile.d
 echo "export PATH=$H/bin:$H/sbin:\$PATH" > /etc/profile.d/godi.sh
 echo "export MANPATH=$H/man:\$MANPATH"  >> /etc/profile.d/godi.sh
 chmod +x /etc/profile.d/godi.sh
