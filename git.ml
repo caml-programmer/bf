@@ -89,12 +89,22 @@ let git_checkout
   log_command "git" !args
 
 let git_branch ?(filter=(fun _ -> true)) ?(remote=false) () =
+  let branch_cleaner s =
+    try
+      let pos = String.index s '>' in
+      let len = pos - 2 in
+      if len > 0 then
+	String.sub s 0 len
+      else s
+    with Not_found -> s
+  in
   try
-    List.map
-      (fun s -> String.sub s 2 ((String.length s) - 2))
-      (read_lines
-	~filter:(fun s -> String.length s > 2 && filter s && s <> "* (no branch)")
-	(if remote then "git branch -r" else "git branch"))
+    List.map branch_cleaner
+      (List.map
+	(fun s -> String.sub s 2 ((String.length s) - 2))
+	(read_lines
+	  ~filter:(fun s -> String.length s > 2 && filter s && s <> "* (no branch)")
+	  (if remote then "git branch -r" else "git branch")))
   with System.Error s -> log_error s
 
 let strip_branch_prefix branch =
