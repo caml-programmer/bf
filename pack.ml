@@ -20,6 +20,7 @@ type pkg_engine =
 type platform =
   | Rhel3
   | Rhel4
+  | Rhel5
   | Cent4
   | Cent5
   | Fedora10
@@ -36,6 +37,7 @@ type platform_mapping =
 let engine_of_platform = function
   | Rhel3     -> Rpm_build
   | Rhel4     -> Rpm_build
+  | Rhel5     -> Rpm_build
   | Cent4     -> Rpm_build
   | Cent5     -> Rpm_build
   | Fedora10  -> Rpm_build
@@ -49,6 +51,7 @@ let engine_of_platform = function
 let string_of_platform = function
   | Rhel3     -> "rhel3"
   | Rhel4     -> "rhel4"
+  | Rhel5     -> "rhel5"
   | Cent4     -> "cent4"
   | Cent5     -> "cent5"
   | Fedora10  -> "f10"
@@ -62,6 +65,7 @@ let string_of_platform = function
 let platform_of_string = function
   | "rhel3" -> Rhel3
   | "rhel4" -> Rhel4
+  | "rhel5" -> Rhel5
   | "cent4" -> Cent4
   | "cent5" -> Cent5
   | "f10"   -> Fedora10
@@ -89,6 +93,7 @@ let linux_platform_mapping =
     [
       "^Red Hat Enterprise.*?release 3",Rhel3;
       "^Red Hat Enterprise.*?release 4",Rhel4;
+      "^Red Hat Enterprise.*?release 5",Rhel5;
       "^CentOS.*?release 4",Cent4;
       "^CentOS.*?release 5",Cent5;
       "^Fedora.*?release 10",Fedora10;
