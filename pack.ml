@@ -395,6 +395,10 @@ let map_pkg f pkgname =
   with exn ->
     raise (Broken_pkg_iteration (Printexc.to_string exn))
 
+let filter_pkg f pkgname =
+  List.filter f
+    (map_pkg (fun x -> x) pkgname)
+
 let find_pkg_version pkgname =
   try
     (match
@@ -411,12 +415,13 @@ let find_pkg_revision pkgname version =
     (match
       List.sort
 	(fun a b -> compare b a)
-	(map_pkg snd pkgname)
+	(List.map snd
+	  (filter_pkg
+	    (fun (ver,_) -> ver = version) pkgname))
     with [] -> raise Not_found
       | hd::tl -> hd)
   with exn ->
     raise (Cannot_find_pkgrev (Printexc.to_string exn))
-
 
 type pkg_name = string
 type pkg_desc = string
