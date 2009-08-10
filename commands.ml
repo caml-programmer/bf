@@ -737,6 +737,15 @@ let scm_substring templ s =
   then Strue
   else Sfalse
 
+let scm_substrings templ s =
+  scm_make_list
+    (function
+      | None   -> Sstring ""
+      | Some s -> Sstring s)
+    (Array.to_list
+      (Pcre.extract_opt
+	~pat:(Scheme.string_of_sval templ)
+	(Scheme.string_of_sval s)))
 ;;
 
 (* Register global functions *)
@@ -788,4 +797,4 @@ Ocs_env.set_pf3 Scheme.env scm_send_message "send-message";;
 Ocs_env.set_pf2 Scheme.env scm_write_file "write-file";;
 Ocs_env.set_pf2 Scheme.env scm_write_scheme_value "write-scheme-value";;
 Ocs_env.set_pf2 Scheme.env scm_substring "substring?";;
-
+Ocs_env.set_pf2 Scheme.env scm_substrings "substrings";;
