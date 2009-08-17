@@ -90,6 +90,10 @@ let linearization s =
       s.[i] <- ' ';
   done; s
 
+let log_error error =
+  log_message ~key:"error" error;
+  exit 3
+
 let log_command ?error_handler prog args =
   let out_buf = Buffer.create 256 in
   let err_buf = Buffer.create 256 in
@@ -124,30 +128,35 @@ let log_command ?error_handler prog args =
 	  ~stdout:(Shell.to_fd log_fd)
 	  ~stderr:(Shell.to_fd log_fd) [cmd];
 	log_message ~logger (sprintf "success: %s" cmd_s)
-	with Shell.Subprocess_error errors ->
-	  List.iter
-	  (fun (cmd,ps) ->
-	    (match ps with
-	      | Unix.WEXITED rc ->
-		  (match error_handler with
-		      Some f -> f ps
-		    | None ->
-			log_message ~logger (sprintf "failed: %d" rc);
-			exit rc)
-	      | Unix.WSIGNALED n -> 
-		  (match error_handler with
-		      Some f -> f ps
-		    | None ->
-			log_message ~logger (sprintf "killed: %d" n);
-			exit n)
-	      | Unix.WSTOPPED n ->
-		  (match error_handler with
-		      Some f -> f ps
-		    | None ->
-			log_message ~logger (sprintf "stopped: %d" n);
-			exit n)))
-	  errors)
+      with 
+	| Unix.Unix_error(error,name,arg) ->
+	    log_error
+	      (sprintf "failed: Unix.Unix_error(%s,%s,%s)" 
+		(Unix.error_message error)
+		name arg)
+	| Shell.Subprocess_error errors ->
+	    List.iter
+	      (fun (cmd,ps) ->
+		(match ps with
+		  | Unix.WEXITED rc ->
+		      (match error_handler with
+			  Some f -> f ps
+			| None ->
+			    log_message ~logger (sprintf "failed: %d" rc);
+			    exit rc)
+		  | Unix.WSIGNALED n -> 
+		      (match error_handler with
+			  Some f -> f ps
+			| None ->
+			    log_message ~logger (sprintf "killed: %d" n);
+			    exit n)
+		  | Unix.WSTOPPED n ->
+		      (match error_handler with
+			  Some f -> f ps
+			| None ->
+			    log_message ~logger (sprintf "stopped: %d" n);
+			    exit n)))
+	      errors)
 
-let log_error error =
-  log_message ~key:"error" error;
-  exit 3
+
+
