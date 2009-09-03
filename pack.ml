@@ -967,9 +967,13 @@ let build_package_impl os platform args =
 				if l > 2 then
 				  (match s.[0] with
 				    | 'd' ->
-					out (reg (sprintf "d none %s 0755 root root\n" (String.sub s 2 (l - 2))))
+					let dir = String.sub s 2 (l - 2) in
+					let mode = sprintf "%o" (Unix.stat dir).Unix.st_perm in
+					out (reg (sprintf "d none %s %s root root\n" dir mode))
 				    | 'f' -> 
-					out (reg (sprintf "f none %s 0644 root root\n" (String.sub s 2 (l - 2))))
+					let file = String.sub s 2 (l - 2) in
+					let mode = sprintf "%o" (Unix.stat file).Unix.st_perm in
+					out (reg (sprintf "f none %s %s root root\n" file mode))
 				    | _ -> ());
 				read ()
 			      with End_of_file -> close_in ch
@@ -991,7 +995,7 @@ let build_package_impl os platform args =
 				  match pkg_desc_opt with
 				    | None -> pkg_name
 				    | Some s -> s
-				in out (sprintf "P %s %s\n" pkg_name pkg_desc))
+				in out (sprintf "P %s %s\n" (pkgtrans_name_format pkg_name) pkg_desc))
 			      depends;
 			    Buffer.contents b
 			  in
