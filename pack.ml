@@ -839,7 +839,7 @@ let build_package_impl os platform args =
 			    (fun (pkg_name,ov_opt,_) ->
 			      (match ov_opt with
 				| Some (op,ver) ->
-				    out (sprintf "echo %s %s %s\n"
+				    out (sprintf "echo \"%s %s %s\"\n"
 				      pkg_name (string_of_pkg_op op) ver)
 				| None ->
 				    out (sprintf "echo %s\n" pkg_name)))
