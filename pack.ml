@@ -1289,11 +1289,17 @@ let update ~specdir ?(ver=None) ?(rev=None) () =
       Some (sprintf "%s/%s-%d" pkgname version (pred revision))
     else None
   in
-
+  
   update_composite composite;
-  install_composite composite;
-  tag_composite composite tag;
+
+  if not (tag_ready ~tag composite) then
+    begin
+      install_composite composite;
+      tag_composite composite tag;
+    end;
+  
   install_composite ~tag composite;
+
   (* todo: build package by tag *)
   build_package [specdir;version;string_of_int revision];
   

@@ -119,7 +119,7 @@ let smart_update_component component =
       let repos =
 	Filename.concat (git_create_url component) component.name in
       let start = git_current_branch () in
-      git_fetch repos;
+      git_fetch ~tags:true repos;
       git_remote_update ();
       git_track_new_branches ();
       List.iter
@@ -463,6 +463,15 @@ let with_tag tag components =
 let only_local components =
   List.filter
     (fun c -> c.pkg = None) components
+
+let tag_ready ~tag composite =
+  List.for_all
+    (fun component ->
+      let res = ref false in
+      with_component_dir ~strict:false component
+	(fun () -> res := List.mem tag (git_tag_list ()));
+      !res)
+    (Rules.components_of_composite composite)
 
 let prepare_composite ?tag composite =
   log_message ("=> prepare-composite " ^ composite);

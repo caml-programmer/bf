@@ -110,7 +110,6 @@ let install_rules () =
   else
     log_error "current component is not built"
 
-
 (*** Component rules *)
 
 let split_by_space s =
