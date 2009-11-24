@@ -657,6 +657,7 @@ let print_depends depends =
     depends
 
 let call_after_build ~location ~fullname file =
+  Rules.load_plugins ();
   Scheme.eval_file file;
   Scheme.eval_code (fun _ -> ())
     (sprintf "(after-build \"%s\" \"%s\" \"%s\")"
