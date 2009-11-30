@@ -1340,19 +1340,21 @@ let extract_platform pkg_name =
     raise (Cannot_extract_platform pkg_name)  
 
 let rec get_depends table acc userhost pkg_path =
+  log_message (sprintf "resolve %s" pkg_path);
   let pkg_dir = Filename.dirname pkg_path in
   let pkg_name = Filename.basename pkg_path in
   let platform = extract_platform pkg_name in
   let extension = extract_extension pkg_name in
   let arch = extract_arch pkg_name in
   let rex = 
-    Pcre.regexp (sprintf "%s\\s+=\\s+([^-]+)-(\\d+)\\." pkg_name) in
+    Pcre.regexp "([^\\ ]+)\\s+=\\s+([^-]+)-(\\d+)\\." in
   Dep_list 
     (List.map
       (fun s ->
 	let a = Pcre.extract ~rex s in
-	let ver = a.(1) in
-	let rev = try int_of_string a.(2) with _ -> raise (Cannot_extract_revision pkg_path) in
+	let pkg_name = a.(1) in
+	let ver = a.(2) in
+	let rev = try int_of_string a.(3) with _ -> raise (Cannot_extract_revision pkg_path) in
 	if Hashtbl.mem table pkg_name then
 	  begin
 	    let (ver',rev') = Hashtbl.find table pkg_name in
@@ -1370,7 +1372,8 @@ let rec get_depends table acc userhost pkg_path =
 	      [(get_depends table (Dep_list []) userhost new_pkg_path); Dep_val (pkg_name,ver,rev); acc]
 	  end)
       (System.read_lines
-	~filter:(fun s -> Pcre.pmatch ~pat:"jet" s && Pcre.pmatch ~rex s)
+	~filter:(fun s -> 
+	  Pcre.pmatch ~pat:"jet" s && Pcre.pmatch ~rex s)
 	(sprintf "ssh %s rpm -qRp %s" userhost pkg_path)))
 
 let rec print_depends depth = function
@@ -1379,9 +1382,22 @@ let rec print_depends depth = function
   | Dep_val (n,v,r) ->
       let step = String.make depth ' ' in
       printf "%s%s %s %d\n" step n v r
-	
-let clone userhost pkg_path =
+
+let rec clone_packages ?(pack_branch="devel") = function
+  | Dep_list l ->
+      List.iter (fun v -> clone_packages v) l
+  | Dep_val (n,v,r) ->
+      let specdir =
+	sprintf "./pack.git/%s/%s" n pack_branch in
+      update ~specdir ~ver:(Some v) ~rev:(Some (string_of_int r)) ()
+
+let clone pack_branch userhost pkg_path =
   let table = Hashtbl.create 32 in
   let depends =
     get_depends table (Dep_list []) userhost pkg_path in  
-  print_depends 0 depends
+  print_depends 0 depends;  
+  clone_packages ~pack_branch depends
+
+
+
+
