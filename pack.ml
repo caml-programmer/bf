@@ -1346,7 +1346,7 @@ let rec get_depends table acc userhost pkg_path =
   let extension = extract_extension pkg_name in
   let arch = extract_arch pkg_name in
   let rex = 
-    tag_extraction_rex pkg_name platform in
+    Pcre.regexp (sprintf "%s\\s+=\\s+([^-]+)-(\\d+)\\." pkg_name) in
   Dep_list 
     (List.map
       (fun s ->
