@@ -360,6 +360,14 @@ let fix_debian_arch = function
   | "i586" -> "i386"
   | s -> s
 
+let tag_extraction_rex pkgname = function
+  | Debian ->
+      Pcre.regexp
+	(pkgname ^ "-([^-]+)-(\\d+)\\." ^ (fix_debian_arch (System.arch ())) ^ "\\.deb")
+  | platform ->
+      Pcre.regexp
+	(pkgname ^ "-([^-]+)-(\\d+)\\." ^ (string_of_platform platform) ^ "\\." ^ (System.arch ()) ^ "\\.")
+
 let map_pkg f pkgname =
   try
     with_platform
@@ -370,17 +378,7 @@ let map_pkg f pkgname =
 	    | Deb_pkg   -> pkgname
 	    | Pkg_trans -> pkgtrans_name_format pkgname
 	in
-	let pat =
-	  match platform with
-	    | Debian ->
-		pkgname ^ "-([^-]+)-(\\d+)\\."
-		^ (fix_debian_arch (System.arch ())) ^ "\\.deb"
-	    | _ ->
-		pkgname ^ "-([^-]+)-(\\d+)\\."
-		^ (string_of_platform platform) ^ "\\."
-		^ (System.arch ()) ^ "\\."
-	in
-	let rex = Pcre.regexp pat in
+	let rex = tag_extraction_rex pkgname platform in
 	let ff acc s =
 	  if Pcre.pmatch ~rex s then
 	    let a = Pcre.extract ~rex s in
@@ -1299,10 +1297,91 @@ let update ~specdir ?(ver=None) ?(rev=None) () =
   build_package [specdir;version;string_of_int revision];
   
   match old_tag with
-    | Some old -> 
+    | Some old ->
 	changelog_composite composite old tag
     | None -> ()
 
+
+(* Clone suport *)
+
+type dep_tree =
+  | Dep_val of (string * version * revision)
+  | Dep_list of dep_tree list
+
+exception Cannot_extract_arch of string
+exception Cannot_extract_platform of string
+exception Cannot_resolve_dependes of string
+exception Cannot_extract_revision of string
+exception Cannot_extract_extension of string
+
+let extract_extension pkg_name =
+  try
+    let pos = String.rindex pkg_name '.' in
+    String.sub pkg_name (succ pos) (String.length pkg_name - pos - 1)
+  with _ ->
+    raise (Cannot_extract_extension pkg_name)
+
+let extract_arch pkg_name =
+  try
+    let pos1 = String.rindex pkg_name '.' in
+    let pos2 = String.rindex_from pkg_name (pred pos1) '.' in
+    String.sub pkg_name (succ pos2) (pos1 - pos2 - 1)
+  with _ ->
+    raise (Cannot_extract_arch pkg_name)
+
+let extract_platform pkg_name =
+  try
+    let pos0 = String.rindex pkg_name '.' in
+    let pos1 = String.rindex_from pkg_name (pred pos0) '.' in
+    let pos2 = String.rindex_from pkg_name (pred pos1) '.' in
+    platform_of_string 
+      (String.sub pkg_name (succ pos2) (pos1 - pos2 - 1))
+  with _ ->
+    raise (Cannot_extract_platform pkg_name)  
+
+let rec get_depends table acc userhost pkg_path =
+  let pkg_dir = Filename.dirname pkg_path in
+  let pkg_name = Filename.basename pkg_path in
+  let platform = extract_platform pkg_name in
+  let extension = extract_extension pkg_name in
+  let arch = extract_arch pkg_name in
+  let rex = 
+    tag_extraction_rex pkg_name platform in
+  Dep_list 
+    (List.map
+      (fun s ->
+	let a = Pcre.extract ~rex s in
+	let ver = a.(1) in
+	let rev = try int_of_string a.(2) with _ -> raise (Cannot_extract_revision pkg_path) in
+	if Hashtbl.mem table pkg_name then
+	  begin
+	    let (ver',rev') = Hashtbl.find table pkg_name in
+	    if ver <> ver' || rev <> rev' then
+	      raise (Cannot_resolve_dependes pkg_path)
+	    else (Dep_list [])
+	  end
+	else
+	  begin
+	    let new_pkg_path =
+	      sprintf "%s/%s-%s-%d.%s.%s.%s" pkg_dir pkg_name ver rev
+		(string_of_platform platform) arch extension in
+	    Hashtbl.add table pkg_name (ver,rev);
+	    Dep_list 
+	      [(get_depends table (Dep_list []) userhost new_pkg_path); Dep_val (pkg_name,ver,rev); acc]
+	  end)
+      (System.read_lines
+	~filter:(fun s -> Pcre.pmatch ~pat:"jet" s && Pcre.pmatch ~rex s)
+	(sprintf "ssh %s rpm -qRp %s" userhost pkg_path)))
+
+let rec print_depends depth = function
+  | Dep_list l ->
+      List.iter (fun v -> print_depends (succ depth) v) l
+  | Dep_val (n,v,r) ->
+      let step = String.make depth ' ' in
+      printf "%s%s %s %d\n" step n v r
+	
 let clone userhost pkg_path =
-  ()
-  
+  let table = Hashtbl.create 32 in
+  let depends =
+    get_depends table (Dep_list []) userhost pkg_path in  
+  print_depends 0 depends

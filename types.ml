@@ -36,3 +36,5 @@ type fs_entry =
 
 type fs_state = (fs_entry,float) Hashtbl.t
 
+type version = string
+type revision = int
