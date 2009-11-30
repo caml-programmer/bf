@@ -656,9 +656,11 @@ let print_depends depends =
 	(match pkg_desc with Some s -> s | None -> "")))
     depends
 
-let call_after_build ~location ~fullname file =
+let call_after_build ~location ~fullname hooks =
   Rules.load_plugins ();
-  Scheme.eval_file file;
+  (match hooks with
+    | Some file -> Scheme.eval_file file
+    | None -> ());
   Scheme.eval_code (fun _ -> ())
     (sprintf "(after-build \"%s\" \"%s\" \"%s\")"
       (System.hostname ()) location fullname)
@@ -674,10 +676,7 @@ let build_over_rpmbuild params =
       ~top_dir 
       ~pkgname ~platform ~version ~release
       ~spec ~files ~findreq ()
-  in match hooks with
-    | None -> ()
-    | Some file ->
-	call_after_build ~location ~fullname file
+  in call_after_build ~location ~fullname hooks
 
 let check_composite_depends spec =
   let composite_depends =
@@ -1054,13 +1053,9 @@ let build_package_impl os platform args =
 		    log_command "mv" ["-f";pkg_file_abs;"./"];
 		    (try Sys.remove pkg_file_gz with _ -> ());
 		    log_command "gzip" [pkg_file];
-
-		    (match spec.hooks with
-		      | None -> ()
-		      | Some file ->
-			  call_after_build 
-			    ~location:(Sys.getcwd ())
-			    ~fullname:pkg_file_gz file)
+		    call_after_build 
+		      ~location:(Sys.getcwd ())
+		      ~fullname:pkg_file_gz spec.hooks
 		| Deb_pkg ->
 		    let make_debian_depends deps =
 		      let b = Buffer.create 32 in
@@ -1262,7 +1257,6 @@ let build_package args =
     (fun os platfrom ->
       build_package_impl os platfrom args)
 
-
 let update ~specdir ?(ver=None) ?(rev=None) () =
   let specdir = System.path_strip_directory specdir in
   let pkgname = pkgname_of_specdir specdir in
@@ -1308,3 +1302,7 @@ let update ~specdir ?(ver=None) ?(rev=None) () =
     | Some old -> 
 	changelog_composite composite old tag
     | None -> ()
+
+let clone userhost pkg_path =
+  ()
+  

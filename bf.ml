@@ -16,6 +16,7 @@ let usage () =
   print_endline "   or: bf review <composite> <since-date>";
   print_endline "   or: bf pack <specdir> <version> <release>";
   print_endline "   or: bf update <specdir> [version] [release]";
+  print_endline "   or: bf clone <ssh-user>@<ssh-host> <pkg-path>";
   print_endline "   or: bf tag <composite> <tag>";
   print_endline "   or: bf log <logdir>";
   exit 1
@@ -145,6 +146,10 @@ let main () =
 	| "log" ->
 	    if len = 2 then
 	      Rules.log_wizor Sys.argv.(2)
+	    else usage ()
+	| "clone" ->
+	    if len = 3 then
+	      Pack.clone Sys.argv.(2) Sys.argv.(3)
 	    else usage ()
 	| "tag" ->
 	    if len = 4 then
