@@ -144,11 +144,11 @@ let main () =
 	    else
 	      analyze ()
 	| "log" ->
-	    if len = 2 then
+	    if len = 3 then
 	      Rules.log_wizor Sys.argv.(2)
 	    else usage ()
 	| "clone" ->
-	    if len = 3 then
+	    if len = 4 then
 	      Pack.clone Sys.argv.(2) Sys.argv.(3)
 	    else usage ()
 	| "tag" ->
