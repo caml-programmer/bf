@@ -1388,7 +1388,7 @@ let rec clone_packages ?(pack_branch="devel") = function
       List.iter (fun v -> clone_packages v) l
   | Dep_val (n,v,r) ->
       let specdir =
-	sprintf "./pack.git/%s/%s" n pack_branch in
+	sprintf "./pack/%s/%s" n pack_branch in
       update ~specdir ~ver:(Some v) ~rev:(Some (string_of_int r)) ()
 
 let clone pack_branch userhost pkg_path =
