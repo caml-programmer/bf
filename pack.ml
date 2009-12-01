@@ -465,6 +465,7 @@ let string_of_pkg_op = function
 
 let spec_from_v2 specdir =
   let f = Filename.concat specdir in
+  let pack_branch = Filename.basename specdir in
   let load s =
     if Sys.file_exists s then
       let ch = open_in s in
@@ -593,14 +594,15 @@ let spec_from_v2 specdir =
   in
   let provides =
     let n = f "provides" in
+    let p = "packbranch-" ^ pack_branch in
     if Sys.file_exists n then
       begin
 	let ch = open_in n in
 	let symbols =
 	  System.list_of_channel ch in
-	close_in ch; symbols
+	close_in ch; (p::symbols)
       end
-    else []
+    else [p]
   in
   let components =
     components_of_composite (f "composite") in
