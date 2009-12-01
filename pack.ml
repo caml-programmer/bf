@@ -1348,7 +1348,9 @@ exception Cannot_extract_arch of string
 exception Cannot_extract_platform of string
 exception Cannot_resolve_dependes of string
 exception Cannot_extract_revision of string
+exception Cannot_extract_version of string
 exception Cannot_extract_extension of string
+exception Cannot_extract_pkgname of string
 exception Pack_branch_is_not_found of string
 
 let extract_extension pkg_name =
@@ -1376,13 +1378,49 @@ let extract_platform pkg_name =
   with _ ->
     raise (Cannot_extract_platform pkg_name)
 
+let extract_revision rest pkg_name =
+  try
+    let rest_len = String.length rest in
+    let s = 
+      String.sub pkg_name 0
+	(String.length pkg_name - rest_len) in
+    let pos = String.rindex s '-' in
+    int_of_string 
+      (String.sub s (succ pos)
+	(String.length s - pos - 1))
+  with _ ->
+    raise (Cannot_extract_revision pkg_name)
+
+let extract_version rest pkg_name =
+  try
+    let rest_len = String.length rest in
+    let s = 
+      String.sub pkg_name 0
+	(String.length pkg_name - rest_len) in
+    let pos = String.rindex s '-' in
+    String.sub s (succ pos)
+      (String.length s - pos - 1)
+  with _ ->
+    raise (Cannot_extract_version pkg_name)
+
+let extract_name rest pkg =
+  try
+    String.sub pkg 0 (String.length pkg - String.length rest)
+  with _ -> raise (Cannot_extract_pkgname pkg)    
+
 let rec get_depends table acc userhost pkg_path =
   log_message (sprintf "resolve %s" pkg_path);
   let pkg_dir = Filename.dirname pkg_path in
-  let pkg_name = Filename.basename pkg_path in
-  let platform = extract_platform pkg_name in
-  let extension = extract_extension pkg_name in
-  let arch = extract_arch pkg_name in
+  let pkg = Filename.basename pkg_path in
+  let platform = extract_platform pkg in
+  let extension = extract_extension pkg in
+  let arch = extract_arch pkg in
+  let revision =
+    extract_revision (sprintf ".%s.%s.%s" (string_of_platform platform) arch extension) pkg in
+  let version = 
+    extract_version (sprintf "-%d.%s.%s.%s" revision (string_of_platform platform) arch extension) pkg in
+  let pkg_name =
+    extract_name (sprintf "-%s-%d.%s.%s.%s" version revision (string_of_platform platform) arch extension) pkg in
   let pack_branch =
     match (System.read_lines
       ~filter:(fun s -> 
@@ -1396,8 +1434,8 @@ let rec get_depends table acc userhost pkg_path =
   in
   let rex = 
     Pcre.regexp "([^\\ ]+)\\s+=\\s+([^-]+)-(\\d+)\\." in
-  Dep_list 
-    (List.map
+  Dep_list
+    ((List.map
       (fun s ->
 	let a = Pcre.extract ~rex s in
 	let pkg_name = a.(1) in
@@ -1417,12 +1455,13 @@ let rec get_depends table acc userhost pkg_path =
 		(string_of_platform platform) arch extension in
 	    Hashtbl.add table pkg_name (ver,rev);
 	    Dep_list 
-	      [(get_depends table (Dep_list []) userhost new_pkg_path); Dep_val (pkg_name,pack_branch,ver,rev); acc]
+	      [(get_depends table (Dep_list []) userhost new_pkg_path); acc]
 	  end)
       (System.read_lines
 	~filter:(fun s -> 
 	  Pcre.pmatch ~pat:"jet" s && Pcre.pmatch ~rex s)
 	(sprintf "ssh %s rpm -qRp %s" userhost pkg_path)))
+    @ [Dep_val (pkg_name,pack_branch,version,revision)])
 
 let rec get_pack_depends table acc specdir =
   log_message (sprintf "resolve %s" specdir);
