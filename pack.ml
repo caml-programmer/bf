@@ -1444,32 +1444,31 @@ let rec get_pack_depends table acc specdir =
   with 
     | [] -> specdir::acc
     | l -> 
-	List.rev
-	  (specdir::(List.flatten
-	    (List.map
-	      (fun pkg ->
-		let pack_branch_variants =
-		  Array.of_list
-		    (System.list_of_directory (Filename.concat pkgdir pkg)) in
-		let len = Array.length pack_branch_variants in
-		if len = 0 then
-		  raise (Pack_branch_is_not_found pkg);
-		if len > 1 then
-		  begin
-		    printf "Select pack-branch for %s\n%!" pkg;
-		    Array.iteri (printf "%d) %s\n%!") pack_branch_variants;
-		    let n = read_number (pred len) in
-		    let specdir = 
-		      sprintf "%s/%s/%s" pkgdir pkg pack_branch_variants.(n) in
-		    (get_pack_depends table [] specdir)
+	(specdir::(List.flatten
+	  (List.map
+	    (fun pkg ->
+	      let pack_branch_variants =
+		Array.of_list
+		  (System.list_of_directory (Filename.concat pkgdir pkg)) in
+	      let len = Array.length pack_branch_variants in
+	      if len = 0 then
+		raise (Pack_branch_is_not_found pkg);
+	      if len > 1 then
+		begin
+		  printf "Select pack-branch for %s\n%!" pkg;
+		  Array.iteri (printf "%d) %s\n%!") pack_branch_variants;
+		  let n = read_number (pred len) in
+		  let specdir = 
+		    sprintf "%s/%s/%s" pkgdir pkg pack_branch_variants.(n) in
+		  (get_pack_depends table [] specdir)
 		  end
-		else
-		  begin
-		    let specdir = 
-		      sprintf "%s/%s/%s" pkgdir pkg pack_branch_variants.(0) in
-		    (get_pack_depends table [] specdir)
-		  end)
-	      l)))
+	      else
+		begin
+		  let specdir = 
+		    sprintf "%s/%s/%s" pkgdir pkg pack_branch_variants.(0) in
+		  (get_pack_depends table [] specdir)
+		end)
+	    l)))
 
 let rec print_depends depth = function
   | Dep_list l ->
@@ -1501,6 +1500,6 @@ let upgrade specdir =
   List.iter 
     (fun specdir ->
       update ~specdir ~interactive:true ())
-    depends
+    (List.rev depends)
 
 
