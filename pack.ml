@@ -1306,8 +1306,10 @@ let update ~specdir ?(ver=None) ?(rev=None) () =
 
 (* Clone suport *)
 
+type pack_branch = string
+
 type dep_tree =
-  | Dep_val of (string * version * revision)
+  | Dep_val of (string * pack_branch * version * revision)
   | Dep_list of dep_tree list
 
 exception Cannot_extract_arch of string
@@ -1315,6 +1317,7 @@ exception Cannot_extract_platform of string
 exception Cannot_resolve_dependes of string
 exception Cannot_extract_revision of string
 exception Cannot_extract_extension of string
+exception Pack_branch_is_not_found of string
 
 let extract_extension pkg_name =
   try
@@ -1339,7 +1342,7 @@ let extract_platform pkg_name =
     platform_of_string 
       (String.sub pkg_name (succ pos2) (pos1 - pos2 - 1))
   with _ ->
-    raise (Cannot_extract_platform pkg_name)  
+    raise (Cannot_extract_platform pkg_name)
 
 let rec get_depends table acc userhost pkg_path =
   log_message (sprintf "resolve %s" pkg_path);
@@ -1348,6 +1351,17 @@ let rec get_depends table acc userhost pkg_path =
   let platform = extract_platform pkg_name in
   let extension = extract_extension pkg_name in
   let arch = extract_arch pkg_name in
+  let pack_branch =
+    match (System.read_lines
+      ~filter:(fun s -> 
+	Pcre.pmatch ~pat:"packbranch-" s)
+      (sprintf "ssh %s rpm -qp --provides %s" userhost pkg_path))
+    with [] -> raise (Pack_branch_is_not_found pkg_path)
+      | hd::_ ->
+	  let pos = String.index hd '-' in
+	  let len = String.length hd in
+	  String.sub hd (succ pos) (len - pos - 1)
+  in
   let rex = 
     Pcre.regexp "([^\\ ]+)\\s+=\\s+([^-]+)-(\\d+)\\." in
   Dep_list 
@@ -1371,7 +1385,7 @@ let rec get_depends table acc userhost pkg_path =
 		(string_of_platform platform) arch extension in
 	    Hashtbl.add table pkg_name (ver,rev);
 	    Dep_list 
-	      [(get_depends table (Dep_list []) userhost new_pkg_path); Dep_val (pkg_name,ver,rev); acc]
+	      [(get_depends table (Dep_list []) userhost new_pkg_path); Dep_val (pkg_name,pack_branch,ver,rev); acc]
 	  end)
       (System.read_lines
 	~filter:(fun s -> 
@@ -1381,24 +1395,24 @@ let rec get_depends table acc userhost pkg_path =
 let rec print_depends depth = function
   | Dep_list l ->
       List.iter (fun v -> print_depends (succ depth) v) l
-  | Dep_val (n,v,r) ->
+  | Dep_val (n,b,v,r) ->
       let step = String.make depth ' ' in
-      printf "%s%s %s %d\n" step n v r
+      printf "%s%s %s %s %d\n" step n b v r
 
-let rec clone_packages ?(pack_branch="devel") = function
+let rec clone_packages = function
   | Dep_list l ->
       List.iter (fun v -> clone_packages v) l
-  | Dep_val (n,v,r) ->
+  | Dep_val (n,b,v,r) ->
       let specdir =
-	sprintf "./pack/%s/%s" n pack_branch in
+	sprintf "./pack/%s/%s" n b in
       update ~specdir ~ver:(Some v) ~rev:(Some (string_of_int r)) ()
 
-let clone pack_branch userhost pkg_path =
+let clone userhost pkg_path =
   let table = Hashtbl.create 32 in
   let depends =
-    get_depends table (Dep_list []) userhost pkg_path in  
+    get_depends table (Dep_list []) userhost pkg_path in
   print_depends 0 depends;  
-  clone_packages ~pack_branch depends
+  clone_packages depends
 
 
 
