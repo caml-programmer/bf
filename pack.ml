@@ -397,7 +397,22 @@ let filter_pkg f pkgname =
   List.filter f
     (map_pkg (fun x -> x) pkgname)
 
-let find_pkg_version pkgname =
+let rec read_number max =
+  print_string "> "; flush stdout;
+  try
+    let s = input_line stdin in
+    let n = int_of_string s in
+    if max <> 0 && n > max then
+      raise Not_found
+    else n
+  with _ ->
+    read_number max
+
+let read_string () =
+  print_string "> "; flush stdout;
+  input_line stdin
+
+let find_pkg_version ?(interactive=false) pkgname =
   try
     (match
       List.sort 
@@ -406,9 +421,15 @@ let find_pkg_version pkgname =
     with [] -> raise Not_found
       | hd::tl -> hd)
   with exn ->
-    raise (Cannot_find_pkgver (Printexc.to_string exn))
+    if interactive then
+      begin
+	log_message (sprintf "Enter package version for %s" pkgname);
+	read_string ()
+      end
+    else
+      raise (Cannot_find_pkgver (Printexc.to_string exn))
 
-let find_pkg_revision pkgname version =
+let find_pkg_revision ?(interactive=false) pkgname version =
   try
     (match
       List.sort
@@ -419,7 +440,13 @@ let find_pkg_revision pkgname version =
     with [] -> raise Not_found
       | hd::tl -> hd)
   with exn ->
-    raise (Cannot_find_pkgrev (Printexc.to_string exn))
+    if interactive then
+      begin
+	log_message (sprintf "Enter package revision for %s-%s" pkgname version);
+	read_number 0	
+      end
+    else
+      raise (Cannot_find_pkgrev (Printexc.to_string exn))
 
 type pkg_name = string
 type pkg_desc = string
@@ -463,6 +490,115 @@ let string_of_pkg_op = function
   | Pkg_gt -> ">"
   | Pkg_last -> "="
 
+let make_depends ?(interactive=false) ?(ignore_last=false) file =
+  let acc = ref ([] : depend list) in
+  let add_depend v = acc := v::!acc in
+  let add_package v =
+    let v2 = Scheme.map (fun v -> v) v in
+    try
+      let name_v = List.hd v2 in
+      let op_ver_v = try Some (List.nth v2 1) with _ -> None in
+      let desc_v = try Some (List.nth v2 2) with _ -> None in
+      
+      let pkg_name = ref None in
+      let pkg_op = ref None in
+      let pkg_ver = ref None in
+      let pkg_desc = ref None in
+      
+      let add_op op v =
+	let ver =
+	  Scheme.make_string (Scheme.fst v) in
+	pkg_op  := Some op;
+	(match op with
+	  | Pkg_last ->
+	      if ignore_last then
+		pkg_ver := Some ver
+	      else
+		with_platform 
+		  (fun os platform ->
+		    pkg_ver := Some (sprintf "%s-%d.%s" ver
+		    (find_pkg_revision
+		      ~interactive
+		      (match !pkg_name with Some s -> s | None -> raise Not_found)
+		      ver)
+		      (string_of_platform platform)))
+	  | _ ->
+	      pkg_ver := Some ver)
+      in
+      
+      (match name_v with
+	| Ssymbol s -> pkg_name := Some s
+	| Sstring s -> pkg_name := Some s
+	| _ -> ());
+      (match op_ver_v with
+	| None -> ()
+	| Some op_ver ->
+	    Scheme.parse
+	      [
+		"=",add_op Pkg_eq;
+		">",add_op Pkg_gt;
+		"<",add_op Pkg_lt;
+		">=", add_op Pkg_ge;
+		"<=", add_op Pkg_le;
+		"last", add_op Pkg_last;
+	      ] op_ver);
+      (match desc_v with
+	| None -> ()
+	| Some desc ->
+	    Scheme.parse
+	      [ "desc", (fun v -> 
+		pkg_desc := Some (Scheme.make_string (Scheme.fst v))) ] desc);
+      
+      (match (!pkg_name : pkg_name option) with
+	| Some name ->
+	    (match !pkg_op, !pkg_ver with
+	      | Some op, Some ver ->
+		  add_depend (name,(Some (op,ver)),!pkg_desc)
+	      | _ ->
+		  add_depend (name,None,!pkg_desc))
+	| None -> raise Not_found)
+    with exn ->
+      log_message (Printexc.to_string exn);
+      log_message "Package value:";
+      Scheme.print v;
+      log_error "Cannot add package"
+  in   
+  let make_platforms v =
+    try
+      Scheme.map
+	(fun x ->
+	  platform_of_string
+	  (Scheme.make_string x)) v
+    with Not_found ->
+      log_message "Platforms value:";
+      Scheme.print v;
+      log_error "Cannot parse platform value";
+  in
+  let platform_filter v =
+    with_platform (fun os platform ->
+      let platforms = make_platforms (Scheme.fst v) in
+      if platforms = [] || List.mem platform platforms then
+	Scheme.iter add_package (Scheme.snd v))
+  in
+  let add_os =
+    Scheme.parse
+      (List.filter
+	(fun v -> (os_of_string (fst v)) = (os ()))
+	[
+	  "linux", platform_filter;
+	  "sunos", platform_filter;
+	])
+  in
+  if Sys.file_exists file then
+    begin
+      Scheme.parse
+	["depends",(Scheme.iter add_os)]
+	(Ocs_read.read_from_port
+	  (Ocs_port.open_input_port file));
+      !acc
+    end
+  else []
+
 let spec_from_v2 specdir =
   let f = Filename.concat specdir in
   let pack_branch = Filename.basename specdir in
@@ -476,111 +612,7 @@ let spec_from_v2 specdir =
     else
       None
   in
-  let depends =
-    let acc = ref ([] : depend list) in
-    let add_depend v = acc := v::!acc in
-    let add_package v =
-      let v2 = Scheme.map (fun v -> v) v in
-      try
-	let name_v = List.hd v2 in
-	let op_ver_v = try Some (List.nth v2 1) with _ -> None in
-	let desc_v = try Some (List.nth v2 2) with _ -> None in
-	
-	let pkg_name = ref None in
-	let pkg_op = ref None in
-	let pkg_ver = ref None in
-	let pkg_desc = ref None in
-	    
-	let add_op op v =
-	  let ver =
-	    Scheme.make_string (Scheme.fst v) in
-	  pkg_op  := Some op;
-	  (match op with
-	    | Pkg_last ->
-		with_platform 
-		  (fun os platform ->
-		    pkg_ver := Some (sprintf "%s-%d.%s" ver
-		      (find_pkg_revision 
-			(match !pkg_name with Some s -> s | None -> raise Not_found)
-			ver)
-		      (string_of_platform platform)))
-	    | _ ->
-		pkg_ver := Some ver)
-	in
-	
-	(match name_v with
-	  | Ssymbol s -> pkg_name := Some s
-	  | Sstring s -> pkg_name := Some s
-	  | _ -> ());
-	(match op_ver_v with
-	  | None -> ()
-	  | Some op_ver ->
-	      Scheme.parse
-		[
-		  "=",add_op Pkg_eq;
-		  ">",add_op Pkg_gt;
-		  "<",add_op Pkg_lt;
-		  ">=", add_op Pkg_ge;
-		  "<=", add_op Pkg_le;
-		  "last", add_op Pkg_last;
-		] op_ver);
-	(match desc_v with
-	  | None -> ()
-	  | Some desc ->
-	      Scheme.parse
-		[ "desc", (fun v -> 
-		  pkg_desc := Some (Scheme.make_string (Scheme.fst v))) ] desc);
-	
-	(match (!pkg_name : pkg_name option) with
-	  | Some name ->
-	      (match !pkg_op, !pkg_ver with
-		| Some op, Some ver ->
-		    add_depend (name,(Some (op,ver)),!pkg_desc)
-		| _ ->
-		    add_depend (name,None,!pkg_desc))
-	  | None -> raise Not_found)
-      with _ ->
-	log_message "Package value:";
-	Scheme.print v;
-	log_error "Cannot add package"
-    in
-    let make_platforms v =
-      try
-	Scheme.map
-	  (fun x ->
-	    platform_of_string
-	    (Scheme.make_string x)) v
-      with Not_found ->
-	log_message "Platforms value:";
-	Scheme.print v;
-	log_error "Cannot parse platform value";
-    in
-    let platform_filter v =
-      with_platform (fun os platform ->
-	let platforms = make_platforms (Scheme.fst v) in
-	if platforms = [] || List.mem platform platforms then
-	  Scheme.iter add_package (Scheme.snd v))
-    in
-    let add_os =
-      Scheme.parse
-	(List.filter
-	  (fun v -> (os_of_string (fst v)) = (os ()))
-	  [
-	    "linux", platform_filter;
-	    "sunos", platform_filter;
-	  ])
-    in
-    let n = f "depends" in
-    if Sys.file_exists n then
-      begin
-	Scheme.parse
-	  ["depends",(Scheme.iter add_os)]
-	  (Ocs_read.read_from_port
-	    (Ocs_port.open_input_port n));
-	!acc
-      end
-    else []
-  in
+  let depends = make_depends (f "depends") in
   let rejects =
     let n = f "rejects" in
     if Sys.file_exists n then
@@ -1257,18 +1289,18 @@ let build_package args =
     (fun os platfrom ->
       build_package_impl os platfrom args)
 
-let update ~specdir ?(ver=None) ?(rev=None) () =
+let update ~specdir ?(interactive=false) ?(ver=None) ?(rev=None) () =
   let specdir = System.path_strip_directory specdir in
   let pkgname = pkgname_of_specdir specdir in
   let version =
     match ver with
       | Some v -> v
-      | None -> find_pkg_version pkgname
+      | None -> find_pkg_version ~interactive pkgname
   in
   let revision =
     match rev with
       | Some r -> (try int_of_string r with _ -> raise (Revision_must_be_digital r))
-      | None -> succ (find_pkg_revision pkgname version)
+      | None -> succ (find_pkg_revision ~interactive pkgname version)
   in
   let pkgname =
     pkgname_of_specdir specdir in
@@ -1392,6 +1424,53 @@ let rec get_depends table acc userhost pkg_path =
 	  Pcre.pmatch ~pat:"jet" s && Pcre.pmatch ~rex s)
 	(sprintf "ssh %s rpm -qRp %s" userhost pkg_path)))
 
+let rec get_pack_depends table acc specdir =
+  log_message (sprintf "resolve %s" specdir);
+  let pkgdir =
+    Filename.dirname (Filename.dirname specdir) in
+  let f = Filename.concat specdir in
+  let depends = make_depends ~ignore_last:true (f "depends") in
+  match
+    (List.fold_left
+      (fun acc (pkg,_,_) ->
+	if Hashtbl.mem table pkg || not (Pcre.pmatch ~pat:"jet" pkg) then
+	  acc
+	else
+	  begin
+	    Hashtbl.add table pkg false;
+	    pkg::acc
+	  end)
+      [] depends)
+  with 
+    | [] -> specdir::acc
+    | l -> 
+	List.rev
+	  (specdir::(List.flatten
+	    (List.map
+	      (fun pkg ->
+		let pack_branch_variants =
+		  Array.of_list
+		    (System.list_of_directory (Filename.concat pkgdir pkg)) in
+		let len = Array.length pack_branch_variants in
+		if len = 0 then
+		  raise (Pack_branch_is_not_found pkg);
+		if len > 1 then
+		  begin
+		    printf "Select pack-branch for %s\n%!" pkg;
+		    Array.iteri (printf "%d) %s\n%!") pack_branch_variants;
+		    let n = read_number (pred len) in
+		    let specdir = 
+		      sprintf "%s/%s/%s" pkgdir pkg pack_branch_variants.(n) in
+		    (get_pack_depends table [] specdir)
+		  end
+		else
+		  begin
+		    let specdir = 
+		      sprintf "%s/%s/%s" pkgdir pkg pack_branch_variants.(0) in
+		    (get_pack_depends table [] specdir)
+		  end)
+	      l)))
+
 let rec print_depends depth = function
   | Dep_list l ->
       List.iter (fun v -> print_depends (succ depth) v) l
@@ -1411,9 +1490,17 @@ let clone userhost pkg_path =
   let table = Hashtbl.create 32 in
   let depends =
     get_depends table (Dep_list []) userhost pkg_path in
-  print_depends 0 depends;  
+  print_depends 0 depends;
   clone_packages depends
 
-
+let upgrade specdir =
+  let specdir = System.path_strip_directory specdir in
+  let table = Hashtbl.create 32 in
+  let depends =
+    get_pack_depends table [] specdir in
+  List.iter 
+    (fun specdir ->
+      update ~specdir ~interactive:true ())
+    depends
 
 

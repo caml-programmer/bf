@@ -153,9 +153,12 @@ let arch () =
     | "SunOS" ->
 	uname ~flag:'p' ()
     | _ ->
-	let ch = Unix.open_process_in "arch" in
-	let name = input_line ch in
-	close_in ch; name
+	(try
+	  uname ~flag:'m' ()
+	with _ ->
+	  let ch = Unix.open_process_in "arch" in
+	  let name = input_line ch in
+	  close_in ch; name)
 
 let hostname () =
   let ch = Unix.open_process_in "hostname" in
