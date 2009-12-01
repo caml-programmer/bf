@@ -1429,7 +1429,11 @@ let rec get_depends table acc userhost pkg_path =
     with [] -> raise (Pack_branch_is_not_found pkg_path)
       | hd::_ ->
 	  let pos = String.index hd '-' in
-	  let len = String.length hd in
+	  let len = 
+	    try
+	      String.index hd ' '	      
+	    with Not_found -> String.length hd
+	  in
 	  String.sub hd (succ pos) (len - pos - 1)
   in
   let rex = 
