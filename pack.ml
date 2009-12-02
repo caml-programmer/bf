@@ -1444,17 +1444,14 @@ let rec get_depends ?(overwrite=false) table acc userhost pkg_path =
 	(fun os platform ->
 	  let cur_pkg_name = 
 	    sprintf "%s-%s-%d.%s.%s.%s" 
-	      pkg_name version revision (string_of_platform platform) arch extension in
+	      pkg_name version revision (string_of_platform platform) (System.arch ()) extension in
 	  if Sys.file_exists cur_pkg_name then
 	    begin
-	      log_message (sprintf "package %s/%s already exists" (Sys.getcwd ()) cur_pkg_name);
+	      log_message (sprintf "\tpackage %s/%s already exists" (Sys.getcwd ()) cur_pkg_name);
 	      []
 	    end
 	  else
-	    begin
-	      log_message (sprintf "package %s/%s is not exists" (Sys.getcwd ()) cur_pkg_name);
-	      [Dep_val (pkg_name,pack_branch,version,revision)]
-	    end)
+	    [Dep_val (pkg_name,pack_branch,version,revision)])
   in
   let rex = 
     Pcre.regexp "([^\\ ]+)\\s+=\\s+([^-]+)-(\\d+)\\." in
