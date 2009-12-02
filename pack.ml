@@ -1408,7 +1408,7 @@ let extract_name rest pkg =
     String.sub pkg 0 (String.length pkg - String.length rest)
   with _ -> raise (Cannot_extract_pkgname pkg)    
 
-let rec get_depends table acc userhost pkg_path =
+let rec get_depends ?(overwrite=false) table acc userhost pkg_path =
   log_message (sprintf "resolve %s" pkg_path);
   let pkg_dir = Filename.dirname pkg_path in
   let pkg = Filename.basename pkg_path in
@@ -1436,6 +1436,20 @@ let rec get_depends table acc userhost pkg_path =
 	  in
 	  String.sub hd (succ pos) (len - pos - 1)
   in
+  let current =
+    if overwrite then
+      [Dep_val (pkg_name,pack_branch,version,revision)]
+    else
+      with_platform 
+	(fun os platform ->
+	  let cur_pkg_name = 
+	    sprintf "%s-%s-%d.%s.%s.%s" 
+	      pkg_name version revision (string_of_platform platform) arch extension in
+	  if Sys.file_exists cur_pkg_name then
+	    []
+	  else
+	    [Dep_val (pkg_name,pack_branch,version,revision)])
+  in
   let rex = 
     Pcre.regexp "([^\\ ]+)\\s+=\\s+([^-]+)-(\\d+)\\." in
   Dep_list
@@ -1459,13 +1473,13 @@ let rec get_depends table acc userhost pkg_path =
 		(string_of_platform platform) arch extension in
 	    Hashtbl.add table pkg_name (ver,rev);
 	    Dep_list 
-	      [(get_depends table (Dep_list []) userhost new_pkg_path); acc]
+	      [(get_depends ~overwrite table (Dep_list []) userhost new_pkg_path); acc]
 	  end)
       (System.read_lines
 	~filter:(fun s -> 
 	  Pcre.pmatch ~pat:"jet" s && Pcre.pmatch ~rex s)
 	(sprintf "ssh %s rpm -qRp %s" userhost pkg_path)))
-    @ [Dep_val (pkg_name,pack_branch,version,revision)])
+    @ current)
 
 let rec get_pack_depends table acc specdir =
   log_message (sprintf "resolve %s" specdir);
@@ -1528,10 +1542,10 @@ let rec clone_packages = function
 	sprintf "./pack/%s/%s" n b in
       update ~specdir ~ver:(Some v) ~rev:(Some (string_of_int r)) ()
 
-let clone userhost pkg_path =
+let clone userhost pkg_path overwrite =
   let table = Hashtbl.create 32 in
   let depends =
-    get_depends table (Dep_list []) userhost pkg_path in
+    get_depends ~overwrite table (Dep_list []) userhost pkg_path in
   print_depends 0 depends;
   clone_packages depends
 
