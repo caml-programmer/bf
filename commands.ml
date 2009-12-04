@@ -673,6 +673,12 @@ let scm_move_file file dir =
     (Scheme.string_of_sval dir);
   Snull
 
+let scm_copy_file src dst =
+  System.copy_file
+    (Scheme.string_of_sval src)
+    (Scheme.string_of_sval dst);
+  Snull
+
 let scm_make_directory v =
   Rules.make_directory 
     (Scheme.string_list_of_sval_array v);
@@ -794,6 +800,7 @@ Ocs_env.set_pf1 Scheme.env scm_dirname "dirname";;
 Ocs_env.set_pf1 Scheme.env scm_basename "basename";;
 Ocs_env.set_pfn Scheme.env scm_remove_file "remove-file";;
 Ocs_env.set_pf2 Scheme.env scm_move_file "move-file";;
+Ocs_env.set_pf2 Scheme.env scm_copy_file "copy-file";;
 Ocs_env.set_pfn Scheme.env scm_make_directory "make-directory";;
 Ocs_env.set_pf2 Scheme.env scm_move_directory "move-directory";;
 Ocs_env.set_pf1 Scheme.env scm_remove_directory "remove-directory";;
