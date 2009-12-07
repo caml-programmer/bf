@@ -304,7 +304,7 @@ let create_symlink src dst =
 	Unix.symlink src dst
       end
     else
-      if Sys.file_exists dst then
+      if dst <> "." && Sys.file_exists dst then
 	raise (Cannot_create_symlink (src,dst))
       else
 	Unix.symlink src dst
