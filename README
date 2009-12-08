@@ -94,6 +94,13 @@ ftp_proxy для утилиты wget, которая используются
 которой можно произовдить установку, переустановку
 и обновление пакетов.
 
+Если на момент сборки godi_console в системе не были
+установлены заголовочные файлы и библиотека ncurses,
+то пользоваться godi_console будет неудобно, поэтому
+после доустановки ncurses может потребоваться пересобрать
+godi_console. Сделать это можно следующим образом:
+
+# godi_console perform -build godi-tools
 
 
 * Установка утилиты bf *
@@ -109,7 +116,14 @@ ftp_proxy для утилиты wget, которая используются
 
 Далее скачиваем исходики bf:
 
+git clone ssh://git@wiki.service.jet.msk.su/users/git/projects/bf.git bf.git
+
+или
+
 git clone http://caml.ru/repos/bf.git bf.git
+
+На caml.ru, bf реже обновляется, поэтому лучше брать
+с wiki.
 
 В отличии от godi_console, git использует
 curl для скачивания файлов, поэтому необходимые
@@ -150,10 +164,18 @@ $ su -c "make install"
 Запуск утилиты bf без параметров выводит возможные варианты
 использования:
 
-Usage: bf (prepare|update|forward|[re]build|[re]install) <components>
-   or: bf (prepare|update|forward|[re]build|[re]install) <component> [branch <branch> | tag <tag>]
-   or: bf (prepare|update|forward|[re]build|[re]install) <composite>
+Usage: bf (prepare|update|forward|[re]build|[re]install|status) <components>
+   or: bf (prepare|update|forward|[re]build|[re]install|status) <component> [branch <branch> | tag <tag>]
+   or: bf (prepare|update|forward|[re]build|[re]install|status) <composite> [tag]
+   or: bf (diff|changelog) <composite> <tag-a> <tag-b>
+   or: bf review <composite> <since-date>
    or: bf pack <specdir> <version> <release>
+   or: bf update <specdir> [version] [release]
+   or: bf upgrade <specdir> [lazy]
+   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite]
+   or: bf tag <composite> <tag>
+   or: bf log <logdir>
+
 
 Где под <composite> подразумевается файл с определением функции composite,
 на языке Scheme, возвращающий список компонентов, над которым необходимо 
@@ -167,11 +189,14 @@ Usage: bf (prepare|update|forward|[re]build|[re]install) <components>
     (cppunit)
     (openssl)
     (mod-ssl)
-    (squid (branch "light"))
+    (squid (branch "light") (package "web-cache"))
     (steel-collar (branch "polishing-stone"))))
 --------------------------------------------------
 Если branch или tag не указаны, то собирается HEAD 
 из ветки master.
+
+Если указан package, это значит этот компонент не нужно
+включать в пакет текущего комопзита.
 
 Технологический утилита bf представляет собой набор
 функций, которые могут потребоваться для сборки
@@ -337,11 +362,17 @@ set_param ~default:"bf@notify" "smtp-from-mail";;
 Типичный .bf-params может выглядеть
 следующим образом:
 
-git-url ssh://user@host/repos/project/components
+git-url ssh://git@wiki/users/git/projects http://caml.ru/repos
 top-dir /opt/project
 dev-dir /opt/devel
-make-opts -j2
+dest-dir /data/project-dest
 log-level high
+smtp-notify-email project@domain.ru
+smtp-from-mail project@domain.ru
+smtp-server smpt.domain.ru
+pkg-storage pkg-storage.domain.ru
+autopkg true
+
 
 При этом переменная top-dir используется в файлах
 .bf-rules как prefix, а dev-dir как место, куда
@@ -385,7 +416,10 @@ plugins/lib.scm
 Для сборки пакетов используется действие bf pack,
 у которого три аргумента: specdir, version и release.
 
-Формат specdir следующий:
+В настоящий момент поддреживается несколько версий формата specdir,
+в частности 1 и 2.
+
+Формат specdir версии 1:
 
 Файл: hooks.scm - набор хуков, например:
 (define (after-build host location pkgname)
@@ -416,10 +450,155 @@ plugins/lib.scm
 | sed -e 's#/usr/bin/##'
 
 Файл rh.spec - RPM-спецификация (набор используемых подстановочных символов можно посмотреть в функции rpmbuild в rules.ml)
-Файл version - файл с номером версии, пока 1.0
+Файл version - файл с номером версии, тут - 1.0
 
+Формат specdir версии 2 (пример):
 
-Соответственно, для того чтобы успешно работала функция:
+Файл <pack-branch>/composite:
+
+(define (composite)
+  '((pack           (branch "master"))
+    ;; runtime
+    (jdk            (branch "master"))
+    (jre            (branch "master") (package "jet-jre"))
+    ;; devel
+    (ant 	    (branch "master"))
+    (maven	    (branch "master"))
+
+    ;; our libs
+    (ngramm         (branch "boost") (package "jet-detect"))
+    (ngramm-maps    (branch "boost") (package "jet-detect"))
+    (file-ng        (branch "release-2") (package "jet-detect"))
+    
+    (traf-daemon (branch "master"))
+    (nio-http-proxy (branch "devel2"))))
+
+Файл <pack-branch>/depends:
+
+(depends
+ (linux ()
+  ;; here pkg-names is symbols in case-insensitive mode
+  (jet-skvt-core (= "1.0") (desc "Jet SKVT core"))
+  (jet-jre (last "1.6.0.14") (desc "Jet JAVA package"))
+  (jet-detect (last "1.0") (desc "Jet detect tools")))
+ (sunos ()
+  ;; here pkg-names is strings in case-sensitive mode
+  ("JETDskvt-core" (= "1.0") (desc "Jet SKVT core"))
+  ("JETDjre" (last "1.6.0.6") (desc "Jet JAVA package"))
+  ("JETDdetect" (last "1.0") (desc "Jet detect tools"))))
+
+Файл <pack-branch>/params:
+
+summary SKVT-proxy
+license Commercial
+vendor Jet Infosystems
+group Security
+url http://www.jetsoft.ru
+email skvt-support@jet.msk.su
+
+Файл <pack-branch>/post-install
+Файл <pack-branch>/pre-install
+Файл <pack-branch>/pre-uninstall
+Файл <pack-branch>/pre-update
+
+Файл <pack-branch>/version
+
+2.0
+
+* Автоматическое обновление пакета *
+
+Для автоматического обновления пакета
+используется действие update применительно
+к specdir, включая pack-branch. Например:
+
+# bf update pack/jet-skvt-proxy/devel 1.0 12
+
+Если не указать номер ревизии, то bf постарается
+автоматический определить её номер исходя из
+уже собранных на данной машине пакетов. При
+этом поиск пакетов будет производится в текущем
+каталоге. Если автоматические определение не
+сработает из-за отсутствия пакетов bf
+предложит интерактивно ввести номерю ревизии.
+Ревизия всегда должна быть представлена целым
+числом.
+
+Указание или не указание версии работает
+аналогично. Версия в отличии от ревизии
+представляется внутри bf как строка, поэтому
+может содержать различные символы (не только 
+цифры).
+
+* Автоматическая сборка набора пакетов *
+
+В bf для создания набора пакетов используется
+концепция метапакета, который не содержит
+компонентов, за исключением быть может
+специального metapkg-компонента, инсталлирующий
+один пустой файлик (чтобы rpmbuild и
+прочие утилиты сборки пакетов не ругались
+на отстуствие файлов в пакете). Но
+при этом в зависимости к метапакету жестко
+прописываются версии и ревизии остальных
+пакетов из набора. При этом между
+собой остальные пакеты могут быть связаны только
+на уровне версий и лишь где необходимо на уровне 
+ревизий - чтобы была достаточная гибкость
+при разработке и частичном обновлении пакетов.
+
+Для создания набора пакетов используется
+команда:
+
+# bf upgrade <specdir> [lazy]
+
+Например:
+
+# bf upgrade pack/jet-skvt-base/devel lazy
+
+При этом bf начнет рекурсивно создавать все
+необходимые пакеты, пока не создаст пакет с
+именем jet-skvt-base.
+
+Флаг lazy - говорит о том, что в случае
+отсутствия изменений в компонентах, новую
+версию пакеты нет необходимости собирать.
+Если его не указать, то пакеты будут
+собираться независимо от того, были ли
+какие-либо изменения в компонентах или
+нет.
+
+В процессе отработки этого действия
+bf может переходить в интерактивный
+режим и спрашивать: какую pack-branch
+использовать для сборки того или иного
+пакета, если этих веток более чем одна.
+
+* Клонирование набора пакетов *
+
+Для клонирования уже собраного набора пакетов
+в bf используется команда:
+
+# bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite]
+
+При в этом pkg-path - задается путь к пакету на удаленном
+сервере. Подразумевается, что остальные пакеты,
+определенные в зависимостях находятся по тому же
+адресу.
+
+Если задан флаг overwrite - то уже созданные пакеты
+заданных версий и ревизий будут пересоздаваться, в противном
+случае будут создаваться только те пакеты, которые
+в текущем каталоге ещё отсутствуют.
+
+Клонирование можно осуществлять как на однотипных
+архитектурах, так и различных. Но в качестве pkg-path
+надо брать путь к rpm-метапакету (так как в bf пока
+автоматическое вычисление зависимостей реализовано
+только для RPM).
+
+* SSH keys *
+
+Для того чтобы успешно работала функция:
 
 (send-file-over-ssh <local-source> <remote-destination>)
 
