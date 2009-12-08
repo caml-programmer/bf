@@ -114,6 +114,7 @@ let update_component component = (* todo: more smart implementation *)
 	| None, _ -> ())
 
 let smart_update_component component =
+  let changes = ref false in
   with_component_dir ~strict:false component
     (fun () ->
       let repos =
@@ -128,7 +129,8 @@ let smart_update_component component =
 	    begin
 	      git_checkout ~force:true ~key:branch ();
 	      git_clean ();
-	      git_pull ~refspec:branch repos
+	      git_pull ~refspec:branch repos;
+	      changes := true
 	    end)
 	(git_branch ());
       let stop = git_current_branch () in
@@ -138,10 +140,11 @@ let smart_update_component component =
 	      git_checkout ~force:true ~key:start_key ()
 	| Some start_key, None ->
 	    git_checkout ~force:true ~key:start_key ()
-	| None, _ -> ())
+	| None, _ -> ());
+  !changes
 
 let update components =
-  non_empty_iter smart_update_component components
+  List.exists (fun x -> x) (List.map smart_update_component components)
 
 let forward_component component =
   with_component_dir ~strict:false component
@@ -431,7 +434,7 @@ let make_changelog tag_a tag_b components =
     (Params.get_param "smtp-notify-email")
 
 let make_review since components =
-  update components;
+  ignore(update components);
 
   let chunks = ref [] in
   let add s = chunks:=s::!chunks in

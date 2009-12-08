@@ -136,7 +136,7 @@ let with_platform (f : os -> platform -> 'a) =
 	    | [] -> log_error "unknown or unsupported platform"
 	    | p::_ -> p)
 	in f os platform
-    | SunOS->
+    | SunOS ->
 	f os (sunos_platfrom ())
 
 let check_rh_build_env () =
@@ -1289,7 +1289,7 @@ let build_package args =
     (fun os platfrom ->
       build_package_impl os platfrom args)
 
-let update ~specdir ?(interactive=false) ?(ver=None) ?(rev=None) () =
+let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
   let specdir = System.path_strip_directory specdir in
   let pkgname = pkgname_of_specdir specdir in
   let version =
@@ -1308,33 +1308,37 @@ let update ~specdir ?(interactive=false) ?(ver=None) ?(rev=None) () =
   let composite =
     Filename.concat specdir "composite" in
 
-  let tag =
-    sprintf "%s/%s-%d" pkgname version revision in
-  
-  let old_tag =
-    if  revision > 0 then
-      Some (sprintf "%s/%s-%d" pkgname version (pred revision))
-    else None
-  in
-  
-  update_composite composite;
+  let have_changes = 
+    update_composite composite in
 
-  if not (tag_ready ~tag composite) then
+  if lazy_mode && not have_changes then
+    log_message "lazy update: noting to do"
+  else
     begin
-      install_composite composite;
-      tag_composite composite tag;
-    end;
-  
-  install_composite ~tag composite;
+      let tag =
+	sprintf "%s/%s-%d" pkgname version revision in
+      
+      let old_tag =
+	if  revision > 0 then
+	  Some (sprintf "%s/%s-%d" pkgname version (pred revision))
+	else None
+      in
 
-  (* todo: build package by tag *)
-  build_package [specdir;version;string_of_int revision];
-  
-  match old_tag with
-    | Some old ->
-	changelog_composite composite old tag
-    | None -> ()
-
+      if not (tag_ready ~tag composite) then
+	begin
+	  install_composite composite;
+	  tag_composite composite tag;
+	end;
+      
+      install_composite ~tag composite;
+      build_package
+	[specdir;version;string_of_int revision];
+      
+      match old_tag with
+	| Some old ->
+	    changelog_composite composite old tag
+	| None -> ()
+    end
 
 (* Clone suport *)
 
@@ -1552,14 +1556,14 @@ let clone userhost pkg_path overwrite =
   print_depends 0 depends;
   clone_packages depends
 
-let upgrade specdir =
+let upgrade specdir lazy_mode =
   let specdir = System.path_strip_directory specdir in
   let table = Hashtbl.create 32 in
   let depends =
     get_pack_depends table [] specdir in
   List.iter 
     (fun specdir ->
-      update ~specdir ~interactive:true ())
+      update ~specdir ~lazy_mode ~interactive:true ())
     (List.rev depends)
 
 

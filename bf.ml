@@ -16,7 +16,7 @@ let usage () =
   print_endline "   or: bf review <composite> <since-date>";
   print_endline "   or: bf pack <specdir> <version> <release>";
   print_endline "   or: bf update <specdir> [version] [release]";
-  print_endline "   or: bf upgrade <specdir>";
+  print_endline "   or: bf upgrade <specdir> [lazy]";
   print_endline "   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite]";
   print_endline "   or: bf tag <composite> <tag>";
   print_endline "   or: bf log <logdir>";
@@ -76,7 +76,7 @@ let main () =
 		| "rebuild"   -> Commands.rebuild   components
 		| "install"   -> Commands.install   components
 		| "reinstall" -> Commands.reinstall components
-		| "update"    -> Commands.update    components
+		| "update"    -> ignore(Commands.update components)
 		| "forward"   -> Commands.forward   components
 		| "status"    -> Commands.status    components
 		| _           -> usage ())
@@ -87,7 +87,7 @@ let main () =
 		| "rebuild"   -> Commands.rebuild   [component]
 		| "install"   -> Commands.install   [component]
 		| "reinstall" -> Commands.reinstall [component]
-		| "update"    -> Commands.update    [component]
+		| "update"    -> ignore(Commands.update [component])
 		| "forward"   -> Commands.forward   [component]
 		| "status"    -> Commands.status    [component]
 		| _           -> usage ())
@@ -99,7 +99,7 @@ let main () =
 		| "rebuild"   -> Commands.rebuild_composite   composite
 		| "install"   -> Commands.install_composite   composite
 		| "reinstall" -> Commands.reinstall_composite composite
-		| "update"    -> Commands.update_composite    composite
+		| "update"    -> ignore(Commands.update_composite composite)
 		| "forward"   -> Commands.forward_composite   composite
 		| "status"    -> Commands.status_composite    composite
 		| _           -> usage ())
@@ -111,7 +111,7 @@ let main () =
 		| "rebuild"   -> Commands.rebuild_composite   ~tag composite
 		| "install"   -> Commands.install_composite   ~tag composite
 		| "reinstall" -> Commands.reinstall_composite ~tag composite
-		| "update"    -> Commands.update_composite	  ~tag composite
+		| "update"    -> ignore(Commands.update_composite ~tag composite)
 		| "forward"   -> Commands.forward_composite   ~tag composite
 		| "status"    -> Commands.status_composite    ~tag composite
 		| _           -> usage ())
@@ -158,8 +158,12 @@ let main () =
 		usage ()
 	| "upgrade" ->
 	    if len = 3 then
-	      Pack.upgrade Sys.argv.(2)
-	    else usage ()
+	      Pack.upgrade Sys.argv.(2) false
+	    else 
+	      if len = 4 then
+		Pack.upgrade Sys.argv.(2) true
+	      else
+		usage ()
 	| "tag" ->
 	    if len = 4 then
 	      Commands.tag_composite Sys.argv.(2) Sys.argv.(3)
