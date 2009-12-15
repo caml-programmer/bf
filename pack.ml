@@ -1549,12 +1549,19 @@ let rec clone_packages = function
 	sprintf "./pack/%s/%s" n b in
       update ~specdir ~ver:(Some v) ~rev:(Some (string_of_int r)) ()
 
-let clone userhost pkg_path overwrite =
+let clone userhost pkg_path mode =  
+  let (overwrite,depends_only) =
+  match mode with
+    | "overwrite" -> (true,false)
+    | "depends" -> (true,true)
+    | _ -> (false,false)
+  in
   let table = Hashtbl.create 32 in
   let depends =
     get_depends ~overwrite table (Dep_list []) userhost pkg_path in
   print_depends 0 depends;
-  clone_packages depends
+  if not depends_only then
+    clone_packages depends	  
 
 let upgrade specdir lazy_mode =
   let specdir = System.path_strip_directory specdir in

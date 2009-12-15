@@ -17,7 +17,7 @@ let usage () =
   print_endline "   or: bf pack <specdir> <version> <release>";
   print_endline "   or: bf update <specdir> [version] [release]";
   print_endline "   or: bf upgrade <specdir> [lazy]";
-  print_endline "   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite]";
+  print_endline "   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite|depends]";
   print_endline "   or: bf tag <composite> <tag>";
   print_endline "   or: bf log <logdir>";
   exit 1
@@ -150,10 +150,10 @@ let main () =
 	    else usage ()
 	| "clone" ->
 	    if len = 4 then
-	      Pack.clone Sys.argv.(2) Sys.argv.(3) false
+	      Pack.clone Sys.argv.(2) Sys.argv.(3) "default"
 	    else
 	      if len = 5 then
-		Pack.clone Sys.argv.(2) Sys.argv.(3) true
+		Pack.clone Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	      else
 		usage ()
 	| "upgrade" ->
