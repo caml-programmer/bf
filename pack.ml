@@ -282,7 +282,7 @@ let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
 	      let src = "/" ^ ns in
 	      let dst = Filename.concat buildroot s in
 	      System.create_directory_r dname;
-	      System.copy_file src dst
+	      System.link_or_copy src dst
 	    with exn ->
 	      log_message ("f " ^ s);
 	      raise exn)
@@ -1151,7 +1151,7 @@ let build_package_impl os platform args =
 				  let dst = Filename.concat 
 				    (Filename.concat abs_specdir "debian") 
 				    (System.strip_root src) in
-				  System.copy_file 
+				  System.link_or_copy
 				    (match dest_dir () with
 				      | Some d -> Filename.concat d src
 				      | None -> src) dst

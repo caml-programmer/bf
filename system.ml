@@ -124,6 +124,17 @@ let copy_file file dest =
       copy_perm file dest
     end
 
+let link_or_copy file dest =
+  try
+    begin
+      let name = Filename.basename file in
+      if is_directory dest then
+	Unix.link file (Filename.concat dest name)
+      else
+	Unix.link file dest
+    end
+  with _ -> copy_file file dest
+
 let transfer_dir src dst =
   let rc = Sys.command (sprintf "cp -arf %s %s" src dst) in
   if rc <> 0 then raise (Cannot_copy_directory (src,dst))
