@@ -1442,7 +1442,7 @@ let rec get_depends ?(overwrite=false) table acc userhost pkg_path =
   in
   let current =
     if overwrite then
-      [Dep_val (pkg_name,pack_branch,version,revision,pkg_dir)]
+      [Dep_val (pkg_name,pack_branch,version,revision,pkg_path)]
     else
       with_platform 
 	(fun os platform ->
@@ -1455,7 +1455,7 @@ let rec get_depends ?(overwrite=false) table acc userhost pkg_path =
 	      []
 	    end
 	  else
-	    [Dep_val (pkg_name,pack_branch,version,revision,pkg_dir)])
+	    [Dep_val (pkg_name,pack_branch,version,revision,pkg_path)])
   in
   let rex = 
     Pcre.regexp "([^\\ ]+)\\s+=\\s+([^-]+)-(\\d+)\\." in
@@ -1552,8 +1552,7 @@ let rec clone_packages = function
 let rec download_packages userhost = function
   | Dep_list l ->
       List.iter (fun v -> download_packages userhost v) l
-  | Dep_val (n,b,v,r,d) ->
-      let path = Filename.concat d n in
+  | Dep_val (n,b,v,r,path) ->
       let src =
 	sprintf "%s:%s" userhost path in
       Rules.send_file_over_ssh src "."
