@@ -17,7 +17,7 @@ let usage () =
   print_endline "   or: bf pack <specdir> <version> <release>";
   print_endline "   or: bf update <specdir> [version] [release]";
   print_endline "   or: bf upgrade <specdir> [lazy]";
-  print_endline "   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite|depends]";
+  print_endline "   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite|depends|packages]";
   print_endline "   or: bf tag <composite> <tag>";
   print_endline "   or: bf log <logdir>";
   exit 1

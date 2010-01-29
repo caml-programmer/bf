@@ -1345,7 +1345,7 @@ let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=No
 type pack_branch = string
 
 type dep_tree =
-  | Dep_val of (string * pack_branch * version * revision)
+  | Dep_val of (string * pack_branch * version * revision * string)
   | Dep_list of dep_tree list
 
 exception Cannot_extract_arch of string
@@ -1442,7 +1442,7 @@ let rec get_depends ?(overwrite=false) table acc userhost pkg_path =
   in
   let current =
     if overwrite then
-      [Dep_val (pkg_name,pack_branch,version,revision)]
+      [Dep_val (pkg_name,pack_branch,version,revision,pkg_dir)]
     else
       with_platform 
 	(fun os platform ->
@@ -1455,7 +1455,7 @@ let rec get_depends ?(overwrite=false) table acc userhost pkg_path =
 	      []
 	    end
 	  else
-	    [Dep_val (pkg_name,pack_branch,version,revision)])
+	    [Dep_val (pkg_name,pack_branch,version,revision,pkg_dir)])
   in
   let rex = 
     Pcre.regexp "([^\\ ]+)\\s+=\\s+([^-]+)-(\\d+)\\." in
@@ -1537,31 +1537,38 @@ let rec get_pack_depends table acc specdir =
 let rec print_depends depth = function
   | Dep_list l ->
       List.iter (fun v -> print_depends (succ depth) v) l
-  | Dep_val (n,b,v,r) ->
+  | Dep_val (n,b,v,r,_) ->
       let step = String.make depth ' ' in
       printf "%s%s %s %s %d\n" step n b v r
 
 let rec clone_packages = function
   | Dep_list l ->
       List.iter (fun v -> clone_packages v) l
-  | Dep_val (n,b,v,r) ->
+  | Dep_val (n,b,v,r,_) ->
       let specdir =
 	sprintf "./pack/%s/%s" n b in
       update ~specdir ~ver:(Some v) ~rev:(Some (string_of_int r)) ()
 
+let rec download_packages userhost = function
+  | Dep_list l ->
+      List.iter (fun v -> download_packages userhost v) l
+  | Dep_val (n,b,v,r,d) ->
+      let path = Filename.concat d n in
+      let src =
+	sprintf "%s:%s" userhost path in
+      Rules.send_file_over_ssh src "."
+
 let clone userhost pkg_path mode =  
-  let (overwrite,depends_only) =
-  match mode with
-    | "overwrite" -> (true,false)
-    | "depends" -> (true,true)
-    | _ -> (false,false)
-  in
   let table = Hashtbl.create 32 in
+  let overwrite = mode <> "default" in
   let depends =
     get_depends ~overwrite table (Dep_list []) userhost pkg_path in
   print_depends 0 depends;
-  if not depends_only then
-    clone_packages depends	  
+  match mode with
+    | "overwrite" -> clone_packages depends
+    | "depends"   -> ()
+    | "packages"  -> download_packages userhost depends
+    | _           -> clone_packages depends
 
 let upgrade specdir lazy_mode =
   let specdir = System.path_strip_directory specdir in
