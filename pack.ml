@@ -599,8 +599,10 @@ let make_depends ?(interactive=false) ?(ignore_last=false) file =
     end
   else []
 
-let spec_from_v2 specdir =
+let spec_from_v2 ~version ~revision specdir =
   let f = Filename.concat specdir in
+  let pkgname = 
+    Filename.basename (Filename.dirname specdir) in
   let pack_branch = Filename.basename specdir in
   let load s =
     if Sys.file_exists s then
@@ -626,7 +628,8 @@ let spec_from_v2 specdir =
   in
   let provides =
     let n = f "provides" in
-    let p = "packbranch-" ^ pack_branch in
+    let p =
+      sprintf "packbranch-%s = %s-%s-%s" pack_branch pkgname version revision in
     if Sys.file_exists n then
       begin
 	let ch = open_in n in
@@ -665,7 +668,7 @@ let spec_from_v2 specdir =
   in
  
   {
-    pkgname = (Filename.basename (Filename.dirname specdir));
+    pkgname = pkgname;
     depends = depends;
     provides = provides;
     rejects = rejects;
@@ -791,7 +794,7 @@ let build_package_impl os platform args =
 			 (pkgname,platform,version,release,spec,files,findreq,hooks)
 		| _-> assert false)
 	  | "2.0" ->
-	      let spec = spec_from_v2 abs_specdir in
+	      let spec = spec_from_v2 ~version ~revision:release abs_specdir in
 	      let bf_table = Hashtbl.create 32 in
 	      let reg k =
 		if Hashtbl.mem bf_table k then "" 
@@ -899,7 +902,7 @@ let build_package_impl os platform args =
 			    | "release" -> release ^ "." ^ (string_of_platform platform)
 			    | "buildroot" -> "buildroot"
 			    | "provides" ->
-				String.concat ", " (spec.pkgname::spec.provides)
+				String.concat ", " ((* spec.pkgname:: *)spec.provides)
 			    | k -> Hashtbl.find spec.params k
 			  in
 			  let gen_param k =
