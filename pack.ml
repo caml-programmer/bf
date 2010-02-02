@@ -629,7 +629,10 @@ let spec_from_v2 ~version ~revision specdir =
   let provides =
     let n = f "provides" in
     let p =
-      sprintf "packbranch-%s = %s-%s-%s" pack_branch pkgname version revision in
+      with_platform 
+	(fun os platform ->
+	  sprintf "packbranch-%s = %s-%s-%s.%s" pack_branch pkgname
+	  version revision (string_of_platform platform)) in
     if Sys.file_exists n then
       begin
 	let ch = open_in n in
