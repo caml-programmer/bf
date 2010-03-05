@@ -1178,7 +1178,8 @@ let build_package_impl os platform args =
 			Filename.concat 
 			  (Filename.concat abs_specdir "debian/DEBIAN") name in
 		      System.write_string
-			~file ~string:(resolve_params find_value content)
+			~file ~string:(resolve_params find_value content);
+		      Unix.chmod file 0o755
 		    in
 
 		    with_dir abs_specdir
