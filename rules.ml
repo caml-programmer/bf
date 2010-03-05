@@ -97,8 +97,9 @@ let build_rules () =
   print_string "load rules...";
   Scheme.eval_file (rules_file ());
   print_endline "ok";
-  Scheme.eval_code (fun _ -> ()) "(build ())"
-    
+  Scheme.eval_code (fun _ -> ()) "(build ())";
+  Env.prepare ()
+
 let install_rules () =
   load_plugins ();
   Env.prepare ();
@@ -106,7 +107,10 @@ let install_rules () =
   Scheme.eval_file (rules_file ());
   print_endline "ok";
   if Sys.file_exists ".bf-build" then
-    Scheme.eval_code (fun _ -> ()) "(install ())"
+    begin
+      Scheme.eval_code (fun _ -> ()) "(install ())";
+      Env.prepare ();
+    end
   else
     log_error "current component is not built"
 
