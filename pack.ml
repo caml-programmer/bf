@@ -1467,7 +1467,7 @@ let rec get_depends ?(overwrite=false) table acc userhost pkg_path =
   let rex = 
     Pcre.regexp "([^\\ ]+)\\s+=\\s+([^-]+)-(\\d+)\\." in
   Dep_list
-    ((List.map
+    (current @ (List.map
       (fun s ->
 	let a = Pcre.extract ~rex s in
 	let pkg_name = a.(1) in
@@ -1492,8 +1492,7 @@ let rec get_depends ?(overwrite=false) table acc userhost pkg_path =
       (System.read_lines
 	~filter:(fun s -> 
 	  Pcre.pmatch ~pat:"jet" s && Pcre.pmatch ~rex s)
-	(sprintf "ssh %s rpm -qRp %s" userhost pkg_path)))
-    @ current)
+	(sprintf "ssh %s rpm -qRp %s" userhost pkg_path))))
 
 let rec get_pack_depends table acc specdir =
   log_message (sprintf "resolve %s" specdir);
@@ -1548,13 +1547,14 @@ let rec print_depends depth = function
       let step = String.make depth ' ' in
       printf "%s%s %s %s %d\n" step n b v r
 
-let rec clone_packages = function
-  | Dep_list l ->
-      List.iter (fun v -> clone_packages v) l
-  | Dep_val (n,b,v,r,_) ->
-      let specdir =
-	sprintf "./pack/%s/%s" n b in
-      update ~specdir ~ver:(Some v) ~rev:(Some (string_of_int r)) ()
+let print_dep_val (n,b,v,r,_) =
+  printf "%s %s %s %d\n" n b v r
+
+let clone_packages l =
+  List.iter (fun (n,b,v,r,_) ->
+    let specdir =
+      sprintf "./pack/%s/%s" n b in
+    update ~specdir ~ver:(Some v) ~rev:(Some (string_of_int r)) ()) l
 
 let rec download_packages userhost = function
   | Dep_list l ->
@@ -1564,17 +1564,28 @@ let rec download_packages userhost = function
 	sprintf "%s:%s" userhost path in
       Rules.send_file_over_ssh src "."
 
-let clone userhost pkg_path mode =  
+let list_of_depends deps =
+  let rec make acc = function
+    | Dep_list l -> 
+	acc @ List.flatten (List.map (make []) l)
+    | Dep_val  v -> acc @ [v]
+  in make [] deps      
+
+let clone userhost pkg_path mode =
   let table = Hashtbl.create 32 in
   let overwrite = mode <> "default" in
   let depends =
     get_depends ~overwrite table (Dep_list []) userhost pkg_path in
+
+  print_endline "Depends Tree:";
   print_depends 0 depends;
   match mode with
-    | "overwrite" -> clone_packages depends
-    | "depends"   -> ()
+    | "overwrite" -> clone_packages (List.rev (list_of_depends depends))
+    | "depends"   ->
+	print_endline "Build Order:";
+	List.iter print_dep_val (List.rev (list_of_depends depends))
     | "packages"  -> download_packages userhost depends
-    | _           -> clone_packages depends
+    | _           -> clone_packages (List.rev (list_of_depends depends))
 
 let upgrade specdir lazy_mode =
   let specdir = System.path_strip_directory specdir in
