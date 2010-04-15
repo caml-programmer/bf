@@ -895,6 +895,15 @@ let build_package_impl os platform args =
 			  else
 			    log_message (sprintf "warning: %s is not found" freq))
 		    in
+		    let specify_provides l =
+		      if System.arch () = "x86_64" then
+			List.map
+			  (fun p ->
+			    if Pcre.pmatch ~pat:"^lib" p then
+			      p ^ "()(64bit)"
+			    else p) l
+		      else l
+		    in		    
 		    let specfile =
 		      with_out "rpmbuild.spec"
 			(fun out ->
@@ -905,7 +914,7 @@ let build_package_impl os platform args =
 			    | "release" -> release ^ "." ^ (string_of_platform platform)
 			    | "buildroot" -> "buildroot"
 			    | "provides" ->
-				String.concat ", " ((* spec.pkgname:: *)spec.provides)
+				String.concat ", " (specify_provides spec.provides)
 			    | k -> Hashtbl.find spec.params k
 			  in
 			  let gen_param k =
