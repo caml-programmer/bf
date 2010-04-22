@@ -764,6 +764,25 @@ let scm_substrings templ s =
       (Pcre.extract_opt
 	~pat:(Scheme.string_of_sval templ)
 	(Scheme.string_of_sval s)))
+
+let scm_env_append v =
+  match Scheme.string_list_of_sval_array v with
+    | key::values ->	
+	let cur = 
+	  (try Env.find key with Not_found -> "") in
+	let sep = 
+	  (match cur with
+	    | "PATH"
+	    | "LD_LIBRARY_PATH" -> ":"
+		(* todo *)
+	    | _ -> ":")
+	in
+	if String.length cur = 0 then
+	  Env.update key (String.concat sep values)
+	else
+	  Env.update key (String.concat sep (cur::values));
+	Snull
+    | _ -> Snull
 ;;
 
 (* Register global functions *)
@@ -817,3 +836,4 @@ Ocs_env.set_pf2 Scheme.env scm_write_file "write-file";;
 Ocs_env.set_pf2 Scheme.env scm_write_scheme_value "write-scheme-value";;
 Ocs_env.set_pf2 Scheme.env scm_substring "substring?";;
 Ocs_env.set_pf2 Scheme.env scm_substrings "substrings";;
+Ocs_env.set_pfn Scheme.env scm_env_append "env-append";;
