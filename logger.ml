@@ -94,7 +94,7 @@ let log_error error =
   log_message ~key:"error" error;
   exit 3
 
-let log_command ?error_handler prog args =
+let log_command ?env ?error_handler prog args =
   let out_buf = Buffer.create 256 in
   let err_buf = Buffer.create 256 in
   with_logger
@@ -109,7 +109,7 @@ let log_command ?error_handler prog args =
 		System.split_env_var s
 	      in Shell_sys.set_env_var environment key value
 	    with Not_found -> ()))
-	  (Env.current ());
+	  (match env with Some e -> e | None -> Env.component ());
 	let cmd =
 	  Shell.cmd
 	    ~cmdname:program

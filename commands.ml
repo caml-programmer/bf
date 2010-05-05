@@ -769,7 +769,7 @@ let scm_env_append v =
   match Scheme.string_list_of_sval_array v with
     | key::values ->	
 	let cur = 
-	  (try Env.find key with Not_found -> "") in
+	  (try Env.find_component key with Not_found -> "") in
 	let sep = 
 	  (match cur with
 	    | "PATH"

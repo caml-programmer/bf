@@ -144,7 +144,7 @@ let export args =
 
 let get_env name =
   try
-    Some (Env.find name)
+    Some (Env.find_component name)
   with Not_found -> None
 
 let make args =
@@ -229,7 +229,7 @@ let with_dir dir f =
     Sys.chdir cur; raise exn
 
 let read_command cmd =
-  System.read_lines ~env:(Env.current ()) cmd
+  System.read_lines ~env:(Env.component ()) cmd
 
 let replace_param key value content =
   let key = String.uppercase key in

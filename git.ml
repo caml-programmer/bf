@@ -3,31 +3,33 @@ open Logger
 open System
 open Printf
 
+let env = Env.system ();;
+
 let git_clone url name =
-  log_command "git" ["clone";"-n";"-q";url;name]
+  log_command ~env "git" ["clone";"-n";"-q";url;name]
 
 let git_pull ?refspec url =
   match refspec with
-    | Some spec -> log_command "git" ["pull";url;spec]
-    | None -> log_command "git" ["pull";url]
+    | Some spec -> log_command ~env "git" ["pull";url;spec]
+    | None -> log_command ~env "git" ["pull";url]
 
 let git_fetch ?refspec ?(tags=false) url =
   let opts = if tags then ["--tags"] else [] in
   match refspec with
-    | Some spec -> log_command "git" (["fetch"] @ opts @ [url;spec])
-    | None -> log_command "git" (["fetch"] @ opts @ [url])
+    | Some spec -> log_command ~env "git" (["fetch"] @ opts @ [url;spec])
+    | None -> log_command ~env "git" (["fetch"] @ opts @ [url])
 
 let git_push ?(tags=false) ?refspec url =
   match refspec with
     | Some spec -> 
 	let opts = if tags then ["--tags"] else [] in
-	log_command "git" (["push"] @ opts @ [url;spec])
+	log_command ~env "git" (["push"] @ opts @ [url;spec])
     | None ->
 	let opts = if tags then ["--tags"] else [] in
-	log_command "git" (["push"] @ opts @ [url])
+	log_command ~env "git" (["push"] @ opts @ [url])
 
 let git_remote_update () =
-  log_command "git" ["remote";"update"]
+  log_command ~env "git" ["remote";"update"]
    
 let git_make_tag tag =
   let state = ref Tag_created in
@@ -39,7 +41,7 @@ let git_make_tag tag =
       | _ ->
 	  log_message (sprintf "tag %s creation problem" tag);
 	  state := Tag_creation_problem
-  in log_command
+  in log_command ~env
        ~error_handler "git" ["tag";"-a";"-m";tag;tag];
   !state
 
@@ -87,7 +89,7 @@ let git_checkout
   if modify then add "-m";
   (match key   with Some k -> add k | None -> ());
   (match files with Some l -> List.iter add l | None -> ());
-  log_command "git" !args
+  log_command ~env "git" !args
 
 let git_branch ?(filter=(fun _ -> true)) ?(remote=false) () =
   let branch_cleaner s =
@@ -103,7 +105,7 @@ let git_branch ?(filter=(fun _ -> true)) ?(remote=false) () =
     List.map branch_cleaner
       (List.map
 	(fun s -> String.sub s 2 ((String.length s) - 2))
-	(read_lines
+	(read_lines ~env
 	  ~filter:(fun s -> String.length s > 2 && filter s && s <> "* (no branch)")
 	  (if remote then "git branch -r" else "git branch")))
   with System.Error s -> log_error s
@@ -118,7 +120,7 @@ let strip_branch_prefix branch =
 let git_track remote_branch =
   try
     let local = strip_branch_prefix remote_branch in
-    log_command "git"
+    log_command ~env "git"
       ["checkout";"-f";"-q";"--track";"-b";local;remote_branch]
   with Not_found -> ()
   
@@ -140,7 +142,7 @@ let git_track_new_branches () =
 	git_track b) rb
 
 let git_clean () =
-  log_command "git" ["clean";"-d";"-x";"-f"]
+  log_command ~env "git" ["clean";"-d";"-x";"-f"]
 
 let git_diff ?(ignore=[]) ?key () =
   let cmd =
@@ -148,6 +150,7 @@ let git_diff ?(ignore=[]) ?key () =
       | None   -> "git diff --name-status"
       | Some k -> "git diff --name-status " ^ k
   in read_lines
+       ~env
        ~filter:(fun s -> not
 	 (List.mem
 	   (String.sub s 2
@@ -157,7 +160,7 @@ let git_diff ?(ignore=[]) ?key () =
 let git_changed key_a key_b =
   let cmd =
     sprintf "git log '%s'..'%s'" key_a key_b in
-  read_lines cmd <> []
+  read_lines ~env cmd <> []
 
 let git_diff_view ~tag_a ~tag_b =
   let cmd =
@@ -175,12 +178,12 @@ let git_diff_view ~tag_a ~tag_b =
 
 let git_tag_list () =
   try
-    read_lines "git tag -l"
+    read_lines ~env "git tag -l"
   with System.Error s -> log_error s
 
 let git_status () =
   try
-    let lines = read_lines ~ignore_error:true "git status" in
+    let lines = read_lines ~env ~ignore_error:true "git status" in
     if 
       List.length lines = 2 && List.nth lines 1 = "nothing to commit (working directory clean)"
     then [] else lines
