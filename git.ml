@@ -29,6 +29,7 @@ let git_push ?(tags=false) ?refspec url =
 	log_command ~env "git" (["push"] @ opts @ [url])
 
 let git_remote_update () =
+  log_command ~env "git" ["remote";"update";"--prune"];
   log_command ~env "git" ["remote";"update"]
    
 let git_make_tag tag =
