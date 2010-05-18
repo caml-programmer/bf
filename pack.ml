@@ -699,10 +699,25 @@ let call_after_build ~location ~fullname hooks =
   (match hooks with
     | Some file -> Scheme.eval_file file
     | None -> ());
-  Scheme.eval_code (fun _ -> ())
-    (sprintf "(after-build \"%s\" \"%s\" \"%s\")"
-      (System.hostname ()) location fullname)
+  if Scheme.defined "after-build" then
+    Scheme.eval_code (fun _ -> ())
+      (sprintf "(after-build \"%s\" \"%s\" \"%s\")"
+	(System.hostname ()) location fullname)
 
+let call_before_build ~pkgname ~version ~revision ~platform hooks =
+  Rules.load_plugins ();
+  (match hooks with
+    | Some file -> Scheme.eval_file file
+    | None -> ());
+  if Scheme.defined "before-build" then
+    let result = ref [] in
+    Scheme.eval_code (fun v ->
+      result := Scheme.map Scheme.make_string v)
+      (sprintf "(before-build \"%s\" \"%s\" \"%s\" \"%s\")"
+	pkgname version revision (string_of_platform platform));
+    !result
+  else []
+      
 let build_over_rpmbuild params =
   let (pkgname,platform,version,release,spec,files,findreq,hooks) = params in
   let top_dir = Params.get_param "top-dir" in
@@ -711,7 +726,7 @@ let build_over_rpmbuild params =
   copy_to_buildroot ~top_dir files;
   let (location,fullname) =
     rpmbuild
-      ~top_dir 
+      ~top_dir
       ~pkgname ~platform ~version ~release
       ~spec ~files ~findreq ()
   in call_after_build ~location ~fullname hooks
@@ -845,29 +860,38 @@ let build_package_impl os platform args =
 
 	      print_depends spec.depends;
 	      check_composite_depends spec;
-
+	      
+	      let add_bf_list custom out file =
+		let ch = open_in file in
+		let rec read () =
+		  try
+		    out (custom (input_line ch));
+		    read ()
+		  with End_of_file -> close_in ch
+		in read ()
+	      in
+	      
 	      (match engine_of_platform platform with
 		| Rpm_build ->
+		    let custom_pkg_files =
+		      call_before_build
+			~pkgname:spec.pkgname ~version ~revision:release ~platform spec.hooks in
+		    
 		    let files =
 		      with_out "rpmbuild.files"
 			(fun out ->
-			  let add_bf_list out file =
-			    let ch = open_in file in
-			    let rec read () =
-			      try
-				let s = input_line ch in
-				let l = String.length s in
-				if l > 2 then
-				  (match s.[0] with
-				    | 'd' ->
-					out (reg (sprintf "%%dir %s\n" (String.sub s 2 (l - 2))))
-				    | 'f' -> 
-					out (reg (sprintf "%s\n" (String.sub s 2 (l - 2))))
-				    | _ -> ());
-				read ()
-			      with End_of_file -> close_in ch
-			    in read ()
-			  in accumulate_lists add_bf_list out)
+			  let make_rpm_line s =
+			    let l = String.length s in
+			    if l > 2 then			      
+			      (match s.[0] with
+				| 'd' -> reg (sprintf "%%dir %s\n" (String.sub s 2 (l - 2)))
+				| 'f' -> reg (sprintf "%s\n" (String.sub s 2 (l - 2)))
+				| _ -> "")
+			    else ""
+			  in
+			  accumulate_lists (add_bf_list make_rpm_line) out;
+			  List.iter (fun s -> out (make_rpm_line s))
+			    custom_pkg_files)
 		    in
 		    let findreq =
 		      with_out "rpmbuild.findreq"
@@ -976,6 +1000,10 @@ let build_package_impl os platform args =
 		      (spec.pkgname,platform,version,release,specfile,files,findreq,spec.hooks)
 		      
 		| Pkg_trans ->
+		    let custom_pkg_files =
+		      call_before_build
+			~pkgname:spec.pkgname ~version ~revision:release ~platform spec.hooks in
+		    
 		    let pkgtrans_key_format = String.uppercase in
 		    let find_value = function
 		      | "topdir" -> Params.get_param "top-dir"
@@ -1005,26 +1033,20 @@ let build_package_impl os platform args =
 		    let prototype =
 		      with_out "prototype"
 			(fun out ->
-			  let add_bf_list out file =
-			    let ch = open_in file in
-			    let rec read () =
-			      try
-				let s = input_line ch in
-				let l = String.length s in
-				if l > 2 then
-				  (match s.[0] with
-				    | 'd' ->
-					let dir = String.sub s 2 (l - 2) in
-					let mode = sprintf "%o" (Unix.stat dir).Unix.st_perm in
-					out (reg (sprintf "d none %s %s root root\n" dir mode))
-				    | 'f' -> 
-					let file = String.sub s 2 (l - 2) in
-					let mode = sprintf "%o" (Unix.stat file).Unix.st_perm in
-					out (reg (sprintf "f none %s %s root root\n" file mode))
-				    | _ -> ());
-				read ()
-			      with End_of_file -> close_in ch
-			    in read ()
+			  let make_pkgtrans_line s =
+			    let l = String.length s in
+			    if l > 2 then
+			      (match s.[0] with
+				| 'd' ->
+				    let dir = String.sub s 2 (l - 2) in
+				    let mode = sprintf "%o" (Unix.stat dir).Unix.st_perm in
+				    reg (sprintf "d none %s %s root root\n" dir mode)
+				| 'f' -> 
+				    let file = String.sub s 2 (l - 2) in
+				    let mode = sprintf "%o" (Unix.stat file).Unix.st_perm in
+				    reg (sprintf "f none %s %s root root\n" file mode)
+				| _ -> "")
+			    else ""
 			  in
 			  let write_content name content =
 			    let file =
@@ -1071,7 +1093,9 @@ let build_package_impl os platform args =
 			    | list ->
 				write_content "depend" (make_depends list));
 			  
-			  accumulate_lists add_bf_list out)
+			  accumulate_lists (add_bf_list make_pkgtrans_line) out;
+			  List.iter (fun s -> out (make_pkgtrans_line s))
+			    custom_pkg_files)
 		    in
 			
 		    let pkg_spool = "/var/spool/pkg/" in
@@ -1104,6 +1128,10 @@ let build_package_impl os platform args =
 		      ~location:(Sys.getcwd ())
 		      ~fullname:pkg_file_gz spec.hooks
 		| Deb_pkg ->
+		    let custom_pkg_files =
+		      call_before_build
+			~pkgname:spec.pkgname ~version ~revision:release ~platform spec.hooks in
+		    
 		    let make_debian_depends deps =
 		      let b = Buffer.create 32 in
 		      let add s =
@@ -1147,40 +1175,33 @@ let build_package_impl os platform args =
 			(tm.Unix.tm_mday)
 		    in
 		    
-		    let add_bf_list out file =
-		      let ch = open_in file in
-		      let rec read () =
-			try
-			  let s = input_line ch in
-			  let l = String.length s in
-			  if l > 2 then
-			    (match s.[0] with
-			      | 'd' ->
-				  let dir =
-				    Filename.concat 
-				      (Filename.concat abs_specdir "debian")
-				      (System.strip_root (String.sub s 2 (l - 2))) in
-				  make_directory [dir];
-			      | 'f' ->
-				  let src = String.sub s 2 (l - 2) in
-				  let dst = Filename.concat 
-				    (Filename.concat abs_specdir "debian") 
-				    (System.strip_root src) in
-				  System.link_or_copy
-				    (match dest_dir () with
-				      | Some d -> Filename.concat d src
-				      | None -> src) dst
-			      | _ -> ());
-			  read ()
-			with End_of_file -> close_in ch
-		      in read ()
-		    in 
-
+		    let make_deb_line s =
+		      let l = String.length s in
+		      if l > 2 then
+			(match s.[0] with
+			  | 'd' ->
+			      let dir =
+				Filename.concat 
+				  (Filename.concat abs_specdir "debian")
+				  (System.strip_root (String.sub s 2 (l - 2))) in
+			      make_directory [dir];
+			  | 'f' ->
+			      let src = String.sub s 2 (l - 2) in
+			      let dst = Filename.concat 
+				(Filename.concat abs_specdir "debian") 
+				(System.strip_root src) in
+			      System.link_or_copy
+				(match dest_dir () with
+				  | Some d -> Filename.concat d src
+				  | None -> src) dst
+			  | _ -> ())
+		    in
 		    let debian_home =
 		      Filename.concat abs_specdir "debian" in
 		    remove_directory debian_home;
-		    make_directory [debian_home];		    
-		    accumulate_lists add_bf_list (fun _ -> ());
+		    make_directory [debian_home];
+		    accumulate_lists (add_bf_list make_deb_line) (fun _ -> ());
+		    List.iter make_deb_line custom_pkg_files;
 		    		    
 		    let write_script name content =
 		      let file =

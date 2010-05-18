@@ -65,6 +65,11 @@ let eval_sval s =
 	    | None -> error s
 	    | Some sval -> sval
 	end
+
+let defined name =
+  match Ocs_vartable.var_find env.env_vartable name with
+    | Some _ -> true
+    | None -> false
 	  
 let fst = function
   | Spair v -> v.car
