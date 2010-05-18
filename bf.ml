@@ -15,7 +15,7 @@ let usage () =
   print_endline "   or: bf (diff|changelog) <composite> <tag-a> <tag-b>";
   print_endline "   or: bf review <composite> <since-date>";
   print_endline "   or: bf pack <specdir> <version> <release>";
-  print_endline "   or: bf update <specdir> [<version>] [<release>]";
+  print_endline "   or: bf update <specdir> [lazy] [<version>] [<release>]";
   print_endline "   or: bf upgrade <specdir> [lazy] [<branch>]";
   print_endline "   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite|depends|packages]";
   print_endline "   or: bf tag <composite> <tag>";
@@ -128,18 +128,28 @@ let main () =
 	    if len > 2 then
 	      let specdir = Sys.argv.(2) in
 	      let version = Filename.concat specdir "version" in
+	      let (lazy_mode,lazy_pos) =
+		if      len > 3 && Sys.argv.(3) = "lazy" then true,3
+		else if len > 4 && Sys.argv.(4) = "lazy" then true,4
+		else if len > 5 && Sys.argv.(5) = "lazy" then true,5
+		else false, 2
+	      in
 	      let ver =
-		if len > 3 then
-		  Some Sys.argv.(3)
+		let pos =
+		  if lazy_pos = 3 then 4 else 3 in
+		if len > pos then
+		  Some Sys.argv.(pos)
 		else None
 	      in
 	      let rev =
-		if len > 4 then
-		  Some Sys.argv.(4)
+		let pos =
+		  if lazy_pos = 3 || lazy_pos = 4 then 5 else 4 in
+		if len > pos then
+		  Some Sys.argv.(pos)
 		else None
 	      in
 	      if Sys.file_exists version then
-		Pack.update ~specdir ~ver ~rev ()
+		Pack.update ~specdir ~lazy_mode ~ver ~rev ()
 	      else
 		analyze ()
 	    else
