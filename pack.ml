@@ -1503,7 +1503,7 @@ let rec get_depends ?(overwrite=false) table acc userhost pkg_path =
 	  Pcre.pmatch ~pat:"jet" s && Pcre.pmatch ~rex s)
 	(sprintf "ssh %s rpm -qRp %s" userhost pkg_path))))
 
-let rec get_pack_depends table acc specdir =
+let rec get_pack_depends ~default_branch table acc specdir =
   log_message (sprintf "resolve %s" specdir);
   let pkgdir =
     Filename.dirname (Filename.dirname specdir) in
@@ -1526,27 +1526,39 @@ let rec get_pack_depends table acc specdir =
 	(specdir::(List.flatten
 	  (List.map
 	    (fun pkg ->
-	      let pack_branch_variants =
-		Array.of_list
-		  (System.list_of_directory (Filename.concat pkgdir pkg)) in
-	      let len = Array.length pack_branch_variants in
+	      let branches =
+		List.filter (fun s -> s <> "hooks.scm")
+		  (System.list_of_directory
+		    (Filename.concat pkgdir pkg))
+	      in
+	      let len = List.length branches in
 	      if len = 0 then
 		raise (Pack_branch_is_not_found pkg);
-	      if len > 1 then
-		begin
-		  printf "Select pack-branch for %s\n%!" pkg;
-		  Array.iteri (printf "%d) %s\n%!") pack_branch_variants;
-		  let n = read_number (pred len) in
-		  let specdir = 
-		    sprintf "%s/%s/%s" pkgdir pkg pack_branch_variants.(n) in
-		  (get_pack_depends table [] specdir)
+	      let branch =
+		if len > 1 then
+		  begin
+		    let select () =
+		      printf "Select pack-branch for %s\n%!" pkg;
+		      let pack_branch_variants =
+			Array.of_list branches in
+		      Array.iteri (printf "%d) %s\n%!") pack_branch_variants;
+		      let n = read_number (pred len) in
+		      pack_branch_variants.(n)
+		    in
+		    match default_branch with
+		      | Some b ->
+			  if List.mem b branches then 
+			    b
+			  else 
+			    raise (Pack_branch_is_not_found pkg)
+		      | None -> select ()			
 		  end
-	      else
-		begin
-		  let specdir = 
-		    sprintf "%s/%s/%s" pkgdir pkg pack_branch_variants.(0) in
-		  (get_pack_depends table [] specdir)
-		end)
+		else
+		  List.hd branches
+	      in
+	      let specdir = 
+		sprintf "%s/%s/%s" pkgdir pkg (List.hd branches) in
+	      (get_pack_depends ~default_branch table [] specdir))
 	    l)))
 
 let rec print_depends depth = function
@@ -1596,11 +1608,11 @@ let clone userhost pkg_path mode =
     | "packages"  -> download_packages userhost depends
     | _           -> clone_packages (List.rev (list_of_depends depends))
 
-let upgrade specdir lazy_mode =
+let upgrade specdir lazy_mode default_branch =
   let specdir = System.path_strip_directory specdir in
   let table = Hashtbl.create 32 in
   let depends =
-    get_pack_depends table [] specdir in
+    get_pack_depends ~default_branch table [] specdir in
   List.iter 
     (fun specdir ->
       update ~specdir ~lazy_mode ~interactive:true ())

@@ -15,8 +15,8 @@ let usage () =
   print_endline "   or: bf (diff|changelog) <composite> <tag-a> <tag-b>";
   print_endline "   or: bf review <composite> <since-date>";
   print_endline "   or: bf pack <specdir> <version> <release>";
-  print_endline "   or: bf update <specdir> [version] [release]";
-  print_endline "   or: bf upgrade <specdir> [lazy]";
+  print_endline "   or: bf update <specdir> [<version>] [<release>]";
+  print_endline "   or: bf upgrade <specdir> [lazy] [<branch>]";
   print_endline "   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite|depends|packages]";
   print_endline "   or: bf tag <composite> <tag>";
   print_endline "   or: bf log <logdir>";
@@ -157,13 +157,18 @@ let main () =
 	      else
 		usage ()
 	| "upgrade" ->
-	    if len = 3 then
-	      Pack.upgrade Sys.argv.(2) false
-	    else 
-	      if len = 4 then
-		Pack.upgrade Sys.argv.(2) true
-	      else
-		usage ()
+	    let (lazy_mode,default_branch) =
+	      match len with
+		| 3 -> false, None
+		| 4 ->
+		    if Sys.argv.(3) = "lazy" then (true,None)
+		    else (false,Some Sys.argv.(3))
+		| 5 ->
+		    if Sys.argv.(3) = "lazy" then (true,Some Sys.argv.(4))
+		    else if Sys.argv.(4) = "lazy" then (true,Some Sys.argv.(3))
+		    else usage ()
+		| _ -> usage ()
+	    in Pack.upgrade Sys.argv.(2) lazy_mode default_branch
 	| "tag" ->
 	    if len = 4 then
 	      Commands.tag_composite Sys.argv.(2) Sys.argv.(3)
