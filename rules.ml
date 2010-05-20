@@ -120,7 +120,11 @@ let split_by_space s =
   Pcre.split ~pat:"\\s+" s
 
 let add_make_opts v =
-  (split_by_space (Params.get_param "make-opts")) @ v
+  (split_by_space
+    (try
+      Env.find_component "MAKE_OPTS"
+    with Not_found ->
+      (Params.get_param "make-opts"))) @ v
 
 let simple_configure args =
   log_command "./configure" args

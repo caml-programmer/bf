@@ -1348,19 +1348,19 @@ let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=No
   let have_changes = 
     update_composite composite in
 
+  let tag =
+    sprintf "%s/%s-%d" pkgname version revision in
+  
+  let old_tag =
+    if  revision > 0 then
+      Some (sprintf "%s/%s-%d" pkgname version (pred revision))
+    else None
+  in    
+
   if lazy_mode && not have_changes then
     log_message "lazy update: noting to do"
   else
     begin
-      let tag =
-	sprintf "%s/%s-%d" pkgname version revision in
-      
-      let old_tag =
-	if  revision > 0 then
-	  Some (sprintf "%s/%s-%d" pkgname version (pred revision))
-	else None
-      in
-
       if not (tag_ready ~tag composite) then
 	begin
 	  install_composite composite;
