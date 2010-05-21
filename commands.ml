@@ -32,7 +32,12 @@ let with_component_dir ?(strict=true) component thunk =
   let curdir = Sys.getcwd () in
 
   let with_dir f =
-    Sys.chdir component.name; f (); thunk (); Sys.chdir curdir in
+    Sys.chdir component.name;     
+    let with_changes = f () in
+    thunk ();
+    Sys.chdir curdir;
+    with_changes
+  in
 
   let label_type =
     string_of_label_type component.label in
@@ -57,23 +62,26 @@ let with_component_dir ?(strict=true) component thunk =
 	clone_component component;
 	with_dir (fun () ->
 	  git_track_new_branches ();
-	  checkout_component component)
+	  checkout_component component;
+	  true)
     | Tree_exists_with_given_key content_status ->
 	(match content_status with
 	  | Tree_prepared ->
 	      log_message "status: working tree is prepared";
-	      with_dir (fun () -> ())
+	      with_dir (fun () -> false)
 	  | Tree_changed changes ->
 	      log_message
 		(sprintf "status: working tree is changed(%d)" (List.length changes));
 	      with_dir (fun () ->
-		checkout_component component; git_clean ()))
+		checkout_component component; git_clean ();
+		true))
     | Tree_exists_with_other_key key ->
 	log_message 
 	  (sprintf "status: working tree exists with other key (%s)" key);
 	with_dir (fun () ->
 	  checkout_component component;
-	  git_clean ())
+	  git_clean ();
+	  true)
   
 let non_empty_iter f = function
     []   -> log_error "don't know what to do"
@@ -88,13 +96,13 @@ let non_empty_map f = function
 
 let prepare_component component =
   Printf.printf "prepare-component %s %s\n" component.name (Sys.getcwd ());
-  with_component_dir ~strict:false component git_clean
+  ignore (with_component_dir ~strict:false component git_clean)
 
 let prepare components =
   non_empty_iter prepare_component components
 
 let update_component component = (* todo: more smart implementation *)
-  with_component_dir ~strict:true component
+  ignore (with_component_dir ~strict:true component
     (fun () ->
       let start = git_current_branch () in
       List.iter
@@ -111,45 +119,47 @@ let update_component component = (* todo: more smart implementation *)
 	      git_checkout ~force:true ~key:start_key ()
 	| Some start_key, None ->
 	    git_checkout ~force:true ~key:start_key ()
-	| None, _ -> ())
+	| None, _ -> ()))
 
 let smart_update_component component =
-  let changes = ref false in
-  with_component_dir ~strict:false component
-    (fun () ->
-      let repos =
-	Filename.concat (git_create_url component) component.name in
-      let start = git_current_branch () in
-      git_fetch ~tags:true repos;
-      git_remote_update ();
-      git_track_new_branches ();
-      List.iter
-	(fun branch ->
-	  if git_changed branch ("origin/" ^ branch) then
-	    begin
-	      git_checkout ~force:true ~key:branch ();
-	      git_clean ();
-	      git_pull ~refspec:branch repos;
-	      changes := true
-	    end)
-	(git_branch ());
-      let stop = git_current_branch () in
-      match start, stop with
-	| Some start_key, Some stop_key -> 
-	    if start_key <> stop_key then
+  let remote_changes = ref false in
+  let local_changes =
+    with_component_dir ~strict:false component
+      (fun () ->
+	let repos =
+	  Filename.concat (git_create_url component) component.name in
+	let start = git_current_branch () in
+	git_fetch ~tags:true repos;
+	git_remote_update ();
+	git_track_new_branches ();
+	List.iter
+	  (fun branch ->
+	    if git_changed branch ("origin/" ^ branch) then
+	      begin
+		git_checkout ~force:true ~key:branch ();
+		git_clean ();
+		git_pull ~refspec:branch repos;
+		remote_changes := true
+	      end)
+	  (git_branch ());
+	let stop = git_current_branch () in
+	match start, stop with
+	  | Some start_key, Some stop_key -> 
+	      if start_key <> stop_key then
+		git_checkout ~force:true ~key:start_key ()
+	  | Some start_key, None ->
 	      git_checkout ~force:true ~key:start_key ()
-	| Some start_key, None ->
-	    git_checkout ~force:true ~key:start_key ()
-	| None, _ -> ());
-  !changes
+	  | None, _ -> ())
+  in local_changes || !remote_changes
 
 let update components =
   List.exists (fun x -> x) (List.map smart_update_component components)
 
 let forward_component component =
-  with_component_dir ~strict:false component
-    (fun () ->
-      git_push (Filename.concat (git_create_url component) component.name))
+  ignore 
+    (with_component_dir ~strict:false component
+      (fun () ->
+	git_push (Filename.concat (git_create_url component) component.name)))
 
 let forward components =
   non_empty_iter forward_component components
@@ -169,9 +179,10 @@ let build_component_native component =
     end
 
 let build_component component =
-  with_component_dir ~strict:true component
-    (fun () ->
-      build_component_native component)
+  ignore 
+    (with_component_dir ~strict:true component
+      (fun () ->
+	build_component_native component))
 	  
 let build components =
   non_empty_iter build_component components
@@ -180,9 +191,9 @@ let rebuild_component component =
   let file = component.name ^ "/.bf-build" in
   if Sys.file_exists file then
     Sys.remove file;
-  with_component_dir ~strict:true component
+  ignore (with_component_dir ~strict:true component
     (fun () ->
-      build_component_native component)
+      build_component_native component))
   
 let rebuild components =
   non_empty_iter rebuild_component components
@@ -269,40 +280,41 @@ let install_component component =
 	log_message
 	  (component.name ^ (sprintf " must be installed by package (%s), noting to do" pkg))
     | _ ->
-	with_component_dir ~strict:false component
-	  (fun () ->
-	    if Sys.file_exists ".bf-install" then
-	      log_message (component.name ^ " already installed, noting to do")
-	    else
-	      begin
-		if not (Sys.file_exists ".bf-build") then
-		  build_component_native component;
-		log_message ("installing " ^ component.name);
-		let top_dir =
-		  Params.get_param "top-dir" in
-		let dest_dir =
-		  Params.get_param "dest-dir" in
-		let real_dir =
-		  if dest_dir = "" then
-		    top_dir
-		  else
-		    Filename.concat dest_dir 
-		      (System.strip_root top_dir)
-		in
-		let state =
-		  create_top_state real_dir in
-		if dest_dir <> "" then
-		  Params.update_param "top-dir" real_dir;
-		Rules.install_rules ();
-		Params.update_param "top-dir" top_dir;
-		generate_changes
-		  state (create_top_state real_dir);
-		log_message (component.name ^ " installed");
-		let ch = open_out ".bf-install" in
-		output_string ch (string_of_float (Unix.gettimeofday ()));
-		output_string ch "\n";
-		close_out ch
-	      end)
+	ignore
+	  (with_component_dir ~strict:false component
+	    (fun () ->
+	      if Sys.file_exists ".bf-install" then
+		log_message (component.name ^ " already installed, noting to do")
+	      else
+		begin
+		  if not (Sys.file_exists ".bf-build") then
+		    build_component_native component;
+		  log_message ("installing " ^ component.name);
+		  let top_dir =
+		    Params.get_param "top-dir" in
+		  let dest_dir =
+		    Params.get_param "dest-dir" in
+		  let real_dir =
+		    if dest_dir = "" then
+		      top_dir
+		    else
+		      Filename.concat dest_dir 
+			(System.strip_root top_dir)
+		  in
+		  let state =
+		    create_top_state real_dir in
+		  if dest_dir <> "" then
+		    Params.update_param "top-dir" real_dir;
+		  Rules.install_rules ();
+		  Params.update_param "top-dir" top_dir;
+		  generate_changes
+		    state (create_top_state real_dir);
+		  log_message (component.name ^ " installed");
+		  let ch = open_out ".bf-install" in
+		  output_string ch (string_of_float (Unix.gettimeofday ()));
+		  output_string ch "\n";
+		  close_out ch
+		end))
 
 let install components =
   non_empty_iter install_component components
@@ -372,49 +384,50 @@ let status components =
     components
 
 let tag_component tag component =
-  with_component_dir ~strict:false component
-    (fun () ->
-      let url = 
-	Filename.concat
-	  (git_create_url component) component.name in
-      match git_current_branch () with
-	  Some branch ->
-	    (match git_make_tag tag with
-	      | Tag_created ->
-		  git_push ~tags:true ~refspec:tag url;
-		  git_pull ~refspec:branch url
-	      | Tag_already_exists -> ()
-	      | Tag_creation_problem -> exit 2)
-	| None ->
-	    (* log_error ("cannot find current branch for " ^ component.name) *)
-	    (match git_make_tag tag with
-	      | Tag_created ->
-		  git_push ~tags:true ~refspec:tag url;
-		  git_pull url
-	      | Tag_already_exists -> ()
-	      | Tag_creation_problem -> exit 2))
+  ignore
+    (with_component_dir ~strict:false component
+      (fun () ->
+	let url = 
+	  Filename.concat
+	    (git_create_url component) component.name in
+	match git_current_branch () with
+	    Some branch ->
+	      (match git_make_tag tag with
+		| Tag_created ->
+		    git_push ~tags:true ~refspec:tag url;
+		    git_pull ~refspec:branch url
+		| Tag_already_exists -> ()
+		| Tag_creation_problem -> exit 2)
+	  | None ->
+	      (* log_error ("cannot find current branch for " ^ component.name) *)
+	      (match git_make_tag tag with
+		| Tag_created ->
+		    git_push ~tags:true ~refspec:tag url;
+		    git_pull url
+		| Tag_already_exists -> ()
+		| Tag_creation_problem -> exit 2)))
 
 let make_tag tag components =
   non_empty_iter (tag_component tag) components
 
 let diff_component tag_a tag_b component =
-  with_component_dir ~strict:false component
+  ignore (with_component_dir ~strict:false component
     (fun () ->
-      print_endline (git_diff_view ~tag_a ~tag_b))
+      print_endline (git_diff_view ~tag_a ~tag_b)))
 
 let make_diff tag_a tag_b components =
   non_empty_iter (diff_component tag_a tag_b) components
 
 let changelog_component ?(diff=false) ?(since=None) tag_a tag_b component =
   let chunks = ref [] in
-  with_component_dir ~strict:false component
+  ignore (with_component_dir ~strict:false component
     (fun () ->
       let logs = git_log ~diff ~since tag_a tag_b in
       if List.length logs > 0 && String.length (List.nth logs 0) > 2 then
 	chunks := (Printf.sprintf "\n\n\n### %s (%s) (%s)\n\n"
 	  (String.uppercase component.name)
 	  (string_of_label_type component.label)
-	  (string_of_label component.label))::logs);
+	  (string_of_label component.label))::logs));
   !chunks
 
 let make_changelog tag_a tag_b components =
@@ -471,8 +484,9 @@ let tag_ready ~tag composite =
   List.for_all
     (fun component ->
       let res = ref false in
-      with_component_dir ~strict:false component
-	(fun () -> res := List.mem tag (git_tag_list ()));
+      ignore 
+	(with_component_dir ~strict:false component
+	  (fun () -> res := List.mem tag (git_tag_list ())));
       !res)
     (Rules.components_of_composite composite)
 

@@ -1355,27 +1355,29 @@ let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=No
     if  revision > 0 then
       Some (sprintf "%s/%s-%d" pkgname version (pred revision))
     else None
-  in    
+  in
+
+  let build () =
+    if not (tag_ready ~tag composite) then
+      begin
+	install_composite composite;
+	tag_composite composite tag;
+      end;
+    
+    install_composite ~tag composite;
+    build_package
+      [specdir;version;string_of_int revision];
+    
+    match old_tag with
+      | Some old ->
+	  changelog_composite composite old tag
+      | None -> ()
+  in
 
   if lazy_mode && not have_changes then
     log_message "lazy update: noting to do"
   else
-    begin
-      if not (tag_ready ~tag composite) then
-	begin
-	  install_composite composite;
-	  tag_composite composite tag;
-	end;
-      
-      install_composite ~tag composite;
-      build_package
-	[specdir;version;string_of_int revision];
-      
-      match old_tag with
-	| Some old ->
-	    changelog_composite composite old tag
-	| None -> ()
-    end
+    build ()
 
 (* Clone suport *)
 
