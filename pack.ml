@@ -1580,7 +1580,7 @@ let rec get_pack_depends ~default_branch table acc specdir =
 		  List.hd branches
 	      in
 	      let specdir = 
-		sprintf "%s/%s/%s" pkgdir pkg (List.hd branches) in
+		sprintf "%s/%s/%s" pkgdir pkg branch in
 	      (get_pack_depends ~default_branch table [] specdir))
 	    l)))
 
