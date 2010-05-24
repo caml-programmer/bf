@@ -122,6 +122,8 @@ let update_component component = (* todo: more smart implementation *)
 	| None, _ -> ()))
 
 let smart_update_component component =
+  let exists s =
+    Sys.file_exists (Filename.concat component.name s) in
   let remote_changes = ref false in
   let local_changes =
     with_component_dir ~strict:false component
@@ -151,6 +153,8 @@ let smart_update_component component =
 	      git_checkout ~force:true ~key:start_key ()
 	  | None, _ -> ())
   in local_changes || !remote_changes
+     || not (exists ".bf-build")
+     || not (exists ".bf-install")
 
 exception Pack_current_branch_is_not_set
 
