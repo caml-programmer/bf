@@ -158,10 +158,13 @@ let git_diff ?(ignore=[]) ?key () =
 	     (String.length s - 2)) ignore))
        cmd
 
-let git_changed key_a key_b =
+let git_changes key_a key_b =
   let cmd =
     sprintf "git log '%s'..'%s'" key_a key_b in
-  read_lines ~env cmd <> []
+  read_lines ~env cmd
+
+let git_changed key_a key_b =
+  git_changes key_a key_b <> []
 
 let git_diff_view ~tag_a ~tag_b =
   let cmd =

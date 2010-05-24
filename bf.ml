@@ -22,9 +22,6 @@ let usage () =
   print_endline "   or: bf log <logdir>";
   exit 1
 
-let make_component s =
-  { name = s; label = Current; pkg = None }
-
 let analyze_arguments () =
   match Array.length Sys.argv with
     | 1 | 2 -> usage ()

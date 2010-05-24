@@ -152,6 +152,60 @@ let smart_update_component component =
 	  | None, _ -> ())
   in local_changes || !remote_changes
 
+exception Pack_current_branch_is_not_set
+
+let pkgname_of_tag tag =
+  try
+    Some (String.sub tag 0 (String.index tag '/'))
+  with Not_found -> None
+
+let smart_update_pack ~tag component =
+  let remote_changes = ref false in
+  let local_changes =
+    with_component_dir ~strict:false component
+      (fun () ->
+	let repos =
+	  Filename.concat (git_create_url component) component.name in
+	let start = git_current_branch () in
+	git_fetch ~tags:true repos;
+	git_remote_update ();
+	git_track_new_branches ();
+	List.iter
+	  (fun branch ->
+	    if git_changed branch ("origin/" ^ branch) then
+	      begin
+		git_checkout ~force:true ~key:branch ();
+		git_clean ();
+		git_pull ~refspec:branch repos;
+		remote_changes := true
+	      end)
+	  (git_branch ());
+	let stop = git_current_branch () in
+	match start, stop with
+	  | Some start_key, Some stop_key ->
+	      if start_key <> stop_key then
+		git_checkout ~force:true ~key:start_key ()
+	  | Some start_key, None ->
+	      git_checkout ~force:true ~key:start_key ()
+	  | None, _ -> ())
+  in 
+
+  if local_changes || !remote_changes then
+    match git_current_branch () with
+      | Some cur ->
+	  (match tag with
+	      Some tag ->
+		(match pkgname_of_tag tag with
+		  | Some pkgname ->
+		      let rex = Pcre.regexp pkgname in
+		      List.exists (Pcre.pmatch ~rex)
+			(git_changes tag cur)
+		  | None -> true)
+	    | None -> true)
+      | None ->
+	  raise Pack_current_branch_is_not_set
+  else false
+
 let update components =
   List.exists (fun x -> x) (List.map smart_update_component components)
 

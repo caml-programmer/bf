@@ -38,3 +38,6 @@ type fs_state = (fs_entry,float) Hashtbl.t
 
 type version = string
 type revision = int
+
+let make_component s =
+  { name = s; label = Current; pkg = None }

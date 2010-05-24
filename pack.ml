@@ -1326,6 +1326,9 @@ let build_package args =
     (fun os platfrom ->
       build_package_impl os platfrom args)
 
+let update_pack ~tag () = (* todo: need fix strange pack update problem *)
+  smart_update_pack ~tag (make_component "pack")
+
 let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
   let specdir = System.path_strip_directory specdir in
   let pkgname = pkgname_of_specdir specdir in
@@ -1341,12 +1344,6 @@ let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=No
   in
   let pkgname =
     pkgname_of_specdir specdir in
-  
-  let composite =
-    Filename.concat specdir "composite" in
-
-  let have_changes = 
-    update_composite composite in
 
   let tag =
     sprintf "%s/%s-%d" pkgname version revision in
@@ -1356,6 +1353,15 @@ let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=No
       Some (sprintf "%s/%s-%d" pkgname version (pred revision))
     else None
   in
+
+  let have_pack_changes =
+    update_pack ~tag:old_tag () in
+    
+  let composite =
+    Filename.concat specdir "composite" in
+
+  let have_composite_changes =
+    update_composite composite in
 
   let build () =
     if not (tag_ready ~tag composite) then
@@ -1374,7 +1380,7 @@ let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=No
       | None -> ()
   in
 
-  if lazy_mode && not have_changes then
+  if lazy_mode && not have_composite_changes && not have_pack_changes then
     log_message "lazy update: noting to do"
   else
     build ()
