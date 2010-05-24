@@ -1326,9 +1326,6 @@ let build_package args =
     (fun os platfrom ->
       build_package_impl os platfrom args)
 
-let update_pack ~tag () = (* todo: need fix strange pack update problem *)
-  smart_update_pack ~tag (make_component "pack")
-
 let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
   let specdir = System.path_strip_directory specdir in
   let pkgname = pkgname_of_specdir specdir in
@@ -1355,7 +1352,7 @@ let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=No
   in
 
   let have_pack_changes =
-    update_pack ~tag:old_tag () in
+    update_pack ~tag:old_tag (make_component "pack") in
     
   let composite =
     Filename.concat specdir "composite" in
