@@ -1371,14 +1371,15 @@ let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=No
     build_package
       [specdir;version;string_of_int revision];
     
-    match old_tag with
+    (match old_tag with
       | Some old ->
 	  changelog_composite composite old tag
-      | None -> ()
+      | None -> ());
+    true
   in
 
   if lazy_mode && not have_composite_changes && not have_pack_changes then
-    log_message "lazy update: noting to do"
+    (log_message "lazy update: noting to do"; false)
   else
     build ()
 
@@ -1529,64 +1530,6 @@ let rec get_depends ?(overwrite=false) table acc userhost pkg_path =
 	  Pcre.pmatch ~pat:"jet" s && Pcre.pmatch ~rex s)
 	(sprintf "ssh %s rpm -qRp %s" userhost pkg_path))))
 
-let rec get_pack_depends ~default_branch table acc specdir =
-  log_message (sprintf "resolve %s" specdir);
-  let pkgdir =
-    Filename.dirname (Filename.dirname specdir) in
-  let f = Filename.concat specdir in
-  let depends = make_depends ~ignore_last:true (f "depends") in
-  match
-    (List.fold_left
-      (fun acc (pkg,_,_) ->
-	if Hashtbl.mem table pkg || not (Pcre.pmatch ~pat:"jet" pkg) then
-	  acc
-	else
-	  begin
-	    Hashtbl.add table pkg false;
-	    pkg::acc
-	  end)
-      [] depends)
-  with 
-    | [] -> specdir::acc
-    | l -> 
-	(specdir::(List.flatten
-	  (List.map
-	    (fun pkg ->
-	      let branches =
-		List.filter (fun s -> s <> "hooks.scm")
-		  (System.list_of_directory
-		    (Filename.concat pkgdir pkg))
-	      in
-	      let len = List.length branches in
-	      if len = 0 then
-		raise (Pack_branch_is_not_found pkg);
-	      let branch =
-		if len > 1 then
-		  begin
-		    let select () =
-		      printf "Select pack-branch for %s\n%!" pkg;
-		      let pack_branch_variants =
-			Array.of_list branches in
-		      Array.iteri (printf "%d) %s\n%!") pack_branch_variants;
-		      let n = read_number (pred len) in
-		      pack_branch_variants.(n)
-		    in
-		    match default_branch with
-		      | Some b ->
-			  if List.mem b branches then 
-			    b
-			  else 
-			    raise (Pack_branch_is_not_found pkg)
-		      | None -> select ()			
-		  end
-		else
-		  List.hd branches
-	      in
-	      let specdir = 
-		sprintf "%s/%s/%s" pkgdir pkg branch in
-	      (get_pack_depends ~default_branch table [] specdir))
-	    l)))
-
 let rec print_depends depth = function
   | Dep_list l ->
       List.iter (fun v -> print_depends (succ depth) v) l
@@ -1601,7 +1544,7 @@ let clone_packages l =
   List.iter (fun (n,b,v,r,_) ->
     let specdir =
       sprintf "./pack/%s/%s" n b in
-    update ~specdir ~ver:(Some v) ~rev:(Some (string_of_int r)) ()) l
+    ignore (update ~specdir ~ver:(Some v) ~rev:(Some (string_of_int r)) ())) l
 
 let rec download_packages userhost = function
   | Dep_list l ->
@@ -1634,14 +1577,147 @@ let clone userhost pkg_path mode =
     | "packages"  -> download_packages userhost depends
     | _           -> clone_packages (List.rev (list_of_depends depends))
 
-let upgrade specdir lazy_mode default_branch =
+let pack_branches pkgdir =
+  List.filter (fun s -> s <> "hooks.scm")
+    (System.list_of_directory pkgdir)
+
+let select_branch ~default_branch pkgdir pkg =
+  match pack_branches (Filename.concat pkgdir pkg) with
+    | [] -> raise (Pack_branch_is_not_found pkg)
+    | hd::tl as branches ->
+	(match tl with
+	  | [] -> hd
+	  | _ ->
+	      begin
+		let select () =
+		  printf "Select pack-branch for %s\n%!" pkg;
+		  let pack_branch_variants =
+		    Array.of_list branches in
+		  Array.iteri (printf "%d) %s\n%!") pack_branch_variants;
+		  let n = read_number (pred (List.length branches)) in
+		  pack_branch_variants.(n)
+		in
+		match default_branch with
+		  | Some b ->
+		      if List.mem b branches then b
+		      else raise
+			(Pack_branch_is_not_found pkg)
+		  | None -> select ()
+	      end)
+
+let specdir_of_pkg ~default_branch pkgdir pkg =
+  sprintf "%s/%s/%s" pkgdir pkg (select_branch ~default_branch pkgdir pkg)
+
+let rec get_pack_depends ~default_branch table acc specdir =
+  log_message (sprintf "resolve %s" specdir);
+  let pkgdir =
+    Filename.dirname (Filename.dirname specdir) in
+  let f = Filename.concat specdir in
+  let depends = make_depends ~ignore_last:true (f "depends") in
+  match
+    (List.fold_left
+      (fun acc (pkg,_,_) ->
+	if Hashtbl.mem table pkg || not (Pcre.pmatch ~pat:"jet" pkg) then
+	  acc
+	else
+	  begin
+	    Hashtbl.add table pkg false;
+	    pkg::acc
+	  end)
+      [] depends)
+  with
+    | [] -> specdir::acc
+    | l  ->
+	(specdir::(List.flatten (List.map (fun pkg ->
+	  (get_pack_depends ~default_branch table [] (specdir_of_pkg ~default_branch pkg pkgdir))) l)))
+
+
+type spectree =
+  | Dval of (string * spectree)
+  | Dlist of spectree list
+
+let branch_of_specdir s =
+  Filename.basename s
+
+let make_depends_tree ~default_branch specdir : spectree =
+  let pkgdir =
+    Filename.dirname (Filename.dirname specdir) in
+  let rec make specdir =
+    log_message (sprintf "resolve %s" specdir);
+    let depends =
+      List.map (fun (pkg,_,_) ->
+	specdir_of_pkg ~default_branch pkgdir pkg)
+	(make_depends ~ignore_last:true
+	  (Filename.concat specdir "depends")) in
+    Dval (specdir, Dlist (List.map (fun s -> Dval (s, make s)) depends))
+  in make specdir
+
+type dep_path = string list
+
+exception Found_specdir of dep_path
+exception Bad_specdir of string
+
+let upgrade specdir upgrade_mode default_branch =
   let specdir = System.path_strip_directory specdir in
-  let table = Hashtbl.create 32 in
   let depends =
-    get_pack_depends ~default_branch table [] specdir in
-  List.iter 
-    (fun specdir ->
-      update ~specdir ~lazy_mode ~interactive:true ())
-    (List.rev depends)
+    get_pack_depends ~default_branch (Hashtbl.create 32) [] specdir in
 
+  let deptree =
+    make_depends_tree ~default_branch specdir in
+  
+  let build_table = Hashtbl.create 32 in
+  let mark_table = Hashtbl.create 32 in
 
+  let find_specdir specdir =
+      let rec make acc = function
+	| Dval (specdir', Dlist l) ->
+	    if specdir = specdir' then
+	      raise (Found_specdir (List.rev acc))
+	    else List.iter (make (specdir'::acc)) l
+	| _ -> assert false
+      in
+      try
+	make [] deptree; raise (Bad_specdir specdir)
+      with Found_specdir s -> s
+  in
+
+  let eval_lazy_mode specdir =
+    log_message "eval lazy mode:";
+    if Hashtbl.mem mark_table specdir && not (Hashtbl.mem build_table specdir) then
+      (false,[])
+    else
+      begin
+	let dep_path = find_specdir specdir in
+	List.iter print_endline dep_path;
+	true,dep_path
+      end
+  in
+  
+  match upgrade_mode with
+    | Upgrade_full ->
+	List.iter
+	  (fun specdir ->
+	    ignore(update ~specdir ~lazy_mode:false ~interactive:true ()))
+	  (List.rev depends)
+    | Upgrade_lazy ->
+	List.iter
+	  (fun specdir ->
+	    ignore(update ~specdir ~lazy_mode:true ~interactive:true ()))
+	  (List.rev depends)
+    | Upgrade_complete ->
+	List.iter
+	  (fun specdir ->
+	    let (lazy_mode,dep_path) =
+	      eval_lazy_mode specdir in
+	    let updated =
+	      update
+		~specdir
+		~lazy_mode
+		~interactive:true ()
+	    in
+	    Hashtbl.replace build_table specdir updated;
+	    if updated then
+	      List.iter
+		(fun s -> Hashtbl.replace mark_table s true) dep_path)
+	  (List.rev depends)
+	  
