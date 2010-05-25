@@ -1628,9 +1628,7 @@ let rec get_pack_depends ~default_branch table acc specdir =
   with
     | [] -> specdir::acc
     | l  ->
-	(specdir::(List.flatten (List.map (fun pkg ->
-	  (get_pack_depends ~default_branch table [] (specdir_of_pkg ~default_branch pkg pkgdir))) l)))
-
+	(specdir::(List.flatten (List.map (fun pkg -> (get_pack_depends ~default_branch table [] (specdir_of_pkg ~default_branch pkgdir pkg))) l)))
 
 type spectree =
   | Dval of (string * spectree)
@@ -1642,15 +1640,15 @@ let branch_of_specdir s =
 let make_depends_tree ~default_branch specdir : spectree =
   let pkgdir =
     Filename.dirname (Filename.dirname specdir) in
-  let rec make specdir =
-    log_message (sprintf "resolve %s" specdir);
+  let rec make depth specdir =
+    log_message (sprintf "%s resolve %s" (String.make depth ' ') specdir);
     let depends =
       List.map (fun (pkg,_,_) ->
 	specdir_of_pkg ~default_branch pkgdir pkg)
 	(make_depends ~ignore_last:true
 	  (Filename.concat specdir "depends")) in
-    Dval (specdir, Dlist (List.map (fun s -> Dval (s, make s)) depends))
-  in make specdir
+    Dval (specdir, Dlist (List.map (make (succ depth)) depends))
+  in make 0 specdir
 
 type dep_path = string list
 
@@ -1660,9 +1658,11 @@ exception Bad_specdir of string
 let upgrade specdir upgrade_mode default_branch =
   let specdir = System.path_strip_directory specdir in
   let depends =
+    log_message "make pack depends...";
     get_pack_depends ~default_branch (Hashtbl.create 32) [] specdir in
 
   let deptree =
+    log_message "make spec depends...";
     make_depends_tree ~default_branch specdir in
   
   let build_table = Hashtbl.create 32 in
@@ -1674,7 +1674,8 @@ let upgrade specdir upgrade_mode default_branch =
 	    if specdir = specdir' then
 	      raise (Found_specdir (List.rev acc))
 	    else List.iter (make (specdir'::acc)) l
-	| _ -> assert false
+	| Dlist l -> assert false
+	| Dval (specdir', Dval _) -> assert false
       in
       try
 	make [] deptree; raise (Bad_specdir specdir)
@@ -1682,15 +1683,12 @@ let upgrade specdir upgrade_mode default_branch =
   in
 
   let eval_lazy_mode specdir =
-    log_message "eval lazy mode:";
+    let dep_path = find_specdir specdir in
+    (* log_message ("eval lazy mode for: " ^ specdir); List.iter print_endline dep_path; *)
     if Hashtbl.mem mark_table specdir && not (Hashtbl.mem build_table specdir) then
-      (false,[])
+      (false,dep_path)
     else
-      begin
-	let dep_path = find_specdir specdir in
-	List.iter print_endline dep_path;
-	true,dep_path
-      end
+      (true,dep_path)
   in
   
   match upgrade_mode with
