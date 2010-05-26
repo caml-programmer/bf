@@ -175,7 +175,7 @@ let git_check_key l tag =
 
 let git_changes key_a key_b =
   let cmd =
-    sprintf "git log '%s'..'%s'" key_a key_b in
+    sprintf "git diff --name-status '%s' '%s'" key_a key_b in
   try
     read_lines ~env cmd
   with exn ->
