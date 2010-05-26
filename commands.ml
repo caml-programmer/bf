@@ -28,6 +28,14 @@ let clone_component component =
     (Filename.concat 
       (git_create_url component) component.name) component.name
 
+let with_dir dir f =
+  let curdir = 
+    Sys.getcwd () in
+  Sys.chdir dir;
+  let result = f () in
+  Sys.chdir curdir;
+  result
+
 let with_component_dir ?(strict=true) component thunk =
   let curdir = Sys.getcwd () in
 
@@ -354,8 +362,11 @@ let update_pack ~tag component =
 
   install_component component; (* need for create .bf-build and .bf-install *)
  
+  let current_pack_branch =
+    with_dir component.name git_current_branch in
+
   if local_changes || !remote_changes then
-    match git_current_branch () with
+    match current_pack_branch with
       | Some cur ->
 	  (match tag with
 	      Some tag ->
