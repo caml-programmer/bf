@@ -294,8 +294,8 @@ let update_component component =
 	let repos =
 	  Filename.concat (git_create_url component) component.name in
 	let start = git_current_branch () in
+	git_fetch repos;
 	git_fetch ~tags:true repos;
-	git_fetch ~repos:"origin" repos;
 	git_remote_update ();
 	git_track_new_branches ();
 	List.iter
@@ -338,8 +338,8 @@ let update_pack ~tag component =
 	let repos =
 	  Filename.concat (git_create_url component) component.name in
 	let start = git_current_branch () in
+	git_fetch repos;
 	git_fetch ~tags:true repos;
-	git_fetch ~repos:"origin" repos;
 	git_remote_update ();
 	git_track_new_branches ();
 	List.iter
