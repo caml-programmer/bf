@@ -282,6 +282,9 @@ let reinstall_component component =
 let reinstall components =
   non_empty_iter reinstall_component components
 
+let origin s = 
+  "origin/" ^ s
+
 let update_component component =
   let exists s =
     Sys.file_exists (Filename.concat component.name s) in
@@ -294,17 +297,16 @@ let update_component component =
 	let repos =
 	  Filename.concat (git_create_url component) component.name in
 	let start = git_current_branch () in
-	git_fetch repos;
-	git_fetch ~tags:true repos;
-	git_remote_update ();
+	git_fetch "origin";
+	git_fetch ~tags:true "origin";
 	git_track_new_branches ();
 	List.iter
 	  (fun branch ->
-	    if git_changed branch ("origin/" ^ branch) then
+	    if git_changed branch (origin branch) then
 	      begin
 		git_checkout ~force:true ~key:branch ();
 		git_clean ();
-		git_pull ~refspec:branch repos;
+		git_merge (origin branch);
 		remote_changes := true
 	      end)
 	  (git_branch ());
@@ -338,17 +340,16 @@ let update_pack ~tag component =
 	let repos =
 	  Filename.concat (git_create_url component) component.name in
 	let start = git_current_branch () in
-	git_fetch repos;
-	git_fetch ~tags:true repos;
-	git_remote_update ();
+	git_fetch "origin";
+	git_fetch ~tags:true "origin";
 	git_track_new_branches ();
 	List.iter
 	  (fun branch ->
-	    if git_changed branch ("origin/" ^ branch) then
+	    if git_changed branch (origin branch) then
 	      begin
 		git_checkout ~force:true ~key:branch ();
 		git_clean ();
-		git_pull ~refspec:branch repos;
+		git_merge (origin branch);
 		remote_changes := true
 	      end)
 	  (git_branch ());

@@ -8,16 +8,19 @@ let env = Env.system ();;
 let git_clone url name =
   log_command ~env "git" ["clone";"-n";"-q";url;name]
 
-let git_pull ?refspec url =
-  match refspec with
-    | Some spec -> log_command ~env "git" ["pull";url;spec]
-    | None -> log_command ~env "git" ["pull";url]
-
 let git_fetch ?refspec ?(tags=false) url =
   let opts = if tags then ["--tags"] else [] in
   match refspec with
     | Some spec -> log_command ~env "git" (["fetch"] @ opts @ [url;spec])
     | None -> log_command ~env "git" (["fetch"] @ opts @ [url])
+
+let git_merge remote =
+  log_command ~env "git" ["merge";remote]
+
+let git_pull ?refspec url =
+  match refspec with
+    | Some spec -> log_command ~env "git" ["pull";url;spec]
+    | None -> log_command ~env "git" ["pull";url]
 
 let git_push ?(tags=false) ?refspec url =
   match refspec with
