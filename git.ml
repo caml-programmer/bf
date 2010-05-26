@@ -95,7 +95,7 @@ let git_checkout
   (match files with Some l -> List.iter add l | None -> ());
   log_command ~env "git" !args
 
-let git_branch ?(filter=(fun _ -> true)) ?(remote=false) () =
+let git_branch ?(filter=(fun _ -> true)) ?(raw_filter=(fun _ -> true)) ?(remote=false) () =
   let branch_cleaner s =
     try
       let pos = String.index s '>' in
@@ -111,7 +111,7 @@ let git_branch ?(filter=(fun _ -> true)) ?(remote=false) () =
 	(List.map
 	  (fun s -> String.sub s 2 ((String.length s) - 2))
 	  (read_lines ~env
-	    ~filter:(fun s -> String.length s > 2 && s <> "* (no branch)")
+	    ~filter:(fun s -> String.length s > 2 && raw_filter s && s <> "* (no branch)")
 	    (if remote then "git branch -r" else "git branch"))))
   with System.Error s -> log_error s
 
@@ -132,7 +132,7 @@ let git_track remote_branch =
 let git_current_branch () =
   let current =
     git_branch
-      ~filter:(fun s -> s.[0] = '*')
+      ~raw_filter:(fun s -> s.[0] = '*')
       ~remote:false ()
   in match current with
     | hd::[] -> Some hd
