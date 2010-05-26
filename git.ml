@@ -13,10 +13,10 @@ let git_pull ?refspec url =
     | Some spec -> log_command ~env "git" ["pull";url;spec]
     | None -> log_command ~env "git" ["pull";url]
 
-let git_fetch ?refspec ?(tags=false) url =
+let git_fetch ?repos ?(tags=false) url =
   let opts = if tags then ["--tags"] else [] in
-  match refspec with
-    | Some spec -> log_command ~env "git" (["fetch"] @ opts @ [url;spec])
+  match repos with
+    | Some r -> log_command ~env "git" (["fetch"] @ opts @ [r;url])
     | None -> log_command ~env "git" (["fetch"] @ opts @ [url])
 
 let git_push ?(tags=false) ?refspec url =
