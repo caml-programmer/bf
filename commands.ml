@@ -365,7 +365,7 @@ let update_pack ~tag component =
   let current_pack_branch =
     with_dir component.name git_current_branch in
 
-  if local_changes || !remote_changes then
+  let tag_changes =
     match current_pack_branch with
       | Some cur ->
 	  (match tag with
@@ -379,8 +379,8 @@ let update_pack ~tag component =
 	    | None -> true)
       | None ->
 	  raise Pack_current_branch_is_not_set
-  else false
-
+  in tag_changes (* || local_changes || !remote_changes *)
+      
 let status_component ?(max_component_length=0) ?(max_label_length=0) component =
   let build =
     Sys.file_exists
