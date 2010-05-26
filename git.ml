@@ -106,12 +106,13 @@ let git_branch ?(filter=(fun _ -> true)) ?(remote=false) () =
     with Not_found -> s
   in
   try
-    List.map branch_cleaner
-      (List.map
-	(fun s -> String.sub s 2 ((String.length s) - 2))
-	(read_lines ~env
-	  ~filter:(fun s -> String.length s > 2 && filter s && s <> "* (no branch)")
-	  (if remote then "git branch -r" else "git branch")))
+    List.filter filter
+      (List.map branch_cleaner
+	(List.map
+	  (fun s -> String.sub s 2 ((String.length s) - 2))
+	  (read_lines ~env
+	    ~filter:(fun s -> String.length s > 2 && s <> "* (no branch)")
+	    (if remote then "git branch -r" else "git branch"))))
   with System.Error s -> log_error s
 
 let strip_branch_prefix branch =
