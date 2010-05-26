@@ -372,8 +372,12 @@ let update_pack ~tag component =
 		    (match pkgname_of_tag tag with
 		      | Some pkgname ->
 			  let rex = Pcre.regexp pkgname in
-			  List.exists (Pcre.pmatch ~rex)
-			    (git_changes tag cur)
+			  (try
+			    List.exists (Pcre.pmatch ~rex)
+			      (git_changes tag cur)
+			  with Key_not_found key ->
+			    log_message (sprintf "Warning: git-key (%s) is not found in pack" key);
+			    true)
 		      | None -> true)
 		| None -> true)
 	  | None ->

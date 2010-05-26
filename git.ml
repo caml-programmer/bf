@@ -158,9 +158,23 @@ let git_diff ?(ignore=[]) ?key () =
 	     (String.length s - 2)) ignore))
        cmd
 
+let git_tag_list () =
+  try
+    read_lines ~env "git tag -l"
+  with System.Error s -> log_error s
+
+exception Key_not_found of string
+
+let git_check_tag l tag =
+  if not (List.mem tag l) then
+    raise (Key_not_found tag)  
+
 let git_changes key_a key_b =
+  let l = git_tag_list () in
+  git_check_tag l key_a;
+  git_check_tag l key_b;
   let cmd =
-    sprintf "git log '%s'..'%s'" key_a key_b in
+    sprintf "git log '%s'..'%s'" key_a key_b in  
   read_lines ~env cmd
 
 let git_changed key_a key_b =
@@ -179,11 +193,6 @@ let git_diff_view ~tag_a ~tag_b =
   with End_of_file ->
     close_in ch);
   Buffer.contents buf
-
-let git_tag_list () =
-  try
-    read_lines ~env "git tag -l"
-  with System.Error s -> log_error s
 
 let git_status () =
   try
