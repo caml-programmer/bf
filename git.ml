@@ -164,21 +164,25 @@ let git_tag_list () =
   with System.Error s -> log_error s
 
 let git_key_list () =
-  (git_branch ()) @ (git_tag_list ())
+  (git_branch ()) @ (git_branch ~remote:true ()) @ (git_tag_list ())
 
 exception Key_not_found of string
 
 let git_check_key l tag =
-  if not (List.mem tag l) then
-    raise (Key_not_found tag)  
+  let rex = Pcre.regexp "HEAD" in
+  if not (List.mem tag l) && not (Pcre.pmatch ~rex tag) then
+    raise (Key_not_found tag)
 
 let git_changes key_a key_b =
-  let l = git_key_list () in
-  git_check_key l key_a;
-  git_check_key l key_b;
   let cmd =
-    sprintf "git log '%s'..'%s'" key_a key_b in  
-  read_lines ~env cmd
+    sprintf "git log '%s'..'%s'" key_a key_b in
+  try
+    read_lines ~env cmd
+  with exn ->
+    let l = git_key_list () in
+    git_check_key l key_a;
+    git_check_key l key_b;
+    raise exn
 
 let git_changed key_a key_b =
   git_changes key_a key_b <> []
