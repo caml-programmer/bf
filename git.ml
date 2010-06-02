@@ -8,6 +8,12 @@ let env = Env.system ();;
 let git_clone url name =
   log_command ~env "git" ["clone";"-n";"-q";url;name]
 
+let git_add name =
+  log_command ~env "git" ["add";name]
+
+let git_commit msg =
+  log_command ~env "git" ["commit";"-m";msg]
+   
 let git_fetch ?refspec ?(tags=false) url =
   let opts = if tags then ["--tags"] else [] in
   match refspec with
@@ -115,6 +121,13 @@ let git_branch ?(filter=(fun _ -> true)) ?(raw_filter=(fun _ -> true)) ?(remote=
 	    (if remote then "git branch -r" else "git branch"))))
   with System.Error s -> log_error s
 
+let git_create_branch ?(start=None) s =
+  match start with
+    | Some start ->
+	log_command ~env "git" ["branch";s;start]
+    | None ->
+	log_command ~env "git" ["branch";s]
+	  
 let strip_branch_prefix branch =
   let len = String.length branch in
   let pos = String.index branch '/' in

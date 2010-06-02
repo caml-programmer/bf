@@ -77,7 +77,36 @@ let load_composite file =
   match !composite with
     | None -> log_error "composite handler is not called"
     | Some v -> v
-  
+
+let write_composite file components =
+  let ch = open_out file in
+  let out = output_string ch in
+  let write c =
+    out "(";
+    out c.Types.name;
+    (match c.Types.label with
+      | Types.Current -> ()
+      | Types.Branch s ->
+	  out " (branch \"";
+	  out s;
+	  out "\")";
+      | Types.Tag s ->
+	  out " (tag \"";
+	  out s;
+	  out "\")");
+    (match c.Types.pkg with
+      | None -> ()
+      | Some s ->
+	  out " (package \"";
+	  out s;
+	  out "\")");
+    out ")\n";
+  in
+  out "(define (composite)\n'(";
+  List.iter write components;
+  out "))\n";
+  close_out ch
+
 let components_of_composite composite =
   let composite = load_composite composite in
   let rec iter acc = function

@@ -1719,3 +1719,65 @@ let upgrade specdir upgrade_mode default_branch =
 		(fun s -> Hashtbl.replace mark_table s true) dep_path)
 	  (List.rev depends)
 	  
+let branch specdir src dst =
+  printf "Create new pack branch from %s to %s\n%!" src dst;
+
+  let dir = Filename.dirname in
+  let depends =
+    get_pack_depends ~default_branch:(Some src) (Hashtbl.create 32) [] specdir in
+
+  let pack_dir = dir (dir specdir) in
+
+  let change =
+    List.map
+      (fun c ->
+	let component_location =
+	  let s = Filename.concat pack_dir c.name in
+	  if Sys.file_exists s then s
+	  else s ^ ".git"
+	in
+	let make_new_branch ?start () =
+	  if not (List.mem dst (Git.git_branch ())) then
+	    Git.git_create_branch ~start dst;
+	  if not (List.mem (origin dst) (Git.git_branch ~remote:true ())) then
+	    begin
+	      Git.git_push ~refspec:dst ".";
+	      Git.git_pull "origin";
+	    end
+	in	
+	(match c.label with
+	  | Current ->
+	      printf "Warning: used current branch for %s component forking\n%!" c.name;
+	      with_dir 
+		component_location make_new_branch;
+	      { c with label = Branch dst }
+	  | Branch start ->
+	      with_dir component_location (make_new_branch ~start);
+	      { c with label = Branch dst }
+	  | Tag s ->
+	      printf "Warning: tag %s unchanged while %s component forking\n%!" s c.name;
+	      c))
+  in
+  let fork_pack_branch specdir =
+    let dstdir = Filename.concat (dir specdir) dst in
+    let composite = Filename.concat specdir "composite" in
+    let components = 
+      components_of_composite composite in
+    make_directory_r dstdir;
+    write_composite
+      (Filename.concat dstdir composite) (change components)
+  in
+
+  let update_pack () =
+    with_dir pack_dir
+      (fun () ->
+	Git.git_add ".";
+	Git.git_commit (sprintf "add new pack branch %s from %s" dst src));
+  in
+  
+  List.iter fork_pack_branch (List.rev depends);
+  update_pack ()
+  
+  
+  
+

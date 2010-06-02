@@ -17,6 +17,7 @@ let usage () =
   print_endline "   or: bf pack <specdir> <version> <release>";
   print_endline "   or: bf update <specdir> [lazy] [<version>] [<release>]";
   print_endline "   or: bf upgrade <specdir> [lazy|complete] [<branch>]";
+  print_endline "   or: bf branch <specdir> <source-branch> <new-branch>";
   print_endline "   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite|depends|packages]";
   print_endline "   or: bf tag <composite> <tag>";
   print_endline "   or: bf log <logdir>";
@@ -183,6 +184,10 @@ let main () =
 			    | _ -> usage ()))
 		| _ -> usage ()
 	    in Pack.upgrade Sys.argv.(2) upgrade_mode default_branch
+	| "branch" ->
+	    if len <> 5 then
+	      usage ()
+	    else Pack.branch Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	| "tag" ->
 	    if len = 4 then
 	      Commands.tag_composite Sys.argv.(2) Sys.argv.(3)
