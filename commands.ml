@@ -332,7 +332,54 @@ let pkgname_of_tag tag =
     Some (String.sub tag 0 (String.index tag '/'))
   with Not_found -> None
 
-let update_pack ~tag component =
+let pkgname_of_specdir specdir =
+  Filename.basename (Filename.dirname specdir)
+
+let branch_of_specdir s =
+  Filename.basename s
+
+let reg_pkg_release specdir ver rev =
+  let file = Filename.concat specdir "release" in
+  System.write_string
+    ~file ~string:(sprintf "%s %d\n" ver rev);
+  with_dir specdir
+    (fun () ->
+      Git.git_add file;
+      Git.git_commit ~empty:true
+	(sprintf "reg pkg release %s %s %s %d" 
+	  (Filename.basename (Filename.dirname specdir))
+	  (Filename.basename specdir) ver rev);
+      Git.git_push ".")
+
+exception Pkg_release_not_found of string
+
+let read_pkg_release ?(next=false) specdir =
+  let with_next n = if next then succ n else n in
+  let file = Filename.concat specdir "release" in
+  (try
+    if Sys.file_exists file then
+      let ch = open_in file in
+      let s = input_line ch in
+      let (ver,rev) =
+	let pos = String.index s ' ' in
+	String.sub s 0 pos,
+	(with_next
+	  (int_of_string
+	    (String.sub s (succ pos) (String.length s - pos - 1))))
+      in close_in ch; (ver,rev)
+    else raise Exit
+  with _ -> raise (Pkg_release_not_found specdir))
+
+let tag_of_specdir specdir =
+  try
+    let pkgname = pkgname_of_specdir specdir in
+    let branch = Filename.basename specdir in
+    let (ver,rev) = read_pkg_release specdir in
+    Some
+      (sprintf "%s/%s/%s-%d" pkgname branch ver rev)
+  with _ -> None
+
+let update_pack ~specdir component =
   let remote_changes = ref false in
   let local_changes =
     with_component_dir ~strict:false component
@@ -364,27 +411,22 @@ let update_pack ~tag component =
   in
 
   install_component component; (* need for create .bf-build and .bf-install *)
- 
+
   let tag_changes =
     with_dir component.name
       (fun () ->
 	match git_current_branch () with
 	  | Some cur ->
-	      (match tag with
+	      (match tag_of_specdir specdir with
 		  Some tag ->
-		    (match pkgname_of_tag tag with
-		      | Some pkgname ->
-			  let rex = Pcre.regexp pkgname in
-			  (try
-			    List.exists (Pcre.pmatch ~rex)
-			      (git_changes tag cur)
-			  with Key_not_found key ->
-			    log_message (sprintf "Warning: git-key (%s) is not found in pack" key);
-			    true)
-		      | None -> true)
+		    let rex = Pcre.regexp (pkgname_of_specdir specdir) in
+		    (try
+		      List.exists (Pcre.pmatch ~rex) (git_changes tag cur)
+		    with Key_not_found key ->
+		      log_message (sprintf "Warning: git-key (%s) is not found in pack" key);
+		      true)
 		| None -> true)
-	  | None ->
-	      raise Pack_current_branch_is_not_set)
+	  | None -> raise Pack_current_branch_is_not_set)
   in tag_changes (* || local_changes || !remote_changes *)
        
 let status_component ?(max_component_length=0) ?(max_label_length=0) component =

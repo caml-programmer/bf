@@ -11,8 +11,11 @@ let git_clone url name =
 let git_add name =
   log_command ~env "git" ["add";name]
 
-let git_commit msg =
-  log_command ~env "git" ["commit";"-m";msg]
+let git_commit ?(empty=false) msg =
+  if empty then
+    log_command ~env "git" ["commit";"--allow-empty";"-m";msg]
+  else
+    log_command ~env "git" ["commit";"-m";msg]
    
 let git_fetch ?refspec ?(tags=false) url =
   let opts = if tags then ["--tags"] else [] in

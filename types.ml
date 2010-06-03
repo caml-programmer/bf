@@ -44,7 +44,7 @@ type upgrade_mode =
   | Upgrade_lazy
   | Upgrade_complete
 
-let make_component s =
+let make_component ?(label=Current) s =
   { name = s; label = Current; pkg = None }
 
 

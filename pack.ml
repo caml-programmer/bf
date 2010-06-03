@@ -342,9 +342,6 @@ exception Cannot_find_pkgver of string
 exception Cannot_find_pkgrev of string
 exception Revision_must_be_digital of string
 
-let pkgname_of_specdir specdir =
-  Filename.basename (Filename.dirname specdir)
-      
 let pkgtrans_name_format s =
   try
     let pos = String.index s '-' in
@@ -837,8 +834,9 @@ let build_package_impl os platform args =
 			    (sprintf "bf list for (%s) is not found -> need installing" name);
 			  let tag =
 			    let k =
-			      sprintf "%s/%s-%s"
-				(pkgname_of_specdir specdir)
+			      sprintf "%s/%s/%s-%s"
+				(pkgname_of_specdir abs_specdir)
+				(branch_of_specdir abs_specdir)
 				version release
 			    in
 			    let tag_exists = ref false in
@@ -1329,31 +1327,36 @@ let build_package args =
 let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
   let specdir = System.path_strip_directory specdir in
   let pkgname = pkgname_of_specdir specdir in
-  let version =
-    match ver with
-      | Some v -> v
-      | None -> find_pkg_version ~interactive pkgname
-  in
-  let revision =
-    match rev with
-      | Some r -> (try int_of_string r with _ -> raise (Revision_must_be_digital r))
-      | None -> succ (find_pkg_revision ~interactive pkgname version)
-  in
-  let pkgname =
-    pkgname_of_specdir specdir in
+  let branch = branch_of_specdir specdir in
 
+  let have_pack_changes =
+    update_pack ~specdir (make_component ~label:(Branch "master") "pack") in
+
+  let (version,revision) =
+    (try
+      read_pkg_release ~next:true specdir
+    with Pkg_release_not_found _ ->
+      log_message (sprintf "Warning: Try using local pkg archive for search next package (%s %s) release" pkgname branch);
+      let ver' =
+	match ver with
+	  | Some v -> v
+	  | None -> find_pkg_version ~interactive pkgname
+      in
+      let rev' =
+	match rev with
+	  | Some r -> (try int_of_string r with _ -> raise (Revision_must_be_digital r))
+	  | None -> succ (find_pkg_revision ~interactive pkgname ver')
+      in (ver',rev'))
+  in
   let tag =
-    sprintf "%s/%s-%d" pkgname version revision in
+    sprintf "%s/%s/%s-%d" pkgname branch version revision in
   
   let old_tag =
     if  revision > 0 then
-      Some (sprintf "%s/%s-%d" pkgname version (pred revision))
+      Some (sprintf "%s/%s/%s-%d" pkgname branch version (pred revision))
     else None
   in
 
-  let have_pack_changes =
-    update_pack ~tag:old_tag (make_component "pack") in
-    
   let composite =
     Filename.concat specdir "composite" in
 
@@ -1361,6 +1364,9 @@ let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=No
     update_composite composite in
 
   let build () =
+    reg_pkg_release
+      specdir version revision;
+
     if not (tag_ready ~tag composite) then
       begin
 	install_composite composite;
@@ -1634,9 +1640,6 @@ type spectree =
   | Dval of (string * spectree)
   | Dlist of spectree list
 
-let branch_of_specdir s =
-  Filename.basename s
-
 let make_depends_tree ~default_branch specdir : spectree =
   let pkgdir =
     Filename.dirname (Filename.dirname specdir) in
@@ -1752,8 +1755,12 @@ let branch specdir src dst =
 		component_location make_new_branch;
 	      { c with label = Branch dst }
 	  | Branch start ->
-	      with_dir component_location (make_new_branch ~start);
-	      { c with label = Branch dst }
+	      if c.name = "pack" then c
+	      else
+		begin
+		  with_dir component_location (make_new_branch ~start);
+		  { c with label = Branch dst }
+		end
 	  | Tag s ->
 	      printf "Warning: tag %s unchanged while %s component forking\n%!" s c.name;
 	      c))
