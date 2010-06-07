@@ -1379,7 +1379,10 @@ let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=No
     
     (match old_tag with
       | Some old ->
-	  changelog_composite composite old tag
+	  (try
+	    changelog_composite composite old tag
+	  with exn ->
+	    log_message (Printexc.to_string exn))
       | None -> ());
     true
   in
@@ -1640,17 +1643,35 @@ type spectree =
   | Dval of (string * spectree)
   | Dlist of spectree list
 
-let make_depends_tree ~default_branch specdir : spectree =
+let make_depends_tree ~default_branch table specdir : spectree =
   let pkgdir =
     Filename.dirname (Filename.dirname specdir) in
   let rec make depth specdir =
     log_message (sprintf "%s resolve %s" (String.make depth ' ') specdir);
-    let depends =
-      List.map (fun (pkg,_,_) ->
-	specdir_of_pkg ~default_branch pkgdir pkg)
-	(make_depends ~ignore_last:true
-	  (Filename.concat specdir "depends")) in
-    Dval (specdir, Dlist (List.map (make (succ depth)) depends))
+    if Hashtbl.mem table specdir then
+      begin
+	log_message (sprintf "%s warning: %s already scanned" (String.make depth ' ') specdir);
+	Dval (specdir, Dlist [])
+      end
+    else
+      begin
+	Hashtbl.add table specdir false;
+	if Sys.file_exists specdir then
+	  let depfile = Filename.concat specdir "depends" in
+	  if Sys.file_exists depfile then
+	    let depends =
+	      List.fold_left (fun acc (pkg,_,_) ->
+		try
+		  acc @ [specdir_of_pkg ~default_branch pkgdir pkg]
+		with _ -> acc)
+		[] (make_depends ~ignore_last:true depfile)
+	    in
+	    Dval (specdir, Dlist (List.map (make (succ depth)) depends))
+	  else
+	    Dval (specdir, Dlist [])
+	else 
+	  Dval (specdir, Dlist [])
+      end
   in make 0 specdir
 
 type dep_path = string list
@@ -1666,7 +1687,7 @@ let upgrade specdir upgrade_mode default_branch =
 
   let deptree =
     log_message "make spec depends...";
-    make_depends_tree ~default_branch specdir in
+    make_depends_tree ~default_branch (Hashtbl.create 32) specdir in
   
   let build_table = Hashtbl.create 32 in
   let mark_table = Hashtbl.create 32 in
