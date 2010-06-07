@@ -834,11 +834,7 @@ let build_package_impl os platform args =
 			    (sprintf "bf list for (%s) is not found -> need installing" name);
 			  let tag =
 			    let k =
-			      sprintf "%s/%s/%s-%s"
-				(pkgname_of_specdir abs_specdir)
-				(branch_of_specdir abs_specdir)
-				version release
-			    in
+			      mk_tag (pkgname_of_specdir abs_specdir) version (int_of_string release) in
 			    let tag_exists = ref false in
 			    with_component_dir ~strict:false c
 			      (fun () -> 
@@ -1349,11 +1345,11 @@ let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=No
       in (ver',rev'))
   in
   let tag =
-    sprintf "%s/%s/%s-%d" pkgname branch version revision in
+    mk_tag pkgname version revision in
   
   let old_tag =
     if  revision > 0 then
-      Some (sprintf "%s/%s/%s-%d" pkgname branch version (pred revision))
+      Some (mk_tag pkgname version (pred revision))
     else None
   in
 

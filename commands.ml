@@ -370,13 +370,14 @@ let read_pkg_release ?(next=false) specdir =
     else raise Exit
   with _ -> raise (Pkg_release_not_found specdir))
 
+let mk_tag pkgname ver rev =
+  sprintf "%s/%s-%d" pkgname ver rev
+
 let tag_of_specdir specdir =
   try
     let pkgname = pkgname_of_specdir specdir in
-    let branch = Filename.basename specdir in
     let (ver,rev) = read_pkg_release specdir in
-    Some
-      (sprintf "%s/%s/%s-%d" pkgname branch ver rev)
+    Some (mk_tag pkgname ver rev)
   with _ -> None
 
 let update_pack ~specdir component =
