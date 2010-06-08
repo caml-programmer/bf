@@ -429,7 +429,11 @@ let update_pack ~specdir component =
 		  Some tag ->
 		    let rex = Pcre.regexp (pkgname_of_specdir specdir) in
 		    (try
-		      List.exists (fun s -> (Pcre.pmatch ~rex s) && not (is_release s)) (git_changes tag cur)
+		      List.exists (fun s ->
+			let r =
+			  (Pcre.pmatch ~rex s) && not (is_release s) in
+			log_message (sprintf "%s - %b" s r); r)
+			(git_changes tag cur)
 		    with Key_not_found key ->
 		      log_message (sprintf "Warning: git-key (%s) is not found in pack" key);
 		      true)
