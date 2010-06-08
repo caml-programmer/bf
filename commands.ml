@@ -427,11 +427,12 @@ let update_pack ~specdir component =
   in
 
   let tag_changes =
+    let tag' = tag_of_specdir specdir in
     with_dir component.name
       (fun () ->
 	match git_current_branch () with
 	  | Some cur ->
-	      (match tag_of_specdir specdir with
+	      (match tag' with
 		  Some tag ->
 		    let rex = Pcre.regexp (pkgname_of_specdir specdir) in
 		    (try
