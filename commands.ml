@@ -440,7 +440,9 @@ let update_pack ~specdir component =
 		    with Key_not_found key ->
 		      log_message (sprintf "Warning: git-key (%s) is not found in pack" key);
 		      true)
-		| None -> true)
+		| None -> 
+		    log_message (sprintf "Warning: cannot find current tag by specdir(%s)" specdir);
+		    true)
 	  | None -> raise Pack_current_branch_is_not_set)
   in tag_changes (* || local_changes || !remote_changes *)
        
