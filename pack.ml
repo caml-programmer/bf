@@ -1402,7 +1402,12 @@ let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=No
   if lazy_mode && not have_composite_changes && not have_pack_changes then
     (log_message "lazy update: noting to do"; false)
   else
-    build ()
+    begin    
+      log_message 
+	(sprintf "start update: lazy-mode(%b), composite-changes(%b), pack-changes(%b)"
+	  lazy_mode have_composite_changes have_pack_changes);
+      build ()
+    end
 
 (* Clone suport *)
 
