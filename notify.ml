@@ -159,6 +159,8 @@ object (self)
 
 end
 
+exception Smtp_error of string
+
 let send_message
   ?(smtp_server=(Params.get_param "smtp-server"))
   ?(smtp_port=(int_of_string (Params.get_param "smtp-port")))
@@ -218,8 +220,7 @@ let send_message
     smtp # quit ()
 
   with exn ->
-    error_message (string_of_exn exn);
-    exit 2
+    raise (Smtp_error (string_of_exn exn))
 
 let package_build_message ~host ~location ~pkgname ~storage =
   sprintf "Package %s/%s built on %s and copied to %s\n"
