@@ -1320,7 +1320,25 @@ let build_package args =
     (fun os platfrom ->
       build_package_impl os platfrom args)
 
+exception Bad_specdir of string
+
+let check_specdir specdir =
+  try
+    ignore(pkgname_of_specdir specdir);
+    ignore(branch_of_specdir specdir);
+    let p =
+      Filename.basename
+	(Filename.dirname 
+	  (Filename.dirname specdir)) in
+    if p <> "pack" && p <> "pack.git" then
+      raise (Bad_specdir specdir)
+  with _ ->
+    raise (Bad_specdir specdir)
+
 let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
+
+  check_specdir specdir;
+
   let specdir = System.path_strip_directory specdir in
   let pkgname = pkgname_of_specdir specdir in
   let branch = branch_of_specdir specdir in
@@ -1676,7 +1694,9 @@ exception Found_specdir of dep_path
 exception Bad_specdir of string
 
 let upgrade specdir upgrade_mode default_branch =
-  let specdir = System.path_strip_directory specdir in
+  check_specdir specdir;
+
+  let specdir = System.path_strip_directory specdir in  
   let depends =
     log_message "make pack depends...";
     get_pack_depends ~default_branch (Hashtbl.create 32) [] specdir in
