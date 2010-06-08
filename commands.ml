@@ -318,7 +318,10 @@ let update_component component =
 	  | Some start_key, None ->
 	      git_checkout ~force:true ~key:start_key ()
 	  | None, _ -> ())
-  in local_changes || !remote_changes || status_changes
+  in 
+  if component.name <> "pack" then
+    local_changes || !remote_changes || status_changes
+  else false
 
 let update components =
   List.exists (fun x -> x) (List.map update_component components)
