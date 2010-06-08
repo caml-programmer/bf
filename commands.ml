@@ -381,7 +381,10 @@ let tag_of_specdir specdir =
     let pkgname = pkgname_of_specdir specdir in
     let (ver,rev) = read_pkg_release specdir in
     Some (mk_tag pkgname ver rev)
-  with _ -> None
+  with exn -> log_message
+    (sprintf "Warning: cannot parse release file from %s by error (%s)" specdir
+      (Printexc.to_string exn));
+    None
 
 let update_pack ~specdir component =
   let remote_changes = ref false in
