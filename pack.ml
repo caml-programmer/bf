@@ -1689,7 +1689,6 @@ let make_depends_tree ~default_branch table specdir : spectree =
 type dep_path = string list
 
 exception Found_specdir of dep_path
-exception Bad_specdir of string
 
 let upgrade specdir upgrade_mode default_branch =
   let specdir = System.path_strip_directory specdir in
@@ -1746,6 +1745,8 @@ let upgrade specdir upgrade_mode default_branch =
 	  (fun specdir ->
 	    let (lazy_mode,dep_path) =
 	      eval_lazy_mode specdir in
+	    log_message (sprintf "lazy-mode is %b for %s, dep-path:" lazy_mode specdir);
+	    List.iter log_message dep_path;
 	    let updated =
 	      update
 		~specdir
