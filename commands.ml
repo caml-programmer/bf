@@ -413,6 +413,13 @@ let update_pack ~specdir component =
 
   install_component component; (* need for create .bf-build and .bf-install *)
 
+  let is_release s =
+    let x = "release" in
+    let sl = String.length s in
+    let xl = String.length x in
+    sl > xl && String.sub s (sl - xl) xl = x      
+  in
+
   let tag_changes =
     with_dir component.name
       (fun () ->
@@ -422,7 +429,7 @@ let update_pack ~specdir component =
 		  Some tag ->
 		    let rex = Pcre.regexp (pkgname_of_specdir specdir) in
 		    (try
-		      List.exists (Pcre.pmatch ~rex) (git_changes tag cur)
+		      List.exists (fun s -> (Pcre.pmatch ~rex s) && not (is_release s)) (git_changes tag cur)
 		    with Key_not_found key ->
 		      log_message (sprintf "Warning: git-key (%s) is not found in pack" key);
 		      true)

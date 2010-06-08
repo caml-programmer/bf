@@ -1336,10 +1336,10 @@ let check_specdir specdir =
     raise (Bad_specdir specdir)
 
 let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
-
+  let specdir = System.path_strip_directory specdir in
+  
   check_specdir specdir;
 
-  let specdir = System.path_strip_directory specdir in
   let pkgname = pkgname_of_specdir specdir in
   let branch = branch_of_specdir specdir in
 
@@ -1378,9 +1378,6 @@ let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=No
     update_composite composite in
 
   let build () =
-    reg_pkg_release
-      specdir version revision;
-
     if not (tag_ready ~tag composite) then
       begin
 	install_composite composite;
@@ -1390,6 +1387,7 @@ let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=No
     install_composite ~tag composite;
     build_package
       [specdir;version;string_of_int revision];
+    reg_pkg_release specdir version revision;
     
     (match old_tag with
       | Some old ->
@@ -1694,9 +1692,10 @@ exception Found_specdir of dep_path
 exception Bad_specdir of string
 
 let upgrade specdir upgrade_mode default_branch =
+  let specdir = System.path_strip_directory specdir in
+
   check_specdir specdir;
 
-  let specdir = System.path_strip_directory specdir in  
   let depends =
     log_message "make pack depends...";
     get_pack_depends ~default_branch (Hashtbl.create 32) [] specdir in
