@@ -339,16 +339,16 @@ let branch_of_specdir s =
   Filename.basename s
 
 let reg_pkg_release specdir ver rev =
-  let file = Filename.concat specdir "release" in
+  let name = "release" in
+  let file = Filename.concat specdir name in
   System.write_string
     ~file ~string:(sprintf "%s %d\n" ver rev);
   with_dir specdir
     (fun () ->
-      Git.git_add file;
+      Git.git_add name;
       Git.git_commit ~empty:true
 	(sprintf "reg pkg release %s %s %s %d" 
-	  (Filename.basename (Filename.dirname specdir))
-	  (Filename.basename specdir) ver rev);
+	  (pkgname_of_specdir specdir) (branch_of_specdir specdir) ver rev);
       Git.git_push ".")
 
 exception Pkg_release_not_found of string
