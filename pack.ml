@@ -519,8 +519,17 @@ let make_depends ?(interactive=false) ?(ignore_last=false) file =
 		      ignore(with_component_dir
 			~strict:false (make_component ~label:(Branch "master") "pack")
 			(fun () ->
+			  let branch = 
+			    branch_of_specdir (Filename.dirname file) in
+			  let specdir =
+			    sprintf "%s/%s"
+			      (match !pkg_name with
+				| Some s -> s
+				| None -> log_error (sprintf "some package name - not found in %s" file))
+			      branch
+			  in
 			  pkg_ver := Some (sprintf "%s-%d.%s" ver
-			    (snd (read_pkg_release ~version:ver (Filename.dirname file)))
+			    (snd (read_pkg_release ~version:ver specdir))
 			    (string_of_platform platform))))
 		    with exn ->
 		      log_message (sprintf "Warning: %s -> try using local pkg archive for search last pkg revision" (Printexc.to_string exn));
