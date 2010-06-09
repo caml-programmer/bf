@@ -1359,7 +1359,7 @@ let check_pack () =
 	| Some "master" -> ()
 	| _ ->
 	    Git.git_checkout
-	      ~force:true ~branch:"master" ();
+	      ~force:true ~key:"master" ();
 	    log_error "current pack branch is not master, bf fix it, try againg"))
 	      
 let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
