@@ -34,6 +34,8 @@ type platform =
 type platform_mapping =
     (string * ((string * platform) list)) list
 
+exception Permanent_error of string
+
 let engine_of_platform = function
   | Rhel3     -> Rpm_build
   | Rhel4     -> Rpm_build
@@ -758,7 +760,7 @@ let check_composite_depends spec =
 	(fun pkg ->
 	  log_message (sprintf "package (%s) is missing in depends file" pkg))
 	missings;
-      log_error "you must correct depends or composite files"
+      raise (Permanent_error "you must correct depends or composite files")
     end
 
 let rpm_key_format s =
@@ -1385,9 +1387,15 @@ let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=No
       end;
     
     install_composite ~tag composite;
-    build_package
-      [specdir;version;string_of_int revision];
-    reg_pkg_release specdir version revision;
+    (try
+      build_package
+	[specdir;version;string_of_int revision];
+      reg_pkg_release specdir version revision
+    with
+      | Permanent_error s ->
+	  reg_pkg_release specdir version revision;
+	  log_error s;
+      | exn -> log_error (Printexc.to_string exn));
     
     (match old_tag with
       | Some old ->
