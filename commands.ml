@@ -343,7 +343,7 @@ let branch_of_specdir s =
 
 let reg_pkg_release specdir ver rev =
   let name = "release" in
-  with_component_dir ~strict:false (make_component ~label:(Branch "master") "pack")
+  with_component_dir ~strict:true (make_component ~label:(Branch "master") "pack")
     (fun () ->
       let file = 
 	sprintf "%s/%s/%s" (pkgname_of_specdir specdir) (branch_of_specdir specdir) name in
@@ -389,7 +389,7 @@ let tag_of_specdir specdir =
 let update_pack ~specdir component =
   let remote_changes = ref false in
   let local_changes =
-    with_component_dir ~strict:false component
+    with_component_dir ~strict:true component
       (fun () ->
 	let repos =
 	  Filename.concat (git_create_url component) component.name in
