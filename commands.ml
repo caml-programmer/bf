@@ -344,11 +344,12 @@ let branch_of_specdir s =
 let reg_pkg_release specdir ver rev =
   let name = "release" in
   let file = Filename.concat specdir name in
-  System.write_string
-    ~file ~string:(sprintf "%s %d\n" ver rev);
-  with_dir specdir
+  with_component_dir ~strict:false (make_component ~label:(Branch "master") "pack")
     (fun () ->
-      Git.git_add name;
+      System.write_string ~file ~string:(sprintf "%s %d\n" ver rev);
+      Git.git_add (sprintf "%s/%s/%s" 
+	(pkgname_of_specdir specdir)
+	(branch_of_specdir specdir) name);
       Git.git_commit ~empty:true
 	(sprintf "reg pkg release %s %s %s %d" 
 	  (pkgname_of_specdir specdir) (branch_of_specdir specdir) ver rev);
