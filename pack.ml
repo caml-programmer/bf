@@ -515,12 +515,18 @@ let make_depends ?(interactive=false) ?(ignore_last=false) file =
 	      else
 		with_platform 
 		  (fun os platform ->
-		    pkg_ver := Some (sprintf "%s-%d.%s" ver
-		    (find_pkg_revision
-		      ~interactive
-		      (match !pkg_name with Some s -> s | None -> raise Not_found)
-		      ver)
-		      (string_of_platform platform)))
+		    (try
+		      ignore(with_component_dir
+			~strict:false (make_component ~label:(Branch "master") "pack")
+			(fun () ->
+			  pkg_ver := Some (sprintf "%s-%d.%s" ver
+			    (snd (read_pkg_release ~version:ver (Filename.dirname file)))
+			    (string_of_platform platform))))
+		    with exn ->
+		      log_message (sprintf "Warning: %s -> try using local pkg archive for search last pkg revision" (Printexc.to_string exn));
+		      pkg_ver := Some (sprintf "%s-%d.%s" ver
+			(find_pkg_revision ~interactive (match !pkg_name with Some s -> s | None -> raise Not_found) ver)
+			(string_of_platform platform))))
 	  | _ ->
 	      pkg_ver := Some ver)
       in
@@ -1358,9 +1364,15 @@ let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=No
   let have_pack_changes =
     update_pack ~specdir (make_component ~label:(Branch "master") "pack") in
 
+  let conv_revision r =
+    try int_of_string r with _ -> raise (Revision_must_be_digital r) in
   let (version,revision) =
     (try
-      read_pkg_release ~next:true specdir
+      (match ver with
+	| Some v ->
+	    v, (match rev with Some r -> conv_revision r | None -> log_error (sprintf "cannot update %s: revision does not set" pkgname))
+	| None ->
+	    read_pkg_release ~next:true specdir)
     with Pkg_release_not_found _ ->
       log_message (sprintf "Warning: Try using local pkg archive for search next package (%s %s) release" pkgname branch);
       let ver' =
@@ -1370,7 +1382,7 @@ let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=No
       in
       let rev' =
 	match rev with
-	  | Some r -> (try int_of_string r with _ -> raise (Revision_must_be_digital r))
+	  | Some r -> conv_revision r
 	  | None -> succ (find_pkg_revision ~interactive pkgname ver')
       in (ver',rev'))
   in

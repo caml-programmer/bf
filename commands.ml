@@ -347,7 +347,7 @@ let reg_pkg_release specdir ver rev =
     (fun () ->
       let file = 
 	sprintf "%s/%s/%s" (pkgname_of_specdir specdir) (branch_of_specdir specdir) name in
-      System.write_string ~file ~string:(sprintf "%s %d\n" ver rev);
+      System.append_write ~file (sprintf "%s %d\n" ver rev);
       Git.git_add file;
       Git.git_commit ~empty:true
 	(sprintf "reg pkg release %s %s %s %d" 
@@ -356,20 +356,35 @@ let reg_pkg_release specdir ver rev =
 
 exception Pkg_release_not_found of string
 
-let read_pkg_release ?(next=false) specdir =
+let rec last = function
+  | [] -> raise Not_found
+  | hd::[] -> hd
+  | hd::tl -> last tl
+     
+let read_pkg_release ?(next=false) ?version specdir =
   let with_next n = if next then succ n else n in
+  let make s =
+    let (ver,rev) =
+      let pos = String.index s ' ' in
+      String.sub s 0 pos,
+      (with_next
+	(int_of_string
+	  (String.sub s (succ pos) (String.length s - pos - 1))))
+    in (ver,rev)
+  in
+  let filter (v,r) =
+    match version with
+      | Some v' -> v' = v
+      | None -> true
+  in
   let file = Filename.concat specdir "release" in
   (try
     if Sys.file_exists file then
       let ch = open_in file in
-      let s = input_line ch in
-      let (ver,rev) =
-	let pos = String.index s ' ' in
-	String.sub s 0 pos,
-	(with_next
-	  (int_of_string
-	    (String.sub s (succ pos) (String.length s - pos - 1))))
-      in close_in ch; (ver,rev)
+      let vr =
+	last (List.filter filter 
+	  (List.map make (System.list_of_channel ch))) in
+      close_in ch; vr
     else raise Exit
   with _ -> raise (Pkg_release_not_found specdir))
 
