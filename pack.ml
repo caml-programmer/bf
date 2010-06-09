@@ -1337,6 +1337,16 @@ let check_specdir specdir =
   with _ ->
     raise (Bad_specdir specdir)
 
+let check_pack () =
+  with_component_dir ~strict:false (make_component "pack")
+    (fun () ->
+      (match Git.git_current_branch () with
+	| Some "master" -> ()
+	| _ ->
+	    Git.git_checkout
+	      ~force:true ~branch:"master" ();
+	    log_error "current pack branch is not master, bf fix it, try againg"))
+	      
 let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
   let specdir = System.path_strip_directory specdir in
   
@@ -1707,6 +1717,7 @@ let upgrade specdir upgrade_mode default_branch =
   let specdir = System.path_strip_directory specdir in
 
   check_specdir specdir;
+  check_pack ();
 
   let depends =
     log_message "make pack depends...";
