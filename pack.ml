@@ -1582,7 +1582,7 @@ let rec get_depends ?(overwrite=false) table acc userhost pkg_path =
 	    if ver <> ver' || rev <> rev' then
 	      begin
 		log_message
-		  (sprintf "Already registerd: ver(%s)/rev(%d) and next found: ver(%s)/rev(%d) not equivalent." ver' rev' ver rev);
+		  (sprintf "Already registered: pkg(%s) ver(%s)/rev(%d) and next found: ver(%s)/rev(%d) not equivalent." pkg_name ver' rev' ver rev);
 		raise (Cannot_resolve_dependes pkg_path)
 	      end
 	    else (Dep_list [])
