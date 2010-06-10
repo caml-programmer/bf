@@ -1356,10 +1356,12 @@ let check_pack () =
   with_component_dir ~strict:false (make_component "pack")
     (fun () ->
       (match Git.git_current_branch () with
-	| Some "master" -> ()
+	| Some "master" ->
+	    Git.git_pull ".";
 	| _ ->
 	    Git.git_checkout
 	      ~force:true ~key:"master" ();
+	    Git.git_pull ".";
 	    log_error "current pack branch is not master, bf fix it, try againg"))
 	      
 let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
