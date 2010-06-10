@@ -16,7 +16,7 @@ let rules_file () =
 let load_plugins () =
   if debug then
     print_string "load ac-configure...";
-  Scheme.eval_code (fun _ -> print_endline "ok") "
+  Scheme.eval_code (fun _ -> if debug then print_endline "ok") "
 (define-syntax ac-configure
   (syntax-rules ()
     ((_ (e1 e2) ...) (ml-ac-configure `((e1 ,e2) ...)))
@@ -28,7 +28,7 @@ let load_plugins () =
 ";
   if debug then
     print_string "load make...";
-  Scheme.eval_code (fun _ -> print_endline "ok") "
+  Scheme.eval_code (fun _ -> if debug then print_endline "ok") "
 (define-syntax make
   (syntax-rules ()
     ((_ (e) (e1 e2) ...) (ml-make `((e ()) (e1 ,e2) ...)))
@@ -41,7 +41,7 @@ let load_plugins () =
 
   if debug then
     print_string "load export...";
-  Scheme.eval_code (fun _ -> print_endline "ok") "
+  Scheme.eval_code (fun _ -> if debug then print_endline "ok") "
 (define-syntax export
   (syntax-rules ()
     ((_ (e1 e2) ...) (ml-export `((e1 ,e2) ...)))
@@ -53,7 +53,7 @@ let load_plugins () =
 
   if debug then
     print_string "load update-make-params...";
-  Scheme.eval_code (fun _ -> print_endline "ok") "
+  Scheme.eval_code (fun _ -> if debug then print_endline "ok") "
 (define-syntax update-make-params
   (syntax-rules ()
     ((_ (e) (e1 e2) ...) (ml-update-make-params `((e ()) (e1 ,e2) ...)))
@@ -70,13 +70,13 @@ let load_plugins () =
       Filename.concat start dir
   in
   if not (System.is_regular (Filename.concat plugdir "lib.scm")) then
-    print_endline "skip"
+    if debug then print_endline "skip"
   else    
     begin
       System.with_extension "scm"
 	Scheme.eval_file
 	(System.with_prefix plugdir (System.list_of_directory plugdir));
-      print_endline "ok";
+      if debug then print_endline "ok";
     end
 
 let load_composite file =
