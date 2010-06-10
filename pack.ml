@@ -1580,7 +1580,11 @@ let rec get_depends ?(overwrite=false) table acc userhost pkg_path =
 	  begin
 	    let (ver',rev') = Hashtbl.find table pkg_name in
 	    if ver <> ver' || rev <> rev' then
-	      raise (Cannot_resolve_dependes pkg_path)
+	      begin
+		log_message
+		  (sprintf "Already registerd: ver(%s)/rev(%d) and next found: ver(%s)/rev(%d) not equivalent." ver' rev' ver rev);
+		raise (Cannot_resolve_dependes pkg_path)
+	      end
 	    else (Dep_list [])
 	  end
 	else
