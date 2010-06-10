@@ -1357,11 +1357,11 @@ let check_pack () =
     (fun () ->
       (match Git.git_current_branch () with
 	| Some "master" ->
-	    Git.git_pull ".";
+	    Git.git_pull "origin";
 	| _ ->
 	    Git.git_checkout
 	      ~force:true ~key:"master" ();
-	    Git.git_pull ".";
+	    Git.git_pull "origin";
 	    log_error "current pack branch is not master, bf fix it, try againg"))
 	      
 let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
