@@ -1352,22 +1352,25 @@ let check_specdir specdir =
   with _ ->
     raise (Bad_specdir specdir)
 
-let check_pack () =
-  with_component_dir ~strict:false (make_component "pack")
-    (fun () ->
-      (match Git.git_current_branch () with
-	| Some "master" ->
-	    Git.git_pull ~tags:true "origin";
-	| _ ->
-	    Git.git_checkout
-	      ~force:true ~key:"master" ();
-	    Git.git_pull ~tags:true "origin";
-	    log_error "current pack branch is not master, bf fix it, try againg"))
+let check_pack_component () =
+  ignore 
+    (with_component_dir ~strict:false (make_component "pack")
+      (fun () ->
+	(match Git.git_current_branch () with
+	  | Some "master" ->
+	      Git.git_pull ~tags:true "origin";
+	  | _ ->
+	      Git.git_checkout
+		~force:true ~key:"master" ();
+	      Git.git_pull ~tags:true "origin";
+	      log_error "current pack branch is not master, bf fix it, try againg")))
 	      
-let update ~specdir ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
+let update ~specdir ?(check_pack=true) ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
   let specdir = System.path_strip_directory specdir in
   
   check_specdir specdir;
+  if check_pack then
+    check_pack_component ();
 
   let pkgname = pkgname_of_specdir specdir in
   let branch = branch_of_specdir specdir in
@@ -1789,7 +1792,7 @@ let upgrade specdir upgrade_mode default_branch =
   let specdir = System.path_strip_directory specdir in
 
   check_specdir specdir;
-  check_pack ();
+  check_pack_component ();
 
   let deptree =
     log_message "make spec depends...";
@@ -1830,12 +1833,12 @@ let upgrade specdir upgrade_mode default_branch =
     | Upgrade_full ->
 	List.iter
 	  (fun specdir ->
-	    ignore(update ~specdir ~lazy_mode:false ~interactive:true ()))
+	    ignore(update ~specdir ~check_pack:false ~lazy_mode:false ~interactive:true ()))
 	  depends
     | Upgrade_lazy ->
 	List.iter
 	  (fun specdir ->
-	    ignore(update ~specdir ~lazy_mode:true ~interactive:true ()))
+	    ignore(update ~specdir ~check_pack:false ~lazy_mode:true ~interactive:true ()))
 	  depends
     | Upgrade_complete ->
 	List.iter
@@ -1848,6 +1851,7 @@ let upgrade specdir upgrade_mode default_branch =
 	      update
 		~specdir
 		~lazy_mode
+		~check_pack:false
 		~interactive:true ()
 	    in
 	    Hashtbl.replace build_table specdir updated;
