@@ -1831,12 +1831,12 @@ let upgrade specdir upgrade_mode default_branch =
 	List.iter
 	  (fun specdir ->
 	    ignore(update ~specdir ~lazy_mode:false ~interactive:true ()))
-	  (List.rev depends)
+	  depends
     | Upgrade_lazy ->
 	List.iter
 	  (fun specdir ->
 	    ignore(update ~specdir ~lazy_mode:true ~interactive:true ()))
-	  (List.rev depends)
+	  depends
     | Upgrade_complete ->
 	List.iter
 	  (fun specdir ->
@@ -1854,7 +1854,7 @@ let upgrade specdir upgrade_mode default_branch =
 	    if updated then
 	      List.iter
 		(fun s -> Hashtbl.replace mark_table s true) dep_path)
-	  (List.rev depends)
+	  depends
 	  
 let branch specdir src dst =
   printf "Create new pack branch from %s to %s\n%!" src dst;
