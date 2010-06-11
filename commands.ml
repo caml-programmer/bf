@@ -352,7 +352,7 @@ let reg_pkg_release specdir ver rev =
       Git.git_commit ~empty:true
 	(sprintf "reg pkg release %s %s %s %d" 
 	  (pkgname_of_specdir specdir) (branch_of_specdir specdir) ver rev);
-      Git.git_push ".")
+      Git.git_push "origin")
 
 exception Pkg_release_not_found of string
 
