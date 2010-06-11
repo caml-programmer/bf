@@ -1702,19 +1702,20 @@ let rec get_pack_depends ~default_branch table acc specdir =
 	(specdir::(List.flatten (List.map (fun pkg -> (get_pack_depends ~default_branch table [] (specdir_of_pkg ~default_branch pkgdir pkg))) l)))
 
 type spectree =
-  | Dval of (string * spectree)
+  | Dval of ((string * int) * spectree)
   | Dlist of spectree list
 
-let make_depends_tree ~default_branch table specdir : spectree =
+let make_depends_tree ~default_branch specdir : spectree =
+  let table = Hashtbl.create 32 in
   let pkgdir =
     Filename.dirname (Filename.dirname specdir) in
-  let rec make depth specdir =
-    log_message (sprintf "%s resolve %s" (String.make depth ' ') specdir);
+  let warning depth specdir =
+    log_message (sprintf "%s warning: %s already scanned" (String.make depth ' ') specdir) in
+  let resolve depth specdir =
+    log_message (sprintf "%s resolve %s" (String.make depth ' ') specdir) in
+  let rec make depth specdir =    
     if Hashtbl.mem table specdir then
-      begin
-	log_message (sprintf "%s warning: %s already scanned" (String.make depth ' ') specdir);
-	Dval (specdir, Dlist [])
-      end
+      raise Exit
     else
       begin
 	Hashtbl.add table specdir false;
@@ -1724,15 +1725,32 @@ let make_depends_tree ~default_branch table specdir : spectree =
 	    let depends =
 	      List.fold_left (fun acc (pkg,_,_) ->
 		try
-		  acc @ [specdir_of_pkg ~default_branch pkgdir pkg]
+		  let new_specdir = 
+		    specdir_of_pkg ~default_branch pkgdir pkg in
+		  if Hashtbl.mem table new_specdir then
+		    begin
+		      log_message (sprintf "%s warning: %s already scanned" (String.make (succ depth) ' ') new_specdir);
+		      acc
+		    end
+		  else
+		    acc @ [new_specdir]
 		with _ -> acc)
 		[] (make_depends ~ignore_last:true depfile)
 	    in
-	    Dval (specdir, Dlist (List.map (make (succ depth)) depends))
+	    resolve depth specdir;
+	    Dval ((specdir,depth), Dlist 
+	      (List.fold_left
+		(fun acc specdir -> (try acc @ [make (succ depth) specdir] with Exit -> acc)) [] depends))
 	  else
-	    Dval (specdir, Dlist [])
-	else 
-	  Dval (specdir, Dlist [])
+	    begin
+	      resolve depth specdir;
+	      Dval ((specdir,depth), Dlist [])
+	    end
+	else
+	  begin
+	    resolve depth specdir;
+	    Dval ((specdir,depth), Dlist [])
+	  end
       end
   in make 0 specdir
 
@@ -1740,26 +1758,54 @@ type dep_path = string list
 
 exception Found_specdir of dep_path
 
+let list_of_deptree tree =
+  let rec make = function
+    | Dval (x, Dlist l) ->
+	(List.flatten (List.map make l)) @ [x]
+    | Dlist l -> assert false
+    | Dval (specdir', Dval _) -> assert false
+  in make tree
+
+let resort_depends l =
+  log_message "before resort depends...";
+  List.iter (fun x -> print_endline (fst x)) l;
+  let compare (pa,da,_) (pb,db,_) =
+    let r = compare db da in
+    if r = 0 then
+      compare pb pa
+    else r
+  in
+  let a =
+    Array.mapi
+      (fun pos (e,depth) ->
+	(pos,depth,e))
+      (Array.of_list l)
+  in Array.sort compare a;
+  List.map
+    (fun (_,_,e) -> e)
+    (Array.to_list a)
+
 let upgrade specdir upgrade_mode default_branch =
   let specdir = System.path_strip_directory specdir in
 
   check_specdir specdir;
   check_pack ();
 
-  let depends =
-    log_message "make pack depends...";
-    get_pack_depends ~default_branch (Hashtbl.create 32) [] specdir in
-
   let deptree =
     log_message "make spec depends...";
-    make_depends_tree ~default_branch (Hashtbl.create 32) specdir in
+    make_depends_tree ~default_branch specdir in
+
+  let depends =
+    resort_depends (list_of_deptree deptree) in
+  log_message "after resort depends...";
+  List.iter print_endline depends;  
   
   let build_table = Hashtbl.create 32 in
   let mark_table = Hashtbl.create 32 in
 
   let find_specdir specdir =
       let rec make acc = function
-	| Dval (specdir', Dlist l) ->
+	| Dval ((specdir',depth), Dlist l) ->
 	    if specdir = specdir' then
 	      raise (Found_specdir (List.rev acc))
 	    else List.iter (make (specdir'::acc)) l
