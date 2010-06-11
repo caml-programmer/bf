@@ -347,6 +347,7 @@ let reg_pkg_release specdir ver rev =
     (fun () ->
       let file = 
 	sprintf "%s/%s/%s" (pkgname_of_specdir specdir) (branch_of_specdir specdir) name in
+      Git.git_pull "origin";
       System.append_write ~file (sprintf "%s %d\n" ver rev);
       Git.git_add file;
       Git.git_commit ~empty:true
