@@ -26,10 +26,14 @@ let git_fetch ?refspec ?(tags=false) url =
 let git_merge remote =
   log_command ~env "git" ["merge";remote]
 
-let git_pull ?refspec url =
+let git_pull ?(tags=false) ?refspec url =
   match refspec with
-    | Some spec -> log_command ~env "git" ["pull";url;spec]
-    | None -> log_command ~env "git" ["pull";url]
+    | Some spec -> 
+	let opts = if tags then ["--tags"] else [] in
+	log_command ~env "git" (["pull"] @ opts @ [url;spec])
+    | None ->
+	let opts = if tags then ["--tags"] else [] in
+	log_command ~env "git" (["pull"] @ opts @ [url])
 
 let git_push ?(tags=false) ?refspec url =
   match refspec with
