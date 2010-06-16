@@ -1382,10 +1382,14 @@ let update ~specdir ?(check_pack=true) ?(lazy_mode=false) ?(interactive=false) ?
 
   let conv_revision r =
     try int_of_string r with _ -> raise (Revision_must_be_digital r) in
+
+  let custom_revision = ref false in
+  
   let (version,revision) =
     (try
       (match ver with
 	| Some v ->
+	    (* custom_revision := true; *)
 	    v, (match rev with Some r -> conv_revision r | None -> log_error (sprintf "cannot update %s: revision does not set" pkgname))
 	| None ->
 	    read_pkg_release ~next:true specdir)
@@ -1428,10 +1432,12 @@ let update ~specdir ?(check_pack=true) ?(lazy_mode=false) ?(interactive=false) ?
     (try
       build_package
 	[specdir;version;string_of_int revision];
-      reg_pkg_release specdir version revision
+      if not !custom_revision then
+	ignore(reg_pkg_release specdir version revision)
     with
       | Permanent_error s ->
-	  reg_pkg_release specdir version revision;
+	  if not !custom_revision then
+	    ignore(reg_pkg_release specdir version revision);
 	  log_error s;
       | exn -> log_error (Printexc.to_string exn));
     
@@ -1459,8 +1465,9 @@ let update ~specdir ?(check_pack=true) ?(lazy_mode=false) ?(interactive=false) ?
 
 type pack_branch = string
 
+type dep_val = string * pack_branch * Types.version * Types.revision * string
 type dep_tree =
-  | Dep_val of (string * pack_branch * version * revision * string)
+  | Dep_val of dep_val
   | Dep_list of dep_tree list
 
 exception Cannot_extract_arch of string
@@ -1527,85 +1534,90 @@ let extract_name rest pkg =
     String.sub pkg 0 (String.length pkg - String.length rest)
   with _ -> raise (Cannot_extract_pkgname pkg)    
 
-let rec get_depends ?(overwrite=false) table acc userhost pkg_path =
+let rec get_depends ?(overwrite=false) userhost pkg_path =
   log_message (sprintf "resolve %s" pkg_path);
-  let pkg_dir = Filename.dirname pkg_path in
-  let pkg = Filename.basename pkg_path in
-  let platform = extract_platform pkg in
-  let extension = extract_extension pkg in
-  let arch = extract_arch pkg in
-  let revision =
-    extract_revision (sprintf ".%s.%s.%s" (string_of_platform platform) arch extension) pkg in
-  let version = 
-    extract_version (sprintf "-%d.%s.%s.%s" revision (string_of_platform platform) arch extension) pkg in
-  let pkg_name =
-    extract_name (sprintf "-%s-%d.%s.%s.%s" version revision (string_of_platform platform) arch extension) pkg in
-  let pack_branch =
-    match (System.read_lines
-      ~filter:(fun s -> 
-	Pcre.pmatch ~pat:"packbranch-" s)
-      (sprintf "ssh %s rpm -qp --provides %s" userhost pkg_path))
-    with [] -> raise (Pack_branch_is_not_found pkg_path)
-      | hd::_ ->
-	  let pos = String.index hd '-' in
-	  let len = 
-	    try
-	      String.index hd ' '	      
-	    with Not_found -> String.length hd
-	  in
-	  String.sub hd (succ pos) (len - pos - 1)
-  in
-  let current =
-    if overwrite then
-      [Dep_val (pkg_name,pack_branch,version,revision,pkg_path)]
-    else
-      with_platform 
-	(fun os platform ->
-	  let cur_pkg_name = 
-	    sprintf "%s-%s-%d.%s.%s.%s" 
-	      pkg_name version revision (string_of_platform platform) (System.arch ()) extension in
-	  if Sys.file_exists cur_pkg_name then
+
+  let table = Hashtbl.create 32 in
+
+  let rec make acc pkg_path =
+    let pkg_dir = Filename.dirname pkg_path in
+    let pkg = Filename.basename pkg_path in
+    let platform = extract_platform pkg in
+    let extension = extract_extension pkg in
+    let arch = extract_arch pkg in
+    let revision =
+      extract_revision (sprintf ".%s.%s.%s" (string_of_platform platform) arch extension) pkg in
+    let version = 
+      extract_version (sprintf "-%d.%s.%s.%s" revision (string_of_platform platform) arch extension) pkg in
+    let pkg_name =
+      extract_name (sprintf "-%s-%d.%s.%s.%s" version revision (string_of_platform platform) arch extension) pkg in
+    let pack_branch =
+      match (System.read_lines
+	~filter:(fun s -> 
+	  Pcre.pmatch ~pat:"packbranch-" s)
+	(sprintf "ssh %s rpm -qp --provides %s" userhost pkg_path))
+      with [] -> raise (Pack_branch_is_not_found pkg_path)
+	| hd::_ ->
+	    let pos = String.index hd '-' in
+	    let len = 
+	      try
+		String.index hd ' '	      
+	      with Not_found -> String.length hd
+	    in
+	    String.sub hd (succ pos) (len - pos - 1)
+    in
+    let current =
+      if overwrite then
+	[Dep_val (pkg_name,pack_branch,version,revision,pkg_path)]
+      else
+	with_platform 
+	  (fun os platform ->
+	    let cur_pkg_name = 
+	      sprintf "%s-%s-%d.%s.%s.%s" 
+		pkg_name version revision (string_of_platform platform) (System.arch ()) extension in
+	    if Sys.file_exists cur_pkg_name then
+	      begin
+		log_message (sprintf "\tpackage %s/%s already exists" (Sys.getcwd ()) cur_pkg_name);
+		[]
+	      end
+	    else
+	      [Dep_val (pkg_name,pack_branch,version,revision,pkg_path)])
+    in
+    let rex = 
+      Pcre.regexp "([^\\ ]+)\\s+=\\s+([^-]+)-(\\d+)\\." in
+    Dep_list
+      (current @ (List.map
+	(fun s ->
+	  let a = Pcre.extract ~rex s in
+	  let pkg_name = a.(1) in
+	  let ver = a.(2) in
+	  let rev = try int_of_string a.(3) with _ -> raise (Cannot_extract_revision pkg_path) in
+	  if Hashtbl.mem table pkg_name then
 	    begin
-	      log_message (sprintf "\tpackage %s/%s already exists" (Sys.getcwd ()) cur_pkg_name);
-	      []
+	      let (ver',rev') = Hashtbl.find table pkg_name in
+	      if ver <> ver' || rev <> rev' then
+		begin
+		  log_message
+		    (sprintf "Already registered: pkg(%s) ver(%s)/rev(%d) and next found: ver(%s)/rev(%d) not equivalent." pkg_name ver' rev' ver rev);
+		  raise (Cannot_resolve_dependes pkg_path)
+		end
+	      else (Dep_list [])
 	    end
 	  else
-	    [Dep_val (pkg_name,pack_branch,version,revision,pkg_path)])
-  in
-  let rex = 
-    Pcre.regexp "([^\\ ]+)\\s+=\\s+([^-]+)-(\\d+)\\." in
-  Dep_list
-    (current @ (List.map
-      (fun s ->
-	let a = Pcre.extract ~rex s in
-	let pkg_name = a.(1) in
-	let ver = a.(2) in
-	let rev = try int_of_string a.(3) with _ -> raise (Cannot_extract_revision pkg_path) in
-	if Hashtbl.mem table pkg_name then
-	  begin
-	    let (ver',rev') = Hashtbl.find table pkg_name in
-	    if ver <> ver' || rev <> rev' then
-	      begin
-		log_message
-		  (sprintf "Already registered: pkg(%s) ver(%s)/rev(%d) and next found: ver(%s)/rev(%d) not equivalent." pkg_name ver' rev' ver rev);
-		raise (Cannot_resolve_dependes pkg_path)
-	      end
-	    else (Dep_list [])
-	  end
-	else
-	  begin
-	    let new_pkg_path =
-	      sprintf "%s/%s-%s-%d.%s.%s.%s" pkg_dir pkg_name ver rev
+	    begin
+	      let new_pkg_path =
+		sprintf "%s/%s-%s-%d.%s.%s.%s" pkg_dir pkg_name ver rev
 		(string_of_platform platform) arch extension in
-	    Hashtbl.add table pkg_name (ver,rev);
-	    Dep_list 
-	      [(get_depends ~overwrite table (Dep_list []) userhost new_pkg_path); acc]
-	  end)
-      (System.read_lines
-	~filter:(fun s -> 
-	  Pcre.pmatch ~pat:"jet" s && Pcre.pmatch ~rex s)
-	(sprintf "ssh %s rpm -qRp %s" userhost pkg_path))))
-
+	      Hashtbl.add table pkg_name (ver,rev);
+	      Dep_list 
+		[(make (Dep_list []) new_pkg_path); acc]
+	    end)
+	(System.read_lines
+	  ~filter:(fun s -> 
+	    Pcre.pmatch ~pat:"jet" s && Pcre.pmatch ~rex s)
+	  (sprintf "ssh %s rpm -qRp %s" userhost pkg_path))))
+  in make (Dep_list []) pkg_path
+       
 let rec print_depends depth = function
   | Dep_list l ->
       List.iter (fun v -> print_depends (succ depth) v) l
@@ -1631,27 +1643,43 @@ let rec download_packages userhost = function
       Rules.send_file_over_ssh src "."
 
 let list_of_depends deps =
-  let rec make acc = function
+  let rec make depth acc = function
     | Dep_list l -> 
-	acc @ List.flatten (List.map (make []) l)
-    | Dep_val  v -> acc @ [v]
-  in make [] deps      
+	acc @ List.flatten (List.map (make (succ depth) []) l)
+    | Dep_val  v -> acc @ [(v,depth)]
+  in make 0 [] deps
+
+let resort_depends l =
+  let compare (pa,da,_) (pb,db,_) =
+    let r = compare db da in
+    if r = 0 then
+      compare pb pa
+    else r
+  in
+  let a =
+    Array.mapi
+      (fun pos (e,depth) ->
+	(pos,depth,e))
+      (Array.of_list l)
+  in Array.sort compare a;
+  List.map
+    (fun (_,_,e) -> e)
+    (Array.to_list a)
 
 let clone userhost pkg_path mode =
-  let table = Hashtbl.create 32 in
   let overwrite = mode <> "default" in
   let depends =
-    get_depends ~overwrite table (Dep_list []) userhost pkg_path in
+    get_depends ~overwrite userhost pkg_path in
 
   print_endline "Depends Tree:";
   print_depends 0 depends;
   match mode with
-    | "overwrite" -> clone_packages (List.rev (list_of_depends depends))
+    | "overwrite" -> clone_packages (resort_depends (list_of_depends depends))
     | "depends"   ->
 	print_endline "Build Order:";
-	List.iter print_dep_val (List.rev (list_of_depends depends))
+	List.iter print_dep_val (resort_depends (list_of_depends depends))
     | "packages"  -> download_packages userhost depends
-    | _           -> clone_packages (List.rev (list_of_depends depends))
+    | _           -> clone_packages (resort_depends (list_of_depends depends))
 
 let pack_branches pkgdir =
   List.filter (fun s -> s <> "hooks.scm")
@@ -1770,25 +1798,6 @@ let list_of_deptree tree =
     | Dlist l -> assert false
     | Dval (specdir', Dval _) -> assert false
   in make tree
-
-let resort_depends l =
-  log_message "before resort depends...";
-  List.iter (fun x -> print_endline (fst x)) l;
-  let compare (pa,da,_) (pb,db,_) =
-    let r = compare db da in
-    if r = 0 then
-      compare pb pa
-    else r
-  in
-  let a =
-    Array.mapi
-      (fun pos (e,depth) ->
-	(pos,depth,e))
-      (Array.of_list l)
-  in Array.sort compare a;
-  List.map
-    (fun (_,_,e) -> e)
-    (Array.to_list a)
 
 let upgrade specdir upgrade_mode default_branch =
   let specdir = System.path_strip_directory specdir in
