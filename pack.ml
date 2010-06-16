@@ -1676,7 +1676,10 @@ let clone userhost pkg_path mode =
   match mode with
     | "overwrite" -> clone_packages (resort_depends (list_of_depends depends))
     | "depends"   ->
-	print_endline "Build Order:";
+	print_endline "Before Resort Order:";
+	List.iter (fun (x,depth) -> printf "%02d" depth; print_string " "; print_dep_val x) (list_of_depends depends);
+	  
+	print_endline "After Resort Order:";
 	List.iter print_dep_val (resort_depends (list_of_depends depends))
     | "packages"  -> download_packages userhost depends
     | _           -> clone_packages (resort_depends (list_of_depends depends))
