@@ -1461,15 +1461,58 @@ let update ~specdir ?(check_pack=true) ?(lazy_mode=false) ?(interactive=false) ?
       build ()
     end
 
+(* Depend tree support *)
+
+type 'a deptree =
+  | Dep_val of 'a * 'a deptree
+  | Dep_list of 'a deptree list
+
+let list_of_deptree tree =
+  let rec make depth = function
+    | Dep_val (x, Dep_list l) -> (List.flatten (List.map (make (succ depth)) l)) @ [x,depth]
+    | _ -> assert false
+  in make 0 tree
+
+let resort_depends l =
+  let compare (pa,da,_) (pb,db,_) =
+    let r = compare db da in
+    if r = 0 then
+      compare pb pa
+    else r
+  in
+  let a =
+    Array.mapi
+      (fun pos (e,depth) ->
+	(pos,depth,e))
+      (Array.of_list l)
+  in Array.sort compare a;
+  List.map
+    (fun (_,_,e) -> e)
+    (Array.to_list a)
+
+let max_uniquely l =
+  let m = Hashtbl.create 32 in
+  List.iter (fun (k,v) ->
+    try
+      let c = Hashtbl.find m k in
+      if v > c then
+	Hashtbl.replace m k v
+    with Not_found -> Hashtbl.add m k v) l;
+  List.filter
+    (fun (k,v) -> Hashtbl.find m k = v) l
+
 (* Clone suport *)
 
 type pack_branch = string
 
-type dep_val = string * pack_branch * Types.version * Types.revision * string
-type dep_tree =
-  | Dep_val of dep_val
-  | Dep_list of dep_tree list
+type clone_val = string * pack_branch * Types.version * Types.revision * string
 
+type clone_tree =
+    clone_val deptree
+
+type string_tree =
+    string deptree
+     
 exception Cannot_extract_arch of string
 exception Cannot_extract_platform of string
 exception Cannot_resolve_dependes of string
@@ -1532,98 +1575,117 @@ let extract_version rest pkg_name =
 let extract_name rest pkg =
   try
     String.sub pkg 0 (String.length pkg - String.length rest)
-  with _ -> raise (Cannot_extract_pkgname pkg)    
+  with _ -> raise (Cannot_extract_pkgname pkg)
 
-let rec get_depends ?(overwrite=false) userhost pkg_path =
+let new_only e =
+  let (pkg_name,pack_branch,version,revision,pkg_path) = e in
+  with_platform 
+    (fun os platform ->
+      let pkg = 
+	sprintf "%s-%s-%d.%s.%s.%s" 
+	  pkg_name version revision
+	  (string_of_platform platform)
+	  (System.arch ()) 
+	  (extract_extension pkg_path)
+      in
+      if Sys.file_exists pkg then
+	begin
+	  log_message (sprintf "\tpackage %s/%s already exists" (Sys.getcwd ()) pkg);
+	  false
+	end
+      else true)
+
+let with_overwrite ow l =
+  if ow then l else List.filter new_only l
+
+let extract_packbranch userhost pkg_path =
+  match (System.read_lines
+	  ~filter:(Pcre.pmatch ~pat:"packbranch-")
+    (sprintf "ssh %s rpm -qp --provides %s" userhost pkg_path))
+  with [] -> raise (Pack_branch_is_not_found pkg_path)
+    | hd::_ ->
+	let pos = String.index hd '-' in
+	let len =
+	  try
+	    String.index hd ' '
+	  with Not_found -> String.length hd
+	in
+	String.sub hd (succ pos) (len - pos - 1)
+
+let req_re =
+  Pcre.regexp "([^\\ ]+)\\s+=\\s+([^-]+)-(\\d+)\\."
+    
+let extract_depend_list userhost pkg_path =
+  List.map 
+    (fun s ->
+      let a = Pcre.extract ~rex:req_re s in
+      let pkg_name = a.(1) in
+      let ver = a.(2) in
+      let rev = try int_of_string a.(3) with _ -> raise (Cannot_extract_revision pkg_path) in
+      (pkg_name,ver,rev))
+    (System.read_lines
+      ~filter:(fun s ->
+	Pcre.pmatch ~pat:"jet" s && Pcre.pmatch ~rex:req_re s)
+      (sprintf "ssh %s rpm -qRp %s" userhost pkg_path))
+
+let deptree_of_package userhost pkg_path =
   log_message (sprintf "resolve %s" pkg_path);
 
   let table = Hashtbl.create 32 in
 
-  let rec make acc pkg_path =
-    let pkg_dir = Filename.dirname pkg_path in
-    let pkg = Filename.basename pkg_path in
-    let platform = extract_platform pkg in
-    let extension = extract_extension pkg in
-    let arch = extract_arch pkg in
-    let revision =
-      extract_revision (sprintf ".%s.%s.%s" (string_of_platform platform) arch extension) pkg in
-    let version = 
-      extract_version (sprintf "-%d.%s.%s.%s" revision (string_of_platform platform) arch extension) pkg in
-    let pkg_name =
-      extract_name (sprintf "-%s-%d.%s.%s.%s" version revision (string_of_platform platform) arch extension) pkg in
-    let pack_branch =
-      match (System.read_lines
-	~filter:(fun s -> 
-	  Pcre.pmatch ~pat:"packbranch-" s)
-	(sprintf "ssh %s rpm -qp --provides %s" userhost pkg_path))
-      with [] -> raise (Pack_branch_is_not_found pkg_path)
-	| hd::_ ->
-	    let pos = String.index hd '-' in
-	    let len = 
-	      try
-		String.index hd ' '	      
-	      with Not_found -> String.length hd
-	    in
-	    String.sub hd (succ pos) (len - pos - 1)
-    in
-    let current =
-      if overwrite then
-	[Dep_val (pkg_name,pack_branch,version,revision,pkg_path)]
-      else
-	with_platform 
-	  (fun os platform ->
-	    let cur_pkg_name = 
-	      sprintf "%s-%s-%d.%s.%s.%s" 
-		pkg_name version revision (string_of_platform platform) (System.arch ()) extension in
-	    if Sys.file_exists cur_pkg_name then
+  let rec make pkg_path =
+    if Hashtbl.mem table pkg_path then
+      raise Exit
+    else
+      let pkg_dir = Filename.dirname pkg_path in
+      let pkg = Filename.basename pkg_path in
+      let platform = extract_platform pkg in
+      let extension = extract_extension pkg in
+      let arch = extract_arch pkg in
+      let revision =
+	extract_revision (sprintf ".%s.%s.%s" (string_of_platform platform) arch extension) pkg in
+      let version = 
+	extract_version (sprintf "-%d.%s.%s.%s" revision (string_of_platform platform) arch extension) pkg in
+      let pkg_name =
+	extract_name (sprintf "-%s-%d.%s.%s.%s" version revision (string_of_platform platform) arch extension) pkg in
+      let pack_branch =
+	extract_packbranch userhost pkg_path in
+            
+      let e = (pkg_name,pack_branch,version,revision,pkg_path) in
+      
+      Hashtbl.add table pkg_name (version,revision);
+
+      let depend_paths =
+	List.map
+	  (fun (pkg_name,ver,rev) ->
+	    if Hashtbl.mem table pkg_name then
 	      begin
-		log_message (sprintf "\tpackage %s/%s already exists" (Sys.getcwd ()) cur_pkg_name);
-		[]
-	      end
-	    else
-	      [Dep_val (pkg_name,pack_branch,version,revision,pkg_path)])
-    in
-    let rex = 
-      Pcre.regexp "([^\\ ]+)\\s+=\\s+([^-]+)-(\\d+)\\." in
-    Dep_list
-      (current @ (List.map
-	(fun s ->
-	  let a = Pcre.extract ~rex s in
-	  let pkg_name = a.(1) in
-	  let ver = a.(2) in
-	  let rev = try int_of_string a.(3) with _ -> raise (Cannot_extract_revision pkg_path) in
-	  if Hashtbl.mem table pkg_name then
-	    begin
-	      let (ver',rev') = Hashtbl.find table pkg_name in
-	      if ver <> ver' || rev <> rev' then
-		begin
+		let (ver',rev') = Hashtbl.find table pkg_name in
+		if ver <> ver' || rev <> rev' then
+		  begin
 		  log_message
 		    (sprintf "Already registered: pkg(%s) ver(%s)/rev(%d) and next found: ver(%s)/rev(%d) not equivalent." pkg_name ver' rev' ver rev);
-		  raise (Cannot_resolve_dependes pkg_path)
-		end
-	      else (Dep_list [])
-	    end
-	  else
-	    begin
-	      let new_pkg_path =
-		sprintf "%s/%s-%s-%d.%s.%s.%s" pkg_dir pkg_name ver rev
-		(string_of_platform platform) arch extension in
-	      Hashtbl.add table pkg_name (ver,rev);
-	      Dep_list 
-		[(make (Dep_list []) new_pkg_path); acc]
-	    end)
-	(System.read_lines
-	  ~filter:(fun s -> 
-	    Pcre.pmatch ~pat:"jet" s && Pcre.pmatch ~rex s)
-	  (sprintf "ssh %s rpm -qRp %s" userhost pkg_path))))
-  in make (Dep_list []) pkg_path
+		    raise (Cannot_resolve_dependes pkg_path)
+		end;
+	      end;
+	    sprintf "%s/%s-%s-%d.%s.%s.%s" pkg_dir pkg_name ver rev (string_of_platform platform) arch extension)
+	  (extract_depend_list userhost pkg_path)
+      in
+      
+      Dep_val (e, Dep_list
+	(List.fold_left
+	  (fun acc path -> (try acc @ [make path] with Exit -> acc)) [] depend_paths))	
+  in 
+
+  make pkg_path
        
 let rec print_depends depth = function
   | Dep_list l ->
       List.iter (fun v -> print_depends (succ depth) v) l
-  | Dep_val (n,b,v,r,_) ->
+  | Dep_val ((n,b,v,r,_), tree) ->
       let step = String.make depth ' ' in
-      printf "%s%s %s %s %d\n" step n b v r
+      printf "%s%s %s %s %d\n" step n b v r;
+      print_depends (succ depth) tree
 
 let print_dep_val (n,b,v,r,_) =
   printf "%s %s %s %d\n" n b v r
@@ -1637,52 +1699,29 @@ let clone_packages l =
 let rec download_packages userhost = function
   | Dep_list l ->
       List.iter (fun v -> download_packages userhost v) l
-  | Dep_val (n,b,v,r,path) ->
+  | Dep_val ((n,b,v,r,path), tree) ->
       let src =
 	sprintf "%s:%s" userhost path in
-      Rules.send_file_over_ssh src "."
+      Rules.send_file_over_ssh src ".";
+      download_packages userhost tree
 
-let list_of_depends deps =
-  let rec make depth acc = function
-    | Dep_list l -> 
-	acc @ List.flatten (List.map (make (succ depth) []) l)
-    | Dep_val  v -> acc @ [(v,depth)]
-  in make 0 [] deps
-
-let resort_depends l =
-  let compare (pa,da,_) (pb,db,_) =
-    let r = compare db da in
-    if r = 0 then
-      compare pb pa
-    else r
-  in
-  let a =
-    Array.mapi
-      (fun pos (e,depth) ->
-	(pos,depth,e))
-      (Array.of_list l)
-  in Array.sort compare a;
-  List.map
-    (fun (_,_,e) -> e)
-    (Array.to_list a)
 
 let clone userhost pkg_path mode =
   let overwrite = mode <> "default" in
   let depends =
-    get_depends ~overwrite userhost pkg_path in
+    deptree_of_package userhost pkg_path in
 
   print_endline "Depends Tree:";
   print_depends 0 depends;
   match mode with
-    | "overwrite" -> clone_packages (resort_depends (list_of_depends depends))
+    | "overwrite" -> clone_packages (resort_depends (max_uniquely (list_of_deptree depends)))
     | "depends"   ->
 	print_endline "Before Resort Order:";
-	List.iter (fun (x,depth) -> printf "%02d" depth; print_string " "; print_dep_val x) (list_of_depends depends);
-	  
+	List.iter (fun (x,depth) -> printf "%02d" depth; print_string " "; print_dep_val x) (list_of_deptree depends);
 	print_endline "After Resort Order:";
-	List.iter print_dep_val (resort_depends (list_of_depends depends))
+	List.iter print_dep_val (resort_depends (max_uniquely (list_of_deptree depends)))
     | "packages"  -> download_packages userhost depends
-    | _           -> clone_packages (resort_depends (list_of_depends depends))
+    | _           -> clone_packages (with_overwrite overwrite (resort_depends (max_uniquely (list_of_deptree depends))))
 
 let pack_branches pkgdir =
   List.filter (fun s -> s <> "hooks.scm")
@@ -1737,11 +1776,7 @@ let rec get_pack_depends ~default_branch table acc specdir =
     | l  ->
 	(specdir::(List.flatten (List.map (fun pkg -> (get_pack_depends ~default_branch table [] (specdir_of_pkg ~default_branch pkgdir pkg))) l)))
 
-type spectree =
-  | Dval of ((string * int) * spectree)
-  | Dlist of spectree list
-
-let make_depends_tree ~default_branch specdir : spectree =
+let make_depends_tree ~default_branch specdir : string_tree =
   let table = Hashtbl.create 32 in
   let pkgdir =
     Filename.dirname (Filename.dirname specdir) in
@@ -1749,58 +1784,44 @@ let make_depends_tree ~default_branch specdir : spectree =
     log_message (sprintf "%s warning: %s already scanned" (String.make depth ' ') specdir) in
   let resolve depth specdir =
     log_message (sprintf "%s resolve %s" (String.make depth ' ') specdir) in
-  let rec make depth specdir =    
+  let rec make depth specdir =
     if Hashtbl.mem table specdir then
       raise Exit
     else
-      begin
+      if Sys.file_exists specdir then
+	let depfile = Filename.concat specdir "depends" in
 	Hashtbl.add table specdir false;
-	if Sys.file_exists specdir then
-	  let depfile = Filename.concat specdir "depends" in
-	  if Sys.file_exists depfile then
-	    let depends =
-	      List.fold_left (fun acc (pkg,_,_) ->
-		try
-		  let new_specdir = 
-		    specdir_of_pkg ~default_branch pkgdir pkg in
+	if Sys.file_exists depfile then
+	  let depends =
+	    List.fold_left (fun acc (pkg,_,_) ->
+	      try
+		let new_specdir = 
+		  specdir_of_pkg ~default_branch pkgdir pkg in
 		  if Hashtbl.mem table new_specdir then
 		    begin
-		      log_message (sprintf "%s warning: %s already scanned" (String.make (succ depth) ' ') new_specdir);
-		      acc
+		      warning (succ depth) new_specdir;
+		      acc @ [new_specdir] (* add specdir for post-processing *)
 		    end
 		  else
 		    acc @ [new_specdir]
-		with _ -> acc)
-		[] (make_depends ~ignore_last:true depfile)
-	    in
-	    resolve depth specdir;
-	    Dval ((specdir,depth), Dlist 
-	      (List.fold_left
-		(fun acc specdir -> (try acc @ [make (succ depth) specdir] with Exit -> acc)) [] depends))
-	  else
-	    begin
-	      resolve depth specdir;
-	      Dval ((specdir,depth), Dlist [])
-	    end
+	      with _ -> acc)
+	      [] (make_depends ~ignore_last:true depfile)
+	  in
+	  resolve depth specdir;
+	  Dep_val (specdir, Dep_list
+	    (List.fold_left
+	      (fun acc specdir -> (try acc @ [make (succ depth) specdir] with Exit -> acc)) [] depends))
 	else
 	  begin
 	    resolve depth specdir;
-	    Dval ((specdir,depth), Dlist [])
+	    Dep_val (specdir, Dep_list [])
 	  end
-      end
+      else raise Exit
   in make 0 specdir
 
 type dep_path = string list
 
 exception Found_specdir of dep_path
-
-let list_of_deptree tree =
-  let rec make = function
-    | Dval (x, Dlist l) ->
-	(List.flatten (List.map make l)) @ [x]
-    | Dlist l -> assert false
-    | Dval (specdir', Dval _) -> assert false
-  in make tree
 
 let upgrade specdir upgrade_mode default_branch =
   let specdir = System.path_strip_directory specdir in
@@ -1813,21 +1834,21 @@ let upgrade specdir upgrade_mode default_branch =
     make_depends_tree ~default_branch specdir in
 
   let depends =
-    resort_depends (list_of_deptree deptree) in
+    resort_depends (max_uniquely (list_of_deptree deptree)) in
   log_message "after resort depends...";
-  List.iter print_endline depends;  
+  List.iter print_endline depends;
   
   let build_table = Hashtbl.create 32 in
   let mark_table = Hashtbl.create 32 in
 
   let find_specdir specdir =
       let rec make acc = function
-	| Dval ((specdir',depth), Dlist l) ->
+	| Dep_val (specdir', Dep_list l) ->
 	    if specdir = specdir' then
 	      raise (Found_specdir (List.rev acc))
 	    else List.iter (make (specdir'::acc)) l
-	| Dlist l -> assert false
-	| Dval (specdir', Dval _) -> assert false
+	| Dep_list l -> assert false
+	| Dep_val (specdir', Dep_val _) -> assert false
       in
       try
 	make [] deptree; raise (Bad_specdir specdir)
