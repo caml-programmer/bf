@@ -1752,7 +1752,8 @@ let deptree_of_package userhost pkg_path =
 		      let (e,_) =
 			Hashtbl.find pre_table pkg_name in
 		      e.pkg_version
-		    with Not_found -> assert false
+		    with Not_found ->
+		      log_error (sprintf "cannot resolve version for %s" pkg_name)
 	    in
 	    let rev =
 	      match rev_opt with
@@ -1762,7 +1763,8 @@ let deptree_of_package userhost pkg_path =
 		      let (e,_) =
 			Hashtbl.find pre_table pkg_name in
 		      e.pkg_revision
-		    with Not_found -> assert false
+		    with Not_found -> 
+		      log_error (sprintf "cannot resolve revision for %s" pkg_name)
 	    in sprintf "%s/%s-%s-%d.%s.%s.%s" e.pkg_dir pkg_name ver rev (string_of_platform e.pkg_platform) e.pkg_arch e.pkg_extension)
 	  deps
       in
