@@ -1823,10 +1823,9 @@ type dep_path = string list
 
 exception Found_specdir of dep_path
 
-let stop_delay () =
-  let n = 5 in
+let stop_delay n =
   printf "wait %d second>%!" n;
-  for i = 1 to 5 do
+  for i = 1 to n do
     Unix.sleep 1;
     print_char ' ';
     print_int i;
@@ -1849,7 +1848,7 @@ let upgrade specdir upgrade_mode default_branch =
   log_message "after resort depends...";
   List.iter print_endline depends;
   
-  stop_delay ();
+  stop_delay 5;
 
   let build_table = Hashtbl.create 32 in
   let mark_table = Hashtbl.create 32 in
