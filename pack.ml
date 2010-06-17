@@ -1739,7 +1739,7 @@ let deptree_of_package userhost pkg_path =
       let pkg_name = name_of_pkg_path pkg_path in
       let (e,deps) = Hashtbl.find pre_table pkg_name in
 
-      Hashtbl.add table pkg_name (e.pkg_version,e.pkg_revision);
+      Hashtbl.add table pkg_path (e.pkg_version,e.pkg_revision);
 
       let depend_paths =
 	List.map
