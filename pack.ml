@@ -1498,8 +1498,15 @@ let max_uniquely l =
       if v > c then
 	Hashtbl.replace m k v
     with Not_found -> Hashtbl.add m k v) l;
+  let t = Hashtbl.create 32 in
   List.filter
-    (fun (k,v) -> Hashtbl.find m k = v) l
+    (fun (k,v) ->
+      if Hashtbl.mem t k then
+	false
+      else
+	if Hashtbl.find m k = v then
+	  (Hashtbl.add t k v; true)
+	else false) l
 
 (* Clone suport *)
 
@@ -1946,7 +1953,11 @@ let upgrade specdir upgrade_mode default_branch =
   let deptree =
     log_message "make spec depends...";
     make_depends_tree ~default_branch specdir in
-
+  
+  log_message "1 phase";
+  List.iter (fun s -> printf "%s - %d\n" (fst s) (snd s)) (list_of_deptree deptree);
+  log_message "2 phase";
+  List.iter (fun s -> printf "%s - %d\n" (fst s) (snd s)) (max_uniquely (list_of_deptree deptree));
   let depends =
     resort_depends (max_uniquely (list_of_deptree deptree)) in
   log_message "after resort depends...";
