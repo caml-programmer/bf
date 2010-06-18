@@ -360,6 +360,15 @@ let rec last = function
   | [] -> raise Not_found
   | hd::[] -> hd
   | hd::tl -> last tl
+
+let vr_compare a b =
+  let r = compare (fst b) (fst a) in
+  if r = 0 then
+    compare (snd b) (snd a)
+  else r
+
+let max_vr l =
+  List.hd (List.sort vr_compare l)
      
 let read_pkg_release ?(next=false) ?version specdir =
   let with_next n = if next then succ n else n in
@@ -382,7 +391,7 @@ let read_pkg_release ?(next=false) ?version specdir =
     if Sys.file_exists file then
       let ch = open_in file in
       let vr =
-	last (List.filter filter 
+	max_vr (List.filter filter
 	  (List.map make (System.list_of_channel ch))) in
       close_in ch; vr
     else raise Exit
