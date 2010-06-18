@@ -1731,10 +1731,16 @@ let deptree_of_package userhost pkg_path =
   scan pkg_path;
 
   let table = Hashtbl.create 32 in
-  let rec make pkg_path =
-    log_message (sprintf "resolve %s" pkg_path);
+  let warning depth s =
+    log_message (sprintf "%s warning: %s already scanned" (String.make depth ' ') s) in
+  let resolve depth s =
+    log_message (sprintf "%s resolve %s" (String.make depth ' ') s) in
+  let rec make depth pkg_path =
     if Hashtbl.mem table pkg_path then
-      Dep_val (fst (Hashtbl.find pre_table (name_of_pkg_path pkg_path)), Dep_list [])
+      begin
+	warning depth pkg_path;
+	Dep_val (fst (Hashtbl.find pre_table (name_of_pkg_path pkg_path)), Dep_list [])
+      end
     else
       let pkg_name = name_of_pkg_path pkg_path in
       let (e,deps) = Hashtbl.find pre_table pkg_name in
@@ -1768,13 +1774,13 @@ let deptree_of_package userhost pkg_path =
 	    in sprintf "%s/%s-%s-%d.%s.%s.%s" e.pkg_dir pkg_name ver rev (string_of_platform e.pkg_platform) e.pkg_arch e.pkg_extension)
 	  deps
       in
-      
+      resolve depth pkg_path;
       Dep_val (e, Dep_list
 	(List.fold_left
-	  (fun acc path -> (try acc @ [make path] with Exit -> acc)) [] depend_paths))
+	  (fun acc path -> (try acc @ [make (succ depth) path] with Exit -> acc)) [] depend_paths))
   in 
 
-  make pkg_path
+  make 0 pkg_path
        
 let rec print_depends depth = function
   | Dep_list l ->
@@ -1882,7 +1888,10 @@ let make_depends_tree ~default_branch specdir : string_tree =
     log_message (sprintf "%s resolve %s" (String.make depth ' ') specdir) in
   let rec make depth specdir =
     if Hashtbl.mem table specdir then
-      Dep_val (specdir, Dep_list [])
+      begin
+	warning depth specdir;
+	Dep_val (specdir, Dep_list [])
+      end
     else
       if Sys.file_exists specdir then
 	let depfile = Filename.concat specdir "depends" in
@@ -1895,7 +1904,6 @@ let make_depends_tree ~default_branch specdir : string_tree =
 		  specdir_of_pkg ~default_branch pkgdir pkg in
 		  if Hashtbl.mem table new_specdir then
 		    begin
-		      warning (succ depth) new_specdir;
 		      acc @ [new_specdir] (* add specdir for post-processing *)
 		    end
 		  else
