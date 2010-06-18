@@ -1715,7 +1715,7 @@ let deptree_of_package userhost pkg_path =
 		  let (e,_) = Hashtbl.find pre_table pkg_name in
 		  if ver <> e.pkg_version || rev <> e.pkg_revision then
 		    begin
-		      log_message (sprintf "Already registered: pkg(%s) ver(%s)/rev(%d) and next found: ver(%s)/rev(%d) not equivalent." 
+		      log_message (sprintf "Already registered: pkg(%s) ver(%s)/rev(%d) and next found: ver(%s)/rev(%d) not equivalent."
 			pkg_name e.pkg_version e.pkg_revision ver rev);
 		      raise (Cannot_resolve_dependes pkg_path)
 		    end;
@@ -1734,7 +1734,7 @@ let deptree_of_package userhost pkg_path =
   let rec make pkg_path =
     log_message (sprintf "resolve %s" pkg_path);
     if Hashtbl.mem table pkg_path then
-      raise Exit
+      Dep_val (fst (Hashtbl.find pre_table (name_of_pkg_path pkg_path)), Dep_list [])
     else
       let pkg_name = name_of_pkg_path pkg_path in
       let (e,deps) = Hashtbl.find pre_table pkg_name in
@@ -1882,7 +1882,7 @@ let make_depends_tree ~default_branch specdir : string_tree =
     log_message (sprintf "%s resolve %s" (String.make depth ' ') specdir) in
   let rec make depth specdir =
     if Hashtbl.mem table specdir then
-      raise Exit
+      Dep_val (specdir, Dep_list [])
     else
       if Sys.file_exists specdir then
 	let depfile = Filename.concat specdir "depends" in
