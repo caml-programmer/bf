@@ -1969,26 +1969,23 @@ let upgrade specdir upgrade_mode default_branch =
   let mark_table = Hashtbl.create 32 in
 
   let find_specdir specdir =
-      let rec make acc = function
-	| Dep_val (specdir', Dep_list l) ->
-	    if specdir = specdir' then
-	      raise (Found_specdir (List.rev acc))
-	    else List.iter (make (specdir'::acc)) l
-	| Dep_list l -> assert false
-	| Dep_val (specdir', Dep_val _) -> assert false
-      in
-      try
-	make [] deptree; raise (Bad_specdir specdir)
-      with Found_specdir s -> s
+    let rec make acc = function
+      | Dep_val (specdir', Dep_list l) ->
+	  let new_acc = specdir'::acc in
+	  if specdir = specdir' then
+	    acc :: (List.flatten (List.map (make new_acc) l))
+	  else
+	    List.flatten (List.map (make new_acc) l)
+      | _ -> assert false
+    in List.flatten (make [] deptree)
   in
 
   let eval_lazy_mode specdir =
-    let dep_path = find_specdir specdir in
-    (* log_message ("eval lazy mode for: " ^ specdir); List.iter print_endline dep_path; *)
+    let dep_paths = find_specdir specdir in
     if Hashtbl.mem mark_table specdir && not (Hashtbl.mem build_table specdir) then
-      (false,dep_path)
+      (false,dep_paths)
     else
-      (true,dep_path)
+      (true,dep_paths)
   in
   
   match upgrade_mode with
@@ -2005,10 +2002,10 @@ let upgrade specdir upgrade_mode default_branch =
     | Upgrade_complete ->
 	List.iter
 	  (fun specdir ->
-	    let (lazy_mode,dep_path) =
+	    let (lazy_mode,dep_paths) =
 	      eval_lazy_mode specdir in
-	    log_message (sprintf "lazy-mode is %b for %s, dep-path:" lazy_mode specdir);
-	    List.iter log_message dep_path;
+	    log_message (sprintf "lazy-mode is %b for %s, dep-paths:" lazy_mode specdir);
+	    List.iter log_message dep_paths;
 	    let updated =
 	      update
 		~specdir
@@ -2019,7 +2016,7 @@ let upgrade specdir upgrade_mode default_branch =
 	    Hashtbl.replace build_table specdir updated;
 	    if updated then
 	      List.iter
-		(fun s -> Hashtbl.replace mark_table s true) dep_path)
+		(fun s -> Hashtbl.replace mark_table s true) dep_paths)
 	  depends
 	  
 let branch specdir src dst =
