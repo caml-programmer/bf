@@ -1390,7 +1390,7 @@ let update ~specdir ?(check_pack=true) ?(lazy_mode=false) ?(interactive=false) ?
     (try
       (match ver with
 	| Some v ->
-	    (* custom_revision := true; *)
+	    custom_revision := true;
 	    v, (match rev with Some r -> conv_revision r | None -> log_error (sprintf "cannot update %s: revision does not set" pkgname))
 	| None ->
 	    read_pkg_release ~next:true specdir)

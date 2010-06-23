@@ -634,7 +634,7 @@ let tag_ready ~tag composite =
 	(with_component_dir ~strict:false component
 	  (fun () -> res := List.mem tag (git_tag_list ())));
       !res)
-    (Rules.components_of_composite composite)
+    (only_local (Rules.components_of_composite composite))
 
 let prepare_composite ?tag composite =
   log_message ("=> prepare-composite " ^ composite);
