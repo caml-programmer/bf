@@ -19,6 +19,7 @@ let usage () =
   print_endline "   or: bf upgrade <specdir> [lazy|complete] [<branch>]";
   print_endline "   or: bf branch <specdir> <source-branch> <new-branch>";
   print_endline "   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite|depends|packages]";
+  print_endline "   or: bf clone <specdir> [overwrite] [norec]";
   print_endline "   or: bf tag <composite> <tag>";
   print_endline "   or: bf log <logdir>";
   exit 1
@@ -157,13 +158,36 @@ let main () =
 	      Rules.log_wizor Sys.argv.(2)
 	    else usage ()
 	| "clone" ->
-	    if len = 4 then
-	      Pack.clone Sys.argv.(2) Sys.argv.(3) "default"
+	    if Sys.file_exists Sys.argv.(2) then
+	      begin
+		let check_rec s = if s = "norec" then false else usage () in
+		let check_over s = if s = "overwrite" then true else usage () in
+		let (recursive,overwrite) =
+		  if len = 3 then
+		    (true,false)
+		  else if len = 4 then
+		    (match Sys.argv.(3) with
+		      | "overwrite" -> (true,true)
+		      | "norec" -> (false,false)
+		      | _ -> usage ())
+		  else if len = 5 then
+		    (match Sys.argv.(3) with
+		      | "overwrite" -> (check_rec Sys.argv.(4),true)
+		      | "norec" -> (false,check_over Sys.argv.(4))
+		      | _ -> usage ())
+		  else usage ()
+		in Pack.clone ~recursive ~overwrite Sys.argv.(2)
+	      end
 	    else
-	      if len = 5 then
-		Pack.clone Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
-	      else
-		usage ()
+	      begin
+		if len = 4 then
+		  Pack.pkg_clone Sys.argv.(2) Sys.argv.(3) "default"
+		else
+		  if len = 5 then
+		    Pack.pkg_clone Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
+		  else
+		    usage ()
+	      end	      
 	| "upgrade" ->
 	    let (upgrade_mode,default_branch) =
 	      match len with

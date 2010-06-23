@@ -1525,10 +1525,13 @@ type pkg_path = {
   pkg_branch: pack_branch;
 }
 
-type clone_val = string * pack_branch * Types.version * Types.revision * string
+type clone_val = string * Types.version * Types.revision
+
+type pkg_clone_tree =
+    pkg_path deptree
 
 type clone_tree =
-    pkg_path deptree
+    clone_val deptree
 
 type string_tree =
     string deptree
@@ -1702,7 +1705,7 @@ let parse_pkg_path userhost pkg_path =
     pkg_branch = pack_branch;    
   }
 
-let deptree_of_package userhost pkg_path =
+let deptree_of_package userhost pkg_path : pkg_clone_tree =
   let pre_table = Hashtbl.create 32 in
   
   let rec scan pkg_path =
@@ -1815,7 +1818,7 @@ let rec download_packages userhost = function
       Rules.send_file_over_ssh src ".";
       download_packages userhost tree
 
-let clone userhost pkg_path mode =
+let pkg_clone userhost pkg_path mode =
   let overwrite = mode <> "default" in
   let depends =
     deptree_of_package userhost pkg_path in
@@ -1885,7 +1888,7 @@ let rec get_pack_depends ~default_branch table acc specdir =
     | l  ->
 	(specdir::(List.flatten (List.map (fun pkg -> (get_pack_depends ~default_branch table [] (specdir_of_pkg ~default_branch pkgdir pkg))) l)))
 
-let make_depends_tree ~default_branch specdir : string_tree =
+let deptree_of_pack ~default_branch specdir : string_tree =
   let table = Hashtbl.create 32 in
   let pkgdir =
     Filename.dirname (Filename.dirname specdir) in
@@ -1930,6 +1933,58 @@ let make_depends_tree ~default_branch specdir : string_tree =
       else raise Exit
   in make 0 specdir
 
+let deptree_of_specdir specdir : clone_tree =
+  let table = Hashtbl.create 32 in
+  let pkgdir =
+    Filename.dirname (Filename.dirname specdir) in
+  let warning depth specdir =
+    log_message (sprintf "%s warning: %s already scanned" (String.make depth ' ') specdir) in
+  let resolve depth specdir =
+    log_message (sprintf "%s resolve %s" (String.make depth ' ') specdir) in
+  let rec make depth specdir =
+    
+    if Hashtbl.mem table specdir then
+      begin
+	warning depth specdir;
+	let (ver,rev) =
+	  Hashtbl.find table specdir in
+	Dep_val ((specdir,ver,rev), Dep_list [])
+      end
+    else
+      if Sys.file_exists specdir then
+	let depfile = Filename.concat specdir "depends" in
+	
+	let (ver,rev) =
+	  read_pkg_release specdir in
+	Hashtbl.add table specdir (ver,rev);
+	
+	if Sys.file_exists depfile then
+	  let depends =
+	    List.fold_left (fun acc (pkg,_,_) ->
+	      try
+		let new_specdir = 
+		  specdir_of_pkg ~default_branch:(Some (branch_of_specdir specdir)) pkgdir pkg in
+		if Hashtbl.mem table new_specdir then
+		  begin
+		    acc @ [new_specdir] (* add specdir for post-processing *)
+		  end
+		else
+		  acc @ [new_specdir]
+	      with _ -> acc)
+	      [] (make_depends ~ignore_last:true depfile)
+	  in
+	  resolve depth specdir;
+	  Dep_val ((specdir,ver,rev), Dep_list
+	    (List.fold_left
+	      (fun acc specdir -> (try acc @ [make (succ depth) specdir] with Exit -> acc)) [] depends))
+	else
+	  begin
+	    resolve depth specdir;
+	    Dep_val ((specdir,ver,rev), Dep_list [])
+	  end
+      else raise Exit
+  in make 0 specdir
+
 type dep_path = string list
 
 exception Found_specdir of dep_path
@@ -1951,8 +2006,8 @@ let upgrade specdir upgrade_mode default_branch =
   check_pack_component ();
 
   let deptree =
-    log_message "make spec depends...";
-    make_depends_tree ~default_branch specdir in
+    log_message "make depends tree...";
+    deptree_of_pack ~default_branch specdir in
   
   log_message "1 phase";
   List.iter (fun s -> printf "%s - %d\n" (fst s) (snd s)) (list_of_deptree deptree);
@@ -1960,7 +2015,7 @@ let upgrade specdir upgrade_mode default_branch =
   List.iter (fun s -> printf "%s - %d\n" (fst s) (snd s)) (max_uniquely (list_of_deptree deptree));
   let depends =
     resort_depends (max_uniquely (list_of_deptree deptree)) in
-  log_message "after resort depends...";
+  log_message "depend list...";
   List.iter print_endline depends;
   
   stop_delay 5;
@@ -2018,6 +2073,36 @@ let upgrade specdir upgrade_mode default_branch =
 	      List.iter
 		(fun s -> Hashtbl.replace mark_table s true) dep_paths)
 	  depends
+
+let clone ~recursive ~overwrite specdir =
+  let specdir = System.path_strip_directory specdir in
+  check_specdir specdir;
+  check_pack_component ();
+  let deptree =
+    if recursive then
+      log_message "make depends tree...";
+    deptree_of_specdir specdir in
+  let depends =
+    resort_depends (max_uniquely (list_of_deptree deptree)) in
+  
+  let with_rec l =
+    (if recursive then l else [last l]) in
+
+  log_message "depend list...";
+  List.iter (fun (pkg,ver,rev) -> printf "%s %s %d\n%!" pkg ver rev) (with_rec depends);
+  stop_delay 5;
+  
+  let pkg_exists specdir ver rev =
+    let pat = sprintf "%s\\-%s\\-%d\\." (pkgname_of_specdir specdir) ver rev in
+    List.exists (Pcre.pmatch ~pat) (System.list_of_directory ".")
+  in
+  
+  List.iter
+    (fun (specdir,ver,rev) ->
+      if not (pkg_exists specdir ver rev) || overwrite then
+	ignore(update ~check_pack:false ~specdir ~ver:(Some ver) ~rev:(Some (string_of_int rev)) ()))
+    (with_rec depends)
+
 	  
 let branch specdir src dst =
   printf "Create new pack branch from %s to %s\n%!" src dst;
