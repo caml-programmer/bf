@@ -9,10 +9,10 @@ let checkout_component component =
   match component.label with
     | Tag key ->
 	git_checkout ~force:true ~key ()
-    | Branch key -> 
+    | Branch key ->
 	git_checkout ~force:true ~key ()
     | Current ->
-	let branches = 
+	let branches =
 	  git_branch ~remote:false () in
 	if List.mem "master" branches then
 	  git_checkout ~force:true ~key:"master" ()
@@ -35,6 +35,9 @@ let with_dir dir f =
   let result = f () in
   Sys.chdir curdir;
   result
+
+let origin s = 
+  "origin/" ^ s
 
 let with_component_dir ?(strict=true) component thunk =
   let curdir = Sys.getcwd () in
@@ -87,6 +90,20 @@ let with_component_dir ?(strict=true) component thunk =
 	log_message 
 	  (sprintf "status: working tree exists with other key (%s)" key);
 	with_dir (fun () ->
+	  (match component.label with
+	    | Branch b ->
+		let rb = git_branch ~remote:true () in
+		let lb = git_branch ~remote:false () in
+		if not (List.mem b lb) then
+		  begin
+		    if not (List.mem (origin b) rb) then
+		      begin
+			git_fetch "origin";
+			git_fetch ~tags:true "origin";		     
+		      end;
+		    git_track_new_branches ();
+		  end
+	    | _ -> ());	  
 	  checkout_component component;
 	  git_clean ();
 	  true)
@@ -281,9 +298,6 @@ let reinstall_component component =
 
 let reinstall components =
   non_empty_iter reinstall_component components
-
-let origin s = 
-  "origin/" ^ s
 
 let update_component component =
   let exists s =
