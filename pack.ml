@@ -1366,7 +1366,7 @@ let check_pack_component () =
 		~force:true ~key:"master" ();
 	      Git.git_pull "origin";
 	      Git.git_fetch ~tags:true "origin";
-	      log_error "current pack branch is not master, bf fix it, try againg")))
+	      log_error "current pack branch is not master, bf has fix it, try again")))
 	      
 let update ~specdir ?(check_pack=true) ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
   let specdir = System.path_strip_directory specdir in
