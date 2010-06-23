@@ -922,6 +922,7 @@ let build_package_impl os platform args =
 			  if Sys.file_exists freq then
 			    begin
 			      out "/usr/lib/rpm/find-requires";
+			      out "\\\n| grep -v ^$";
 			      List.iter
 				(fun reject ->
 				  out (sprintf "\\\n| sed -e 's#%s##'" reject))
