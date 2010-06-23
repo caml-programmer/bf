@@ -1810,14 +1810,12 @@ let clone_packages l =
       sprintf "./pack/%s/%s" e.pkg_name e.pkg_branch in
     ignore (update ~specdir ~ver:(Some e.pkg_version) ~rev:(Some (string_of_int e.pkg_revision)) ())) l
 
-let rec download_packages userhost = function
-  | Dep_list l ->
-      List.iter (fun v -> download_packages userhost v) l
-  | Dep_val (e, tree) ->
+let rec download_packages userhost l =
+  List.iter 
+    (fun e ->
       let src =
 	sprintf "%s:%s" userhost e.pkg_path in
-      Rules.send_file_over_ssh src ".";
-      download_packages userhost tree
+      Rules.send_file_over_ssh src ".") l
 
 let pkg_clone userhost pkg_path mode =
   let overwrite = mode <> "default" in
@@ -1833,7 +1831,7 @@ let pkg_clone userhost pkg_path mode =
 	List.iter (fun (x,depth) -> printf "%02d" depth; print_string " "; print_dep_val x) (list_of_deptree depends);
 	print_endline "After Resort Order:";
 	List.iter print_dep_val (resort_depends (max_uniquely (list_of_deptree depends)))
-    | "packages"  -> download_packages userhost depends
+    | "packages"  -> download_packages userhost (resort_depends (max_uniquely (list_of_deptree depends)))
     | _           -> clone_packages (with_overwrite overwrite (resort_depends (max_uniquely (list_of_deptree depends))))
 
 let pack_branches pkgdir =
