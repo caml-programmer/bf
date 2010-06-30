@@ -794,7 +794,7 @@ let resolve_params find s =
       (try find k with Not_found -> s))
     s
 
-let build_package_impl os platform args =
+let build_package_impl ?(ready_spec=None) os platform args =
   match args with
     | [specdir;version;release] ->
 	let abs_specdir =
@@ -826,7 +826,11 @@ let build_package_impl os platform args =
 			 (pkgname,platform,version,release,spec,files,findreq,hooks)
 		| _-> assert false)
 	  | "2.0" ->
-	      let spec = spec_from_v2 ~version ~revision:release abs_specdir in
+	      let spec = 
+		match ready_spec with
+		  | Some s -> s
+		  | None ->
+		      spec_from_v2 ~version ~revision:release abs_specdir in
 	      let bf_table = Hashtbl.create 32 in
 	      let reg k =
 		if Hashtbl.mem bf_table k then "" 
@@ -1333,10 +1337,10 @@ let build_package_impl os platform args =
 	      raise (Unsupported_specdir_version version))
     | _ -> log_error "build_rh_package: wrong arguments"
 
-let build_package args =
+let build_package ?(ready_spec=None) args =
   with_platform
     (fun os platfrom ->
-      build_package_impl os platfrom args)
+      build_package_impl ~ready_spec os platfrom args)
 
 exception Bad_specdir of string
 
@@ -1368,7 +1372,7 @@ let check_pack_component () =
 	      Git.git_fetch ~tags:true "origin";
 	      log_error "current pack branch is not master, bf has fix it, try again")))
 	      
-let update ~specdir ?(check_pack=true) ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
+let update ?ready_spec ~specdir ?(check_pack=true) ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
   let specdir = System.path_strip_directory specdir in
   
   check_specdir specdir;
@@ -1431,7 +1435,7 @@ let update ~specdir ?(check_pack=true) ?(lazy_mode=false) ?(interactive=false) ?
     
     install_composite ~tag composite;
     (try
-      build_package
+      build_package ~ready_spec
 	[specdir;version;string_of_int revision];
       if not !custom_revision then
 	ignore(reg_pkg_release specdir version revision)
@@ -1526,10 +1530,14 @@ type pkg_path = {
   pkg_branch: pack_branch;
 }
 
-type clone_val = string * Types.version * Types.revision
+type top_val = string * Types.version * Types.revision
+type clone_val = string * Types.version * Types.revision * spec
 
 type pkg_clone_tree =
     pkg_path deptree
+
+type top_tree =
+    top_val deptree
 
 type clone_tree =
     clone_val deptree
@@ -1932,7 +1940,7 @@ let deptree_of_pack ~default_branch specdir : string_tree =
       else raise Exit
   in make 0 specdir
 
-let deptree_of_specdir specdir : clone_tree =
+let toptree_of_specdir specdir : top_tree =
   let table = Hashtbl.create 32 in
   let pkgdir =
     Filename.dirname (Filename.dirname specdir) in
@@ -1983,6 +1991,82 @@ let deptree_of_specdir specdir : clone_tree =
 	  end
       else raise Exit
   in make 0 specdir
+
+let deptree_of_specdir ~vr specdir : clone_tree =
+  let table = Hashtbl.create 32 in
+  let pkgdir =
+    Filename.dirname (Filename.dirname specdir) in
+  let warning depth specdir =
+    log_message (sprintf "%s warning: %s already scanned" (String.make depth ' ') specdir) in
+  let resolve depth specdir =
+    log_message (sprintf "%s resolve %s" (String.make depth ' ') specdir) in
+  let checkout_pack key =
+    with_dir
+      (Filename.dirname pkgdir)
+      (Git.git_checkout ~key) in
+
+  let (ver,rev) =
+    match vr with
+	Some x -> x | None -> read_pkg_release specdir in
+  
+  let rec make depth (specdir,ver,rev) =
+    if Hashtbl.mem table specdir then
+      begin
+	warning depth specdir;
+	let (ver,rev,spec) =
+	  Hashtbl.find table specdir in
+	Dep_val ((specdir,ver,rev,spec), Dep_list [])
+      end
+    else
+      begin
+	let key =
+	  let pkgname =
+	    pkgname_of_specdir specdir in
+	  mk_tag pkgname ver rev in
+
+	checkout_pack key;
+
+	if Sys.file_exists specdir then
+	  let spec = 
+	    spec_from_v2
+	      ~version:ver
+	      ~revision:(string_of_int rev) specdir in
+	  Hashtbl.add table specdir (ver,rev,spec);
+	  
+	  let depfile = 
+	    Filename.concat specdir "depends" in
+	  if Sys.file_exists depfile then
+	    let depends =
+	      List.fold_left (fun acc (pkg,_,_) ->
+		try
+		  let new_specdir = 
+		    specdir_of_pkg ~default_branch:(Some (branch_of_specdir specdir)) pkgdir pkg in
+		  if Hashtbl.mem table new_specdir then
+		    begin
+		      acc @ [new_specdir] (* add specdir for post-processing *)
+		    end
+		  else
+		    acc @ [new_specdir]
+		with _ -> acc)
+		[] (make_depends ~ignore_last:true depfile)
+	    in
+	    resolve depth specdir;
+	    Dep_val ((specdir,ver,rev,spec), Dep_list
+	      (List.fold_left
+		(fun acc specdir -> 
+		  let (ver,rev) = read_pkg_release specdir in
+		  (try acc @ [make (succ depth) (specdir,ver,rev)] with Exit -> acc)) [] depends))
+	  else
+	    begin
+	      resolve depth specdir;
+	      Dep_val ((specdir,ver,rev,spec), Dep_list [])
+	    end
+	else raise Exit
+      end
+  in 
+  
+  let tree = make 0 (specdir,ver,rev) in
+  checkout_pack "master"; tree
 
 type dep_path = string list
 
@@ -2073,14 +2157,14 @@ let upgrade specdir upgrade_mode default_branch =
 		(fun s -> Hashtbl.replace mark_table s true) dep_paths)
 	  depends
 
-let clone ~recursive ~overwrite specdir =
+let top ~recursive ~overwrite specdir =
   let specdir = System.path_strip_directory specdir in
   check_specdir specdir;
   check_pack_component ();
   let deptree =
     if recursive then
       log_message "make depends tree...";
-    deptree_of_specdir specdir in
+    toptree_of_specdir specdir in
   let depends =
     resort_depends (max_uniquely (list_of_deptree deptree)) in
   
@@ -2100,6 +2184,36 @@ let clone ~recursive ~overwrite specdir =
     (fun (specdir,ver,rev) ->
       if not (pkg_exists specdir ver rev) || overwrite then
 	ignore(update ~check_pack:false ~specdir ~ver:(Some ver) ~rev:(Some (string_of_int rev)) ()))
+    (with_rec depends)
+
+let clone ?(vr=None) ~recursive ~overwrite specdir =
+  let specdir = System.path_strip_directory specdir in
+
+  check_specdir specdir;
+  check_pack_component ();
+  let deptree =
+    if recursive then
+      log_message "make depends tree...";
+    deptree_of_specdir ~vr specdir in
+  let depends =
+    resort_depends (max_uniquely (list_of_deptree deptree)) in
+  
+  let with_rec l =
+    (if recursive then l else [last l]) in
+
+  log_message "depend list...";
+  List.iter (fun (pkg,ver,rev,spec) -> printf "%s %s %d\n%!" pkg ver rev) (with_rec depends);
+  stop_delay 5;
+  
+  let pkg_exists specdir ver rev =
+    let pat = sprintf "%s\\-%s\\-%d\\." (pkgname_of_specdir specdir) ver rev in
+    List.exists (Pcre.pmatch ~pat) (System.list_of_directory ".")
+  in
+  
+  List.iter
+    (fun (specdir,ver,rev,spec) ->
+      if not (pkg_exists specdir ver rev) || overwrite then
+	ignore(update ~ready_spec:spec ~check_pack:false ~specdir ~ver:(Some ver) ~rev:(Some (string_of_int rev)) ()))
     (with_rec depends)
 
 	  

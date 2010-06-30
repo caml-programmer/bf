@@ -28,14 +28,6 @@ let clone_component component =
     (Filename.concat 
       (git_create_url component) component.name) component.name
 
-let with_dir dir f =
-  let curdir = 
-    Sys.getcwd () in
-  Sys.chdir dir;
-  let result = f () in
-  Sys.chdir curdir;
-  result
-
 let origin s = 
   "origin/" ^ s
 
