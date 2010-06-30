@@ -159,7 +159,6 @@ let main () =
 	      Rules.log_wizor Sys.argv.(2)
 	    else usage ()
 	| "clone" ->
-	    print_endline "   or: bf clone <specdir> [overwrite] [norec] [<ver> <rev>]";
 	    if Sys.file_exists Sys.argv.(2) then
 	      begin
 		let check_rec s = if s = "norec" then false else usage () in
