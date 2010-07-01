@@ -1995,8 +1995,8 @@ let deptree_of_specdir ~vr specdir : clone_tree =
   let table = Hashtbl.create 32 in
   let pkgdir =
     Filename.dirname (Filename.dirname specdir) in
-  let warning depth specdir ver rev =
-    log_message (sprintf "%s warning: %s %s %d already scanned" (String.make depth ' ') specdir ver rev) in
+  let warning depth specdir ver rev iver irev =
+    log_message (sprintf "%s warning: %s %s %d already scanned, ignore %s %d" (String.make depth ' ') specdir ver rev iver irev) in
   let resolve depth specdir ver rev =
     log_message (sprintf "%s resolve %s %s %d" (String.make depth ' ') specdir ver rev) in
   let checkout_pack key =
@@ -2010,16 +2010,10 @@ let deptree_of_specdir ~vr specdir : clone_tree =
   let rec make depth (specdir,ver,rev) =
     if Hashtbl.mem table specdir then
       begin
-	warning depth specdir ver rev;
 	let (ver',rev',spec) =
-	  Hashtbl.find table specdir in
-	if ver <> ver' || rev <> rev' then
-	  begin
-	    log_message (sprintf "Already registered: specdir(%s) ver(%s)/rev(%d) and next found: ver(%s)/rev(%d) not equivalent."
-	      specdir ver' rev' ver rev);
-	    raise (Cannot_resolve_dependes specdir)
-	  end;
-	Dep_val ((specdir,ver,rev,spec), Dep_list [])
+	  Hashtbl.find table specdir in	
+	warning depth specdir ver' rev' ver rev;
+	Dep_val ((specdir,ver',rev',spec), Dep_list [])
       end
     else
       begin
