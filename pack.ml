@@ -1995,10 +1995,10 @@ let deptree_of_specdir ~vr specdir : clone_tree =
   let table = Hashtbl.create 32 in
   let pkgdir =
     Filename.dirname (Filename.dirname specdir) in
-  let warning depth specdir =
-    log_message (sprintf "%s warning: %s already scanned" (String.make depth ' ') specdir) in
-  let resolve depth specdir =
-    log_message (sprintf "%s resolve %s" (String.make depth ' ') specdir) in
+  let warning depth specdir ver rev =
+    log_message (sprintf "%s warning: %s %s %d already scanned" (String.make depth ' ') specdir ver rev) in
+  let resolve depth specdir ver rev =
+    log_message (sprintf "%s resolve %s %s %d" (String.make depth ' ') specdir ver rev) in
   let checkout_pack key =
     with_dir pkgdir
       (Git.git_checkout ~low:true ~key) in
@@ -2010,9 +2010,15 @@ let deptree_of_specdir ~vr specdir : clone_tree =
   let rec make depth (specdir,ver,rev) =
     if Hashtbl.mem table specdir then
       begin
-	warning depth specdir;
-	let (ver,rev,spec) =
+	warning depth specdir ver rev;
+	let (ver',rev',spec) =
 	  Hashtbl.find table specdir in
+	if ver <> ver' || rev <> rev' then
+	  begin
+	    log_message (sprintf "Already registered: specdir(%s) ver(%s)/rev(%d) and next found: ver(%s)/rev(%d) not equivalent."
+	      specdir ver' rev' ver rev);
+	    raise (Cannot_resolve_dependes specdir)
+	  end;
 	Dep_val ((specdir,ver,rev,spec), Dep_list [])
       end
     else
@@ -2048,7 +2054,7 @@ let deptree_of_specdir ~vr specdir : clone_tree =
 		with _ -> acc)
 		[] (make_depends ~ignore_last:true depfile)
 	    in
-	    resolve depth specdir;
+	    resolve depth specdir ver rev;
 	    Dep_val ((specdir,ver,rev,spec), Dep_list
 	      (List.fold_left
 		(fun acc specdir -> 
@@ -2056,7 +2062,7 @@ let deptree_of_specdir ~vr specdir : clone_tree =
 		  (try acc @ [make (succ depth) (specdir,ver,rev)] with Exit -> acc)) [] depends))
 	  else
 	    begin
-	      resolve depth specdir;
+	      resolve depth specdir ver rev;
 	      Dep_val ((specdir,ver,rev,spec), Dep_list [])
 	    end
 	else raise Exit
