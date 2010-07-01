@@ -516,8 +516,7 @@ let make_depends ?(interactive=false) ?(ignore_last=false) file =
 		with_platform 
 		  (fun os platform ->
 		    (try
-		      ignore(with_component_dir
-			~strict:false (make_component ~label:(Branch "master") "pack")
+		      ignore(with_component_dir ~low:true ~strict:false (make_component "pack")
 			(fun () ->
 			  let branch = 
 			    branch_of_specdir (Filename.dirname file) in
