@@ -38,7 +38,7 @@ let human_timestamp t =
     tm.Unix.tm_sec
     nano_sec
 
-let log_message ?key ?logger message =
+let log_message ?(low=false) ?key ?logger message =
   let timestamp = current_time () in
   let (starttime,port) =
     match logger with
@@ -51,7 +51,8 @@ let log_message ?key ?logger message =
       | Some k -> (sprintf "%s> [%s] %s\n" (human_timestamp timestamp) k message)
   in
   output_string port s; flush port;
-  output_string stdout s; flush stdout;
+  if not low then 
+    ( output_string stdout s; flush stdout );
   match logger with
     | Some l ->	flush port
     | None   ->	close_out port
@@ -126,11 +127,11 @@ let log_command ?(low=false) ?env ?error_handler prog args =
 	      | "high" -> Unix.descr_of_out_channel stdout
 	      | _      -> Unix.descr_of_out_channel stdout
 	in
-	log_message ~logger (sprintf "run: %s" cmd_s);
+	log_message ~low ~logger (sprintf "run: %s" cmd_s);
 	Shell.call
 	  ~stdout:(Shell.to_fd log_fd)
 	  ~stderr:(Shell.to_fd log_fd) [cmd];
-	log_message ~logger (sprintf "success: %s" cmd_s)
+	log_message ~low ~logger (sprintf "success: %s" cmd_s)
       with 
 	| Unix.Unix_error(error,name,arg) ->
 	    log_error
@@ -160,7 +161,3 @@ let log_command ?(low=false) ?env ?error_handler prog args =
 			    log_message ~logger (sprintf "stopped: %d" n);
 			    exit n)))
 	      errors)
-
-
-
-
