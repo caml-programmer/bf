@@ -2039,20 +2039,21 @@ let deptree_of_specdir ~vr specdir : clone_tree =
 		try
 		  let new_specdir = 
 		    specdir_of_pkg ~default_branch:(Some (branch_of_specdir specdir)) pkgdir pkg in
+		  let (ver,rev) = 
+		    read_pkg_release new_specdir in
 		  if Hashtbl.mem table new_specdir then
 		    begin
-		      acc @ [new_specdir] (* add specdir for post-processing *)
+		      acc @ [new_specdir,ver,rev] (* add specdir for post-processing *)
 		    end
 		  else
-		    acc @ [new_specdir]
+		    acc @ [new_specdir,ver,rev]
 		with _ -> acc)
 		[] (make_depends ~ignore_last:true depfile)
 	    in
 	    resolve depth specdir ver rev;
 	    Dep_val ((specdir,ver,rev,spec), Dep_list
 	      (List.fold_left
-		(fun acc specdir -> 
-		  let (ver,rev) = read_pkg_release specdir in
+		(fun acc (specdir,ver,rev) ->
 		  (try acc @ [make (succ depth) (specdir,ver,rev)] with Exit -> acc)) [] depends))
 	  else
 	    begin
