@@ -94,6 +94,7 @@ let git_log ?(diff=false) ?(since=None) tag_a tag_b =
   List.rev !chunks
 
 let git_checkout
+  ?(low=false)
   ?(force=false)
   ?branch
   ?(modify=false)
@@ -106,7 +107,7 @@ let git_checkout
   if modify then add "-m";
   (match key   with Some k -> add k | None -> ());
   (match files with Some l -> List.iter add l | None -> ());
-  log_command ~env "git" !args
+  log_command ~low ~env "git" !args
 
 let git_branch ?(filter=(fun _ -> true)) ?(raw_filter=(fun _ -> true)) ?(remote=false) () =
   let branch_cleaner s =

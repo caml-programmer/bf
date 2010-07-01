@@ -2001,9 +2001,8 @@ let deptree_of_specdir ~vr specdir : clone_tree =
   let resolve depth specdir =
     log_message (sprintf "%s resolve %s" (String.make depth ' ') specdir) in
   let checkout_pack key =
-    log_message (sprintf "checkout pack by key (%s)" key);
     with_dir pkgdir
-      (Git.git_checkout ~key) in
+      (Git.git_checkout ~low:true ~key) in
 
   let (ver,rev) =
     match vr with

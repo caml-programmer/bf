@@ -94,7 +94,7 @@ let log_error error =
   log_message ~key:"error" error;
   exit 3
 
-let log_command ?env ?error_handler prog args =
+let log_command ?(low=false) ?env ?error_handler prog args =
   let out_buf = Buffer.create 256 in
   let err_buf = Buffer.create 256 in
   with_logger
@@ -118,10 +118,13 @@ let log_command ?env ?error_handler prog args =
 	in
 	let cmd_s = program ^ " " ^ (String.concat " " args) in
 	let log_fd =
-	  match Params.get_param "log-level" with
-	    | "low"  -> Unix.descr_of_out_channel logger.port
-	    | "high" -> Unix.descr_of_out_channel stdout
-	    | _      -> Unix.descr_of_out_channel stdout
+	  if low then
+	    Unix.descr_of_out_channel logger.port
+	  else
+	    match Params.get_param "log-level" with
+	      | "low"  -> Unix.descr_of_out_channel logger.port
+	      | "high" -> Unix.descr_of_out_channel stdout
+	      | _      -> Unix.descr_of_out_channel stdout
 	in
 	log_message ~logger (sprintf "run: %s" cmd_s);
 	Shell.call
