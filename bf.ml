@@ -177,7 +177,7 @@ let main () =
 		    (match Sys.argv.(3) with
 		      | "overwrite" -> (check_rec Sys.argv.(4),true,None)
 		      | "norec" -> (false,check_over Sys.argv.(4),None)
-		      | _ -> (true,false,Some (Sys.argv.(5), make_int Sys.argv.(6))))
+		      | _ -> (true,false,Some (Sys.argv.(3), make_int Sys.argv.(4))))
 		  else if len = 7 then
 		    (match Sys.argv.(3) with
 		      | "overwrite" -> (check_rec
