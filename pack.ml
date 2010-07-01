@@ -1359,7 +1359,7 @@ let check_specdir specdir =
 
 let check_pack_component () =
   ignore 
-    (with_component_dir ~strict:false (make_component "pack")
+    (with_component_dir ~low:true ~strict:false (make_component "pack")
       (fun () ->
 	(match Git.git_current_branch () with
 	  | Some "master" ->

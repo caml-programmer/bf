@@ -5,19 +5,19 @@ open Ocs_types
 open Printf
 open Types
 
-let checkout_component component =
+let checkout_component ?(low=false) component =
   match component.label with
     | Tag key ->
-	git_checkout ~force:true ~key ()
+	git_checkout ~low ~force:true ~key ()
     | Branch key ->
-	git_checkout ~force:true ~key ()
+	git_checkout ~low ~force:true ~key ()
     | Current ->
 	let branches =
 	  git_branch ~remote:false () in
 	if List.mem "master" branches then
-	  git_checkout ~force:true ~key:"master" ()
+	  git_checkout ~low ~force:true ~key:"master" ()
 	else
-	  git_checkout ~force:true ~key:"HEAD" ()
+	  git_checkout ~low ~force:true ~key:"HEAD" ()
 
 let remove_component component =
   if System.is_directory component.name then
@@ -31,7 +31,7 @@ let clone_component component =
 let origin s = 
   "origin/" ^ s
 
-let with_component_dir ?(strict=true) component thunk =
+let with_component_dir ?(low=false) ?(strict=true) component thunk =
   let curdir = Sys.getcwd () in
 
   let with_dir f =
@@ -51,7 +51,7 @@ let with_component_dir ?(strict=true) component thunk =
   Params.update_param "label" label;
   Params.update_param "label-type" label_type;
 
-  log_message
+  log_message ~low
     (Printf.sprintf "=> component (%s %s [%s])"
       (curdir ^ "/" ^ component.name) label_type label);
 
@@ -60,26 +60,26 @@ let with_component_dir ?(strict=true) component thunk =
 
   match git_component_status ~strict component with
     | Tree_not_exists ->
-	log_message "status: working tree is not exists";
+	log_message ~low "status: working tree is not exists";
 	remove_component component;
 	clone_component component;
 	with_dir (fun () ->
 	  git_track_new_branches ();
-	  checkout_component component;
+	  checkout_component ~low component;
 	  true)
     | Tree_exists_with_given_key content_status ->
 	(match content_status with
 	  | Tree_prepared ->
-	      log_message "status: working tree is prepared";
+	      log_message ~low "status: working tree is prepared";
 	      with_dir (fun () -> false)
 	  | Tree_changed changes ->
-	      log_message
+	      log_message ~low
 		(sprintf "status: working tree is changed(%d)" (List.length changes));
 	      with_dir (fun () ->
-		checkout_component component; git_clean ();
+		checkout_component ~low component; git_clean ();
 		true))
     | Tree_exists_with_other_key key ->
-	log_message 
+	log_message ~low 
 	  (sprintf "status: working tree exists with other key (%s)" key);
 	with_dir (fun () ->
 	  (match component.label with
@@ -96,7 +96,7 @@ let with_component_dir ?(strict=true) component thunk =
 		    git_track_new_branches ();
 		  end
 	    | _ -> ());	  
-	  checkout_component component;
+	  checkout_component ~low component;
 	  git_clean ();
 	  true)
   
