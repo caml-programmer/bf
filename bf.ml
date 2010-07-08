@@ -19,7 +19,7 @@ let usage () =
   print_endline "   or: bf upgrade <specdir> [lazy|complete] [<branch>]";
   print_endline "   or: bf branch <specdir> <source-branch> <new-branch>";
   print_endline "   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite|depends|packages]";
-  print_endline "   or: bf clone <specdir> [overwrite] [norec] [<ver>] [<rev>]";
+  print_endline "   or: bf clone <specdir> [overwrite] [norec] [<ver> <rev>]";
   print_endline "   or: bf top <specdir> [overwrite] [norec]";
   print_endline "   or: bf tag <composite> <tag>";
   print_endline "   or: bf log <logdir>";

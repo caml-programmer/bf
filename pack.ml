@@ -2219,6 +2219,9 @@ let clone ?(vr=None) ~recursive ~overwrite specdir =
 let branch specdir src dst =
   printf "Create new pack branch from %s to %s\n%!" src dst;
 
+  check_specdir specdir;
+  check_pack_component ();
+
   let dir = Filename.dirname in
   let depends =
     get_pack_depends ~default_branch:(Some src) (Hashtbl.create 32) [] specdir in
@@ -2241,7 +2244,7 @@ let branch specdir src dst =
 	      Git.git_push ~refspec:dst ".";
 	      Git.git_pull "origin";
 	    end
-	in	
+	in
 	(match c.label with
 	  | Current ->
 	      printf "Warning: used current branch for %s component forking\n%!" c.name;
@@ -2278,7 +2281,3 @@ let branch specdir src dst =
   
   List.iter fork_pack_branch (List.rev depends);
   update_pack ()
-  
-  
-  
-
