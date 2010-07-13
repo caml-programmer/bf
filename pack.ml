@@ -489,6 +489,10 @@ let string_of_pkg_op = function
   | Pkg_gt -> ">"
   | Pkg_last -> "="
 
+let string_of_op = function
+  | Pkg_last -> "last"
+  | v -> string_of_pkg_op v
+
 let make_depends ?(interactive=false) ?(ignore_last=false) file =
   let acc = ref ([] : depend list) in
   let add_depend v = acc := v::!acc in
@@ -612,6 +616,105 @@ let make_depends ?(interactive=false) ?(ignore_last=false) file =
     end
   else []
 
+let parse_depends file =
+  let make_dep v =
+    let v2 = Scheme.map (fun v -> v) v in
+    try
+      let name_v = List.hd v2 in
+      let op_ver_v = try Some (List.nth v2 1) with _ -> None in
+      let desc_v = try Some (List.nth v2 2) with _ -> None in
+      
+      let pkg_name = ref None in
+      let pkg_op = ref None in
+      let pkg_ver = ref None in
+      let pkg_desc = ref None in
+      
+      let add_op op v =
+	let ver =
+	  Scheme.make_string (Scheme.fst v) in
+	pkg_op  := Some op;
+	pkg_ver := Some ver;
+      in
+      
+      (match name_v with
+	| Ssymbol s -> pkg_name := Some s
+	| Sstring s -> pkg_name := Some s
+	| _ -> ());
+      (match op_ver_v with
+	| None -> ()
+	| Some op_ver ->
+	    Scheme.parse
+	      [
+		"=",add_op Pkg_eq;
+		">",add_op Pkg_gt;
+		"<",add_op Pkg_lt;
+		">=", add_op Pkg_ge;
+		"<=", add_op Pkg_le;
+		"last", add_op Pkg_last;
+	      ] op_ver);
+      (match desc_v with
+	| None -> ()
+	| Some desc ->
+	    Scheme.parse
+	      [ "desc", (fun v -> 
+		pkg_desc := Some (Scheme.make_string (Scheme.fst v))) ] desc);
+      
+      (match (!pkg_name : pkg_name option) with
+	| Some name ->
+	    (match !pkg_op, !pkg_ver with
+	      | Some op, Some ver ->
+		  (name,(Some (op,ver)),!pkg_desc)
+	      | _ ->
+		  (name,None,!pkg_desc))
+	| None -> raise Not_found)
+    with exn ->
+      log_message (Printexc.to_string exn);
+      log_message "Package value:";
+      Scheme.print v;
+      log_error "Cannot add package"
+  in   
+  let add_os v =
+    let n = 
+      Scheme.make_string (Scheme.fst v) in
+    n, (Scheme.map make_dep (Scheme.snd (Scheme.snd v)))
+  in
+  if Sys.file_exists file then
+    begin
+      let acc = ref [] in
+      Scheme.parse
+	["depends",(fun v -> acc := (Scheme.map add_os v))]
+	(Ocs_read.read_from_port
+	  (Ocs_port.open_input_port file));
+      !acc
+    end
+  else []
+
+let write_depends file depends =
+  let ch = open_out file in
+  let out = output_string ch in
+  out "(depends\n";
+  List.iter 
+    (fun (os,deps) ->
+      out (sprintf "  (%s ()\n" os);
+      List.iter 
+	(fun (pkg_name, ov_opt, pkg_desc_opt) ->
+	  let pkg_desc =
+	    match pkg_desc_opt with
+	      | None -> ""
+	      | Some desc ->
+		  sprintf " (desc \"%s\")" desc
+	  in
+	  match ov_opt with
+	    | Some (op,ver) ->
+		out (sprintf "    (\"%s\" (%s \"%s\")%s)\n" pkg_name (string_of_op op) ver pkg_desc)
+	    | None ->
+		out (sprintf "    (\"%s\"%s)\n" pkg_name pkg_desc))
+	deps;
+      out "  )\n";
+    ) depends;
+  out ")\n";
+  close_out ch
+
 let spec_from_v2 ~version ~revision specdir =
   let f = Filename.concat specdir in
   let pkgname = 
@@ -642,7 +745,7 @@ let spec_from_v2 ~version ~revision specdir =
   let provides =
     let n = f "provides" in
     let p =
-      with_platform 
+      with_platform
 	(fun os platform ->
 	  sprintf "packbranch-%s = %s-%s-%s.%s" pack_branch pkgname
 	  version revision (string_of_platform platform)) in
@@ -702,7 +805,7 @@ let print_depends depends =
   List.iter
     (fun (pkg_name, ov_opt, pkg_desc) ->
       print_endline (sprintf "  - pkg-name(%s), pkg-op(%s), pkg-ver(%s), pkg-desc(%s)" pkg_name
-	(match ov_opt with Some ov -> string_of_pkg_op (fst ov) | None -> "")
+	(match ov_opt with Some ov -> string_of_op (fst ov) | None -> "")
 	(match ov_opt with Some ov -> snd ov | None -> "")
 	(match pkg_desc with Some s -> s | None -> "")))
     depends
@@ -2215,20 +2318,64 @@ let clone ?(vr=None) ~recursive ~overwrite specdir =
 	ignore(update ~ready_spec:spec ~check_pack:false ~specdir ~ver:(Some ver) ~rev:(Some (string_of_int rev)) ()))
     (with_rec depends)
 
-	  
-let branch specdir src dst =
-  printf "Create new pack branch from %s to %s\n%!" src dst;
+exception Bad_version_format_for_major_increment of string
+
+let major_increment ver =
+  try
+    let pos = String.index ver '.' in
+    let len = String.length ver in
+    let major =
+      int_of_string (String.sub ver 0 pos) in
+    (string_of_int (succ major)) ^ (String.sub ver pos (len - pos))
+  with _ ->
+    raise (Bad_version_format_for_major_increment ver)
+    
+let write_release file l =
+  let ch = open_out file in
+  List.iter (fun s ->
+    output_string ch s;
+    output_string ch "\n") l;
+  close_out ch
+
+let change_release specdir =
+  let (ver,rev) =
+    read_pkg_release specdir in
+  [sprintf "%s %d" (major_increment ver) 0]
+
+let fork specdir src dst =
+  log_message
+    (sprintf "Create new pack branch %s from %s:\n%!" dst src);
 
   check_specdir specdir;
   check_pack_component ();
 
   let dir = Filename.dirname in
-  let depends =
-    get_pack_depends ~default_branch:(Some src) (Hashtbl.create 32) [] specdir in
-
   let pack_dir = dir (dir specdir) in
+  let deptree = deptree_of_pack ~default_branch:(Some src) specdir in
+  let depends =
+    resort_depends (max_uniquely (list_of_deptree deptree)) in
+  log_message "depend list...";
+  List.iter print_endline depends;
 
-  let change =
+  let check_components =
+    print_endline "check components...";
+    List.iter
+      (fun c ->
+	let component_location =
+	  let s = Filename.concat pack_dir c.name in
+	  if Sys.file_exists s then s
+	  else s ^ ".git"
+	in
+	(match c.label with
+	  | Current ->
+	      log_error (sprintf "used current branch for %s component forking\n%!" c.name)
+	  | Branch start -> ()
+	  | Tag s ->
+	      log_message (sprintf "Warning: tag %s unchanged while %s component forking\n%!" s c.name);
+	      ()))
+  in
+
+  let change_components ?(full=true) =
     List.map
       (fun c ->
 	let component_location =
@@ -2248,36 +2395,112 @@ let branch specdir src dst =
 	(match c.label with
 	  | Current ->
 	      printf "Warning: used current branch for %s component forking\n%!" c.name;
-	      with_dir 
-		component_location make_new_branch;
+	      if full then
+		with_dir component_location make_new_branch;
 	      { c with label = Branch dst }
 	  | Branch start ->
 	      if c.name = "pack" then c
 	      else
 		begin
-		  with_dir component_location (make_new_branch ~start);
+		  if full then
+		    with_dir component_location (make_new_branch ~start);
 		  { c with label = Branch dst }
 		end
 	  | Tag s ->
 	      printf "Warning: tag %s unchanged while %s component forking\n%!" s c.name;
 	      c))
   in
-  let fork_pack_branch specdir =
-    let dstdir = Filename.concat (dir specdir) dst in
-    let composite = Filename.concat specdir "composite" in
-    let components = 
-      components_of_composite composite in
-    make_directory_r dstdir;
-    write_composite
-      (Filename.concat dstdir composite) (change components)
+  
+  let change_depends depends =
+    let change = function
+      | None -> None
+      | Some (op,ver) ->
+	  Some (op,major_increment ver)
+    in
+    List.map (fun (os,deplist) ->
+      os,(List.map (fun (pkgname,ov_opt,pkg_desc_opt) -> 
+	(pkgname,(change ov_opt),pkg_desc_opt)) deplist)) 
+      depends
   in
 
-  let update_pack () =
+  let check specdir =
+    check_components
+      (components_of_composite
+	(Filename.concat specdir "composite")) in
+
+  let commit_pack_changes () =
     with_dir pack_dir
       (fun () ->
 	Git.git_add ".";
 	Git.git_commit (sprintf "add new pack branch %s from %s" dst src));
   in
   
-  List.iter fork_pack_branch (List.rev depends);
-  update_pack ()
+  let make_new_specdir specdir =
+    Filename.concat (dir specdir) dst in
+  
+  let fork_components specdir =
+    let files = System.list_of_directory specdir in
+    let forkdir = make_new_specdir specdir in
+    let components = 
+      components_of_composite (Filename.concat specdir "composite") in
+    make_directory_r forkdir;
+    
+    let ignore = ["depends";"composite";"release"] in
+    List.iter
+      (fun n ->
+	if not (List.mem n ignore) then
+	  System.copy_file
+	    (Filename.concat specdir n)
+	    (Filename.concat forkdir n)) files;
+    
+    if Sys.file_exists (Filename.concat specdir "composite") && (not (Sys.file_exists (Filename.concat forkdir "composite"))) then
+      write_composite (Filename.concat forkdir "composite") (change_components ~full:false components);
+    
+    if Sys.file_exists (Filename.concat specdir "depends") then
+      begin
+	if Sys.file_exists (Filename.concat forkdir "depends") then
+	  begin (* it is necessary for aborting process after copy the depends file *)
+	    let depends =
+	      parse_depends (Filename.concat forkdir "depends") in
+	    write_depends
+	      (Filename.concat specdir "depends") (change_depends depends);
+	  end
+	else
+	  begin
+	    let depends =
+	      parse_depends (Filename.concat specdir "depends") in
+	    System.copy_file (Filename.concat specdir "depends") (Filename.concat forkdir "depends");
+	    write_depends
+	      (Filename.concat specdir "depends") (change_depends depends);
+	  end
+      end;
+
+    if Sys.file_exists (Filename.concat specdir "release") then
+      if Sys.file_exists (Filename.concat forkdir "release") then
+	begin
+	  write_release
+	    (Filename.concat specdir "release")
+	    (change_release forkdir);
+	end
+      else
+	begin
+	  System.copy_file (Filename.concat specdir "release") (Filename.concat forkdir "release");
+	  write_release
+	    (Filename.concat specdir "release")
+	    (change_release forkdir)
+	end
+  in
+  
+  List.iter check depends;
+  List.iter
+    fork_components depends
+  (*commit_pack_changes ()*)
+
+
+
+
+
+
+
+
+
