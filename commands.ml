@@ -174,8 +174,13 @@ let rec scan_entry f dir =
     (fun s ->
       if s <> "." && s <> ".." then
 	let abs = Filename.concat dir s in
+	let st = Unix.stat abs in
 	let last =
-	  (Unix.stat abs).Unix.st_mtime in
+	  match st.Unix.st_kind with
+	    | Unix.S_LNK ->
+		(Unix.lstat abs).Unix.st_mtime
+	    | _ -> st.Unix.st_mtime
+	in
 	if System.is_directory abs then
 	  (f (Dir abs,last); scan_entry f abs)
 	else

@@ -2342,16 +2342,48 @@ let change_release specdir =
     read_pkg_release specdir in
   [sprintf "%s %d" (major_increment ver) 0]
 
-let fork specdir src dst =
+let make_external_depends packdir branch local_depends =
+  List.filter
+    (fun specdir ->
+      let depfile = Filename.concat specdir "depends" in
+      Sys.file_exists depfile && (not (List.mem specdir local_depends)))
+    (List.map (fun s -> Filename.concat packdir (sprintf "%s/%s" s branch))
+      (System.list_of_directory packdir))
+
+let update_external_depends local_depends specdir =
+  let depends =
+    parse_depends (Filename.concat specdir "depends") in
+  let fixed_depends =
+    let change pkgname = function
+      | None -> None
+      | Some (op,ver) ->
+	  let specdir' =
+	    let d = Filename.dirname in
+	    Filename.concat (d (d specdir))
+	      (sprintf "%s/%s" pkgname (branch_of_specdir specdir)) in
+	  if List.mem specdir' local_depends then
+	    Some (op,major_increment ver)
+	  else
+	    Some (op,ver)
+    in
+    List.map (fun (os,deplist) ->
+      os,(List.map (fun (pkgname,ov_opt,pkg_desc_opt) -> 
+	(pkgname,(change pkgname ov_opt),pkg_desc_opt)) deplist)) 
+      depends      
+  in
+  write_depends
+    (Filename.concat specdir "depends") fixed_depends
+
+let fork top_specdir src dst =
   log_message
     (sprintf "Create new pack branch %s from %s:\n%!" dst src);
 
-  check_specdir specdir;
+  check_specdir top_specdir;
   check_pack_component ();
 
   let dir = Filename.dirname in
-  let pack_dir = dir (dir specdir) in
-  let deptree = deptree_of_pack ~default_branch:(Some src) specdir in
+  let pack_dir = dir (dir top_specdir) in
+  let deptree = deptree_of_pack ~default_branch:(Some src) top_specdir in
   let depends =
     resort_depends (max_uniquely (list_of_deptree deptree)) in
   log_message "depend list...";
@@ -2455,7 +2487,8 @@ let fork specdir src dst =
     
     if Sys.file_exists (Filename.concat specdir "composite") && (not (Sys.file_exists (Filename.concat forkdir "composite"))) then
       write_composite (Filename.concat forkdir "composite") (change_components ~full:false components);
-    
+
+
     if Sys.file_exists (Filename.concat specdir "depends") then
       begin
 	if Sys.file_exists (Filename.concat forkdir "depends") then
@@ -2473,8 +2506,8 @@ let fork specdir src dst =
 	    write_depends
 	      (Filename.concat specdir "depends") (change_depends depends);
 	  end
-      end;
-
+      end;    
+    
     if Sys.file_exists (Filename.concat specdir "release") then
       if Sys.file_exists (Filename.concat forkdir "release") then
 	begin
@@ -2490,10 +2523,13 @@ let fork specdir src dst =
 	    (change_release forkdir)
 	end
   in
-  
+
   List.iter check depends;
   List.iter
-    fork_components depends
+    fork_components depends;
+  List.iter (update_external_depends depends)
+    (make_external_depends pack_dir (branch_of_specdir top_specdir) depends)
+  
   (*commit_pack_changes ()*)
 
 
