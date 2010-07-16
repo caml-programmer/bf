@@ -2506,7 +2506,7 @@ let fork top_specdir src dst =
 	    write_depends
 	      (Filename.concat specdir "depends") (change_depends depends);
 	  end
-      end;    
+      end;
     
     if Sys.file_exists (Filename.concat specdir "release") then
       if Sys.file_exists (Filename.concat forkdir "release") then
@@ -2532,7 +2532,68 @@ let fork top_specdir src dst =
   
   (*commit_pack_changes ()*)
 
+exception Cannot_create_image of string
+exception Cannot_view_image of string
 
+let graph specdir =
+  let dotfile = "graph.dot" in
+  let pngfile = "graph.png" in
+
+  let tree = toptree_of_specdir specdir in
+  let depends =  
+    resort_depends (max_uniquely (list_of_deptree tree)) in
+  
+  List.iter 
+    (fun (n,v,r) -> printf "%s %s %d\n" (pkgname_of_specdir n) v r) depends;
+  let ch = open_out dotfile in
+  let out = output_string ch in
+  
+  out "digraph g {\n";
+  out "graph [ rankdir = \"LR\" ];\n";
+  out "node  [ fontname = \"Arial\", fontsize = \"10\" ];\n"; (* , //shape = record  *)
+  out "edge  [ labelfontname = \"Arial\", labelfontsize = \"10\" ];\n";  (* , //style = dashed *)
+  
+  List.iter
+    (fun (n,v,r) ->
+      out (sprintf "\"%s %s-%d\"
+    [shape=box,style=\"rounded,filled\",fillcolor=\"#77CC77\"]\n" (pkgname_of_specdir n) v r))
+    depends;
+
+  let rec write_links parent = function
+    | Dep_val (e, tree) ->
+	let (en,ev,er) = e in
+	(match parent with
+	  | Some p ->
+	      let (pn,pv,pr) = p in
+	      out (sprintf "\"%s %s-%d\" -> \"%s %s-%d\"\n" 
+		(pkgname_of_specdir pn) pv pr 
+		(pkgname_of_specdir en) ev er);
+	      write_links (Some e) tree
+	  | None ->
+	      write_links (Some e) tree)
+    | Dep_list l ->
+	List.iter (write_links parent) l
+  in
+
+  let make_image () =
+    if Sys.command (sprintf "dot -Tpng %s > %s" dotfile pngfile) <> 0 then
+      raise (Cannot_create_image pngfile)
+  in
+  
+  let view_image () =
+    if Sys.command (sprintf "qiv -f %s" pngfile) <> 0 then
+      if Sys.command (sprintf "gqview %s" pngfile) <> 0 then
+	raise (Cannot_view_image pngfile)
+  in
+
+  write_links None tree;
+  
+  out "}\n";
+  close_out ch;
+  make_image ();
+  view_image ()
+
+  
 
 
 

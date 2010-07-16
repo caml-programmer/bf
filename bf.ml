@@ -21,6 +21,7 @@ let usage () =
   print_endline "   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite|depends|packages]";
   print_endline "   or: bf clone <specdir> [overwrite] [norec] [<ver> <rev>]";
   print_endline "   or: bf top <specdir> [overwrite] [norec]";
+  print_endline "   or: bf graph <specdir>";
   print_endline "   or: bf tag <composite> <tag>";
   print_endline "   or: bf log <logdir>";
   exit 1
@@ -244,6 +245,10 @@ let main () =
 	    if len <> 5 then
 	      usage ()
 	    else Pack.fork Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
+	| "graph" ->
+	    if len <> 3 then
+	      usage ()
+	    else Pack.graph Sys.argv.(2)
 	| "tag" ->
 	    if len = 4 then
 	      Commands.tag_composite Sys.argv.(2) Sys.argv.(3)
