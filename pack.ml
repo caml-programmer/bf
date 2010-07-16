@@ -2555,7 +2555,7 @@ let graph specdir =
   
   List.iter
     (fun (n,v,r) ->
-      out (sprintf "\"%s %s-%d\"
+      out (sprintf "\"%s\\n%s-%d\"
     [shape=box,style=\"rounded,filled\",fillcolor=\"#77CC77\"]\n" (pkgname_of_specdir n) v r))
     depends;
 
@@ -2565,7 +2565,7 @@ let graph specdir =
 	(match parent with
 	  | Some p ->
 	      let (pn,pv,pr) = p in
-	      out (sprintf "\"%s %s-%d\" -> \"%s %s-%d\"\n" 
+	      out (sprintf "\"%s\\n%s-%d\" -> \"%s\\n%s-%d\"\n" 
 		(pkgname_of_specdir pn) pv pr 
 		(pkgname_of_specdir en) ev er);
 	      write_links (Some e) tree
