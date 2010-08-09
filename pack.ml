@@ -2599,7 +2599,7 @@ let diff_packages specdir rev_a rev_b =
     try
       let pos = String.index s '-' in
       let len = String.length s in
-      String.sub s 0 (pred pos),
+      String.sub s 0 pos,
       int_of_string (String.sub s (succ pos) (len - pos - 1))
     with _ -> raise (Invalid_argument s)
   in
