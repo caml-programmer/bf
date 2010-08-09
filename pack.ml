@@ -2628,7 +2628,7 @@ let diff_packages ?(changelog=false) specdir rev_a rev_b =
 	    let tag_b = sprintf "%s/%s-%d" (pkgname_of_specdir pkgname_b) ver_b rev_b in
 	    List.iter (List.iter print_endline)
 	      (List.map (changelog_component tag_a tag_b)
-		(Rules.components_of_composite composite))
+		(List.filter (fun c -> c.name <> "pack") (Rules.components_of_composite composite)))
 	  end
       with Not_found ->
 	printf "+ %s %s %d\n%!" pkgname_b ver_b rev_b))
