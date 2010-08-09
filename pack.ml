@@ -2607,7 +2607,7 @@ let diff_packages ?(changelog=false) specdir rev_a rev_b =
   let tree_a =
     deptree_of_specdir ~vr:(Some (vr_of_rev rev_a)) specdir in
   let tree_b =
-    deptree_of_specdir ~vr:(Some (vr_of_rev rev_b)) specdir in  
+    deptree_of_specdir ~vr:(Some (vr_of_rev rev_b)) specdir in
   let depends_a =
     List.map (fun (p,v,r,s) -> p,(v,r))
       (resort_depends (max_uniquely (list_of_deptree tree_a))) in
@@ -2624,12 +2624,13 @@ let diff_packages ?(changelog=false) specdir rev_a rev_b =
 	  begin
 	    let composite =
 	      Filename.concat pkgname_b "composite" in
-	    let tag_a = sprintf "%s/%s-%d" (pkgname_of_specdir pkgname_b) ver_a rev_a in
-	    let tag_b = sprintf "%s/%s-%d" (pkgname_of_specdir pkgname_b) ver_b rev_b in
+	    let pkgname = pkgname_of_specdir pkgname_b in
+	    let tag_a = sprintf "%s/%s-%d" pkgname ver_a rev_a in
+	    let tag_b = sprintf "%s/%s-%d" pkgname ver_b rev_b in
 	    if tag_a <> tag_b then
 	      List.iter (List.iter print_endline)
 		(List.map (changelog_component tag_a tag_b)
-		  (List.filter (fun c -> c.name <> "pack") (Rules.components_of_composite composite)))
+		  (List.filter (fun c -> c.name <> "pack" && c.pkg = None) (Rules.components_of_composite composite)))
 	  end
       with Not_found ->
 	printf "+ %s %s %d\n%!" pkgname_b ver_b rev_b))
