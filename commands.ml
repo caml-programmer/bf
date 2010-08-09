@@ -577,7 +577,7 @@ let make_diff tag_a tag_b components =
 
 let changelog_component ?(diff=false) ?(since=None) tag_a tag_b component =
   let chunks = ref [] in
-  ignore (with_component_dir ~strict:false component
+  ignore (with_component_dir ~low:true ~strict:false component
     (fun () ->
       let logs = git_log ~diff ~since tag_a tag_b in
       if List.length logs > 0 && String.length (List.nth logs 0) > 2 then
