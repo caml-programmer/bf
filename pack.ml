@@ -2535,7 +2535,7 @@ let fork top_specdir src dst =
 exception Cannot_create_image of string
 exception Cannot_view_image of string
 
-let graph specdir =
+let graph ?ver ?rev specdir =
   let dotfile = "graph.dot" in
   let pngfile = "graph.png" in
 
@@ -2593,10 +2593,42 @@ let graph specdir =
   make_image ();
   view_image ()
 
+let diff_packages specdir rev_a rev_b =
+  let pkgname = pkgname_of_specdir specdir in
+  let vr_of_rev s =
+    try
+      let pos = String.index s '-' in
+      let len = String.length s in
+      String.sub s 0 (pred pos),
+      int_of_string (String.sub s (succ pos) (len - pos - 1))
+    with _ -> raise (Invalid_argument s)
+  in
+  let tree_a =
+    deptree_of_specdir ~vr:(Some (vr_of_rev rev_a)) specdir in
+  let tree_b =
+    deptree_of_specdir ~vr:(Some (vr_of_rev rev_b)) specdir in  
+  let depends_a =
+    List.map (fun (p,v,r,s) -> p,(v,r))
+      (resort_depends (max_uniquely (list_of_deptree tree_a))) in
+  let depends_b =
+    List.map (fun (p,v,r,s) -> p,(v,r))
+      (resort_depends (max_uniquely (list_of_deptree tree_b))) in
   
-
-
-
+  List.iter 
+    (fun (pkgname_b,(ver_b,rev_b)) ->
+      (try
+	let (ver_a,rev_a) = 
+	  List.assoc pkgname_b depends_a in
+	printf "# %s %s %d -> %s %d\n%!" pkgname_b ver_a rev_a ver_b rev_b
+      with Not_found ->
+	printf "+ %s %s %d\n%!" pkgname_b ver_b rev_b))
+    depends_b;
+      
+  List.iter
+    (fun (pkgname_a,(ver_a,rev_a)) ->
+      if not (List.mem_assoc pkgname_a depends_b) then
+	printf "- %s %s %d\n%!" pkgname_a ver_a rev_a)
+    depends_a
 
 
 

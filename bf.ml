@@ -13,6 +13,7 @@ let usage () =
   print_endline "   or: bf (prepare|update|forward|[re]build|[re]install|status) <component> [branch <branch> | tag <tag>]";
   print_endline "   or: bf (prepare|update|forward|[re]build|[re]install|status) <composite> [<tag>]";
   print_endline "   or: bf (diff|changelog) <composite> <tag-a> <tag-b>";
+  print_endline "   or: bf diff <specdir> <rev-a> <rev-b>";
   print_endline "   or: bf review <composite> <since-date>";
   print_endline "   or: bf pack <specdir> <version> <release>";
   print_endline "   or: bf update <specdir> [lazy] [<version>] [<release>]";
@@ -21,7 +22,7 @@ let usage () =
   print_endline "   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite|depends|packages]";
   print_endline "   or: bf clone <specdir> [overwrite] [norec] [<ver> <rev>]";
   print_endline "   or: bf top <specdir> [overwrite] [norec]";
-  print_endline "   or: bf graph <specdir>";
+  print_endline "   or: bf graph <specdir> [<ver> <rev>]";
   print_endline "   or: bf tag <composite> <tag>";
   print_endline "   or: bf log <logdir>";
   exit 1
@@ -247,8 +248,12 @@ let main () =
 	    else Pack.fork Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	| "graph" ->
 	    if len <> 3 then
-	      usage ()
-	    else Pack.graph Sys.argv.(2)
+	      if len <> 5 then
+		usage ()
+	      else
+		Pack.graph ~ver:Sys.argv.(3) ~rev:Sys.argv.(4) Sys.argv.(2)
+	    else
+		Pack.graph Sys.argv.(2)
 	| "tag" ->
 	    if len = 4 then
 	      Commands.tag_composite Sys.argv.(2) Sys.argv.(3)
@@ -259,7 +264,10 @@ let main () =
 	    else usage ()
 	| "diff" ->
 	    if len = 5 then
-	      Commands.diff_composite Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
+	      if Filename.basename Sys.argv.(2) = "composite" then
+		Commands.diff_composite Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
+	      else
+		Pack.diff_packages Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	    else usage ()
 	| "changelog" ->
 	    if len = 5 then
