@@ -27,6 +27,9 @@ let usage () =
   print_endline "   or: bf log <logdir>";
   exit 1
 
+let make_int s =
+  try int_of_string s with _ -> usage ()
+
 let analyze_arguments () =
   match Array.length Sys.argv with
     | 1 | 2 -> usage ()
@@ -165,8 +168,6 @@ let main () =
 	      begin
 		let check_rec s = if s = "norec" then false else usage () in
 		let check_over s = if s = "overwrite" then true else usage () in
-		let make_int s =
-		  try int_of_string s with _ -> usage () in
 		let (recursive,overwrite,vr) =
 		  if len = 3 then
 		    (true,false,None)
@@ -251,7 +252,7 @@ let main () =
 	      if len <> 5 then
 		usage ()
 	      else
-		Pack.graph ~ver:Sys.argv.(3) ~rev:Sys.argv.(4) Sys.argv.(2)
+		Pack.graph ~ver:Sys.argv.(3) ~rev:(make_int Sys.argv.(4)) Sys.argv.(2)
 	    else
 		Pack.graph Sys.argv.(2)
 	| "tag" ->

@@ -2539,12 +2539,18 @@ let graph ?ver ?rev specdir =
   let dotfile = "graph.dot" in
   let pngfile = "graph.png" in
 
-  let tree = toptree_of_specdir specdir in
+  let vr =
+    match ver,rev with
+      | Some v, Some r -> Some (v,r)
+      | _ -> None
+  in
+
+  let tree = deptree_of_specdir ~vr specdir in
   let depends =  
     resort_depends (max_uniquely (list_of_deptree tree)) in
   
   List.iter 
-    (fun (n,v,r) -> printf "%s %s %d\n" (pkgname_of_specdir n) v r) depends;
+    (fun (n,v,r,_) -> printf "%s %s %d\n" (pkgname_of_specdir n) v r) depends;
   let ch = open_out dotfile in
   let out = output_string ch in
   
@@ -2554,17 +2560,17 @@ let graph ?ver ?rev specdir =
   out "edge  [ labelfontname = \"Arial\", labelfontsize = \"10\" ];\n";  (* , //style = dashed *)
   
   List.iter
-    (fun (n,v,r) ->
+    (fun (n,v,r,_) ->
       out (sprintf "\"%s\\n%s-%d\"
     [shape=box,style=\"rounded,filled\",fillcolor=\"#77CC77\"]\n" (pkgname_of_specdir n) v r))
     depends;
 
   let rec write_links parent = function
     | Dep_val (e, tree) ->
-	let (en,ev,er) = e in
+	let (en,ev,er,_) = e in
 	(match parent with
 	  | Some p ->
-	      let (pn,pv,pr) = p in
+	      let (pn,pv,pr,_) = p in
 	      out (sprintf "\"%s\\n%s-%d\" -> \"%s\\n%s-%d\"\n" 
 		(pkgname_of_specdir pn) pv pr 
 		(pkgname_of_specdir en) ev er);
