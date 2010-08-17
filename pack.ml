@@ -2561,12 +2561,12 @@ let fork ?(depth=0) top_specdir src dst =
   List.iter (update_external_depends depends)
     (make_external_depends pack_dir (branch_of_specdir top_specdir) depends);
   List.iter (fun x ->
-    log_message (sprintf "Need branching %s\n" (fst x))) !branch_jobs;
+    log_message (sprintf "Need branching %s" (fst x))) !branch_jobs;
   log_message "Delay before components branching...";
   stop_delay 10;
   List.iter
     (fun (loc,f) -> 
-      log_message (sprintf "Branching %s\n" loc);
+      log_message (sprintf "Branching %s" loc);
       with_dir loc f)
     !branch_jobs;
   log_message "Delay before commit pack changes...";
