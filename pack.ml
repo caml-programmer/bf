@@ -2330,6 +2330,23 @@ let major_increment ver =
   with _ ->
     raise (Bad_version_format_for_major_increment ver)
     
+let clear_version_symbols s =
+  let b = Buffer.create 32 in
+  String.iter 
+    (function
+      | '0' .. '9'
+      | '.' as c -> Buffer.add_char b c
+      | _ -> ()) s;
+  Buffer.contents b
+
+let minor_increment ver =
+  let ver = clear_version_symbols ver in
+  let pos = String.rindex ver '.' in
+  let len = String.length ver in
+  let minor =
+    int_of_string (String.sub ver (succ pos) (len - 1 - pos)) in
+  (String.sub ver 0 (succ pos)) ^ (string_of_int (succ minor))
+
 let write_release file l =
   let ch = open_out file in
   List.iter (fun s ->
@@ -2337,10 +2354,13 @@ let write_release file l =
     output_string ch "\n") l;
   close_out ch
 
-let change_release specdir =
+let change_release depth local_depth specdir =
   let (ver,rev) =
     read_pkg_release specdir in
-  [sprintf "%s %d" (major_increment ver) 0]
+  if local_depth > depth then
+    [sprintf "%s %d" (major_increment ver) 0]
+  else
+    [sprintf "%s %d" (minor_increment ver) 0]
 
 let make_external_depends packdir branch local_depends =
   List.filter
@@ -2374,7 +2394,7 @@ let update_external_depends local_depends specdir =
   write_depends
     (Filename.concat specdir "depends") fixed_depends
 
-let fork top_specdir src dst =
+let fork ?(depth=0) top_specdir src dst =
   log_message
     (sprintf "Create new pack branch %s from %s:\n%!" dst src);
 
@@ -2384,8 +2404,9 @@ let fork top_specdir src dst =
   let dir = Filename.dirname in
   let pack_dir = dir (dir top_specdir) in
   let deptree = deptree_of_pack ~default_branch:(Some src) top_specdir in
+  let deplist = list_of_deptree deptree in
   let depends =
-    resort_depends (max_uniquely (list_of_deptree deptree)) in
+    resort_depends (max_uniquely deplist) in
   log_message "depend list...";
   List.iter print_endline depends;
 
@@ -2407,7 +2428,11 @@ let fork top_specdir src dst =
 	      ()))
   in
 
-  let change_components ?(full=true) =
+  let branch_jobs = ref [] in
+  let regjob loc f =
+    branch_jobs := (loc,f)::!branch_jobs in
+
+  let change_components =
     List.map
       (fun c ->
 	let component_location =
@@ -2415,27 +2440,30 @@ let fork top_specdir src dst =
 	  if Sys.file_exists s then s
 	  else s ^ ".git"
 	in
-	let make_new_branch ?start () =
-	  if not (List.mem dst (Git.git_branch ())) then
-	    Git.git_create_branch ~start dst;
+	let make_new_branch ?(start=None) () =
+	  Git.git_pull "origin";
 	  if not (List.mem (origin dst) (Git.git_branch ~remote:true ())) then
-	    begin
-	      Git.git_push ~refspec:dst ".";
-	      Git.git_pull "origin";
-	    end
+	    if List.mem dst (Git.git_branch ()) then
+	      Git.git_push ~refspec:dst "origin"
+	    else
+	      begin
+		Git.git_create_branch ~start dst;
+		Git.git_push ~refspec:dst "origin";
+	      end
+	  else
+	    log_message (sprintf "warning: remote branch (%s/%s) already exists" component_location dst)
 	in
 	(match c.label with
 	  | Current ->
 	      printf "Warning: used current branch for %s component forking\n%!" c.name;
-	      if full then
-		with_dir component_location make_new_branch;
+	      regjob component_location (make_new_branch ~start:None);
 	      { c with label = Branch dst }
 	  | Branch start ->
 	      if c.name = "pack" then c
 	      else
 		begin
-		  if full then
-		    with_dir component_location (make_new_branch ~start);
+		  regjob component_location 
+		    (make_new_branch ~start:(Some start));
 		  { c with label = Branch dst }
 		end
 	  | Tag s ->
@@ -2464,13 +2492,16 @@ let fork top_specdir src dst =
     with_dir pack_dir
       (fun () ->
 	Git.git_add ".";
-	Git.git_commit (sprintf "add new pack branch %s from %s" dst src));
+	Git.git_add "-u";
+	Git.git_commit (sprintf "add new pack branch %s from %s" dst src);
+	Git.git_push "master");
   in
   
   let make_new_specdir specdir =
     Filename.concat (dir specdir) dst in
   
   let fork_components specdir =
+    let local_depth = List.assoc specdir deplist in
     let files = System.list_of_directory specdir in
     let forkdir = make_new_specdir specdir in
     let components = 
@@ -2486,7 +2517,7 @@ let fork top_specdir src dst =
 	    (Filename.concat forkdir n)) files;
     
     if Sys.file_exists (Filename.concat specdir "composite") && (not (Sys.file_exists (Filename.concat forkdir "composite"))) then
-      write_composite (Filename.concat forkdir "composite") (change_components ~full:false components);
+      write_composite (Filename.concat forkdir "composite") (change_components components);
 
 
     if Sys.file_exists (Filename.concat specdir "depends") then
@@ -2513,14 +2544,14 @@ let fork top_specdir src dst =
 	begin
 	  write_release
 	    (Filename.concat specdir "release")
-	    (change_release forkdir);
+	    (change_release depth local_depth forkdir);
 	end
       else
 	begin
 	  System.copy_file (Filename.concat specdir "release") (Filename.concat forkdir "release");
 	  write_release
 	    (Filename.concat specdir "release")
-	    (change_release forkdir)
+	    (change_release depth local_depth forkdir)
 	end
   in
 
@@ -2528,9 +2559,19 @@ let fork top_specdir src dst =
   List.iter
     fork_components depends;
   List.iter (update_external_depends depends)
-    (make_external_depends pack_dir (branch_of_specdir top_specdir) depends)
-  
-  (*commit_pack_changes ()*)
+    (make_external_depends pack_dir (branch_of_specdir top_specdir) depends);
+  List.iter (fun x ->
+    log_message (sprintf "Need branching %s\n" (fst x))) !branch_jobs;
+  log_message "Delay before components branching...";
+  stop_delay 10;
+  List.iter
+    (fun (loc,f) -> 
+      log_message (sprintf "Branching %s\n" loc);
+      with_dir loc f)
+    !branch_jobs;
+  log_message "Delay before commit pack changes...";
+  stop_delay 10;
+  commit_pack_changes ()
 
 exception Cannot_create_image of string
 exception Cannot_view_image of string
