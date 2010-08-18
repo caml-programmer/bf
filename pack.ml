@@ -2430,7 +2430,8 @@ let fork ?(depth=0) top_specdir src dst =
 
   let branch_jobs = ref [] in
   let regjob loc f =
-    branch_jobs := (loc,f)::!branch_jobs in
+    if not (List.mem_assoc loc !branch_jobs) then
+      branch_jobs := (loc,f)::!branch_jobs in
 
   let change_components =
     List.map
