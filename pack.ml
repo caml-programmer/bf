@@ -2494,7 +2494,7 @@ let fork ?(depth=0) top_specdir src dst =
 	Git.git_add ".";
 	Git.git_add "-u";
 	Git.git_commit (sprintf "add new pack branch %s from %s" dst src);
-	Git.git_push "master");
+	Git.git_push "origin");
   in
   
   let make_new_specdir specdir =
