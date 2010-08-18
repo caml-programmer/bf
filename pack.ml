@@ -2415,7 +2415,7 @@ let fork ?(depth=0) top_specdir src dst =
     List.iter
       (fun c ->
 	let component_location =
-	  let s = Filename.concat pack_dir c.name in
+	  let s = c.name in
 	  if Sys.file_exists s then s
 	  else s ^ ".git"
 	in
@@ -2436,7 +2436,7 @@ let fork ?(depth=0) top_specdir src dst =
     List.map
       (fun c ->
 	let component_location =
-	  let s = Filename.concat pack_dir c.name in
+	  let s = c.name in
 	  if Sys.file_exists s then s
 	  else s ^ ".git"
 	in
