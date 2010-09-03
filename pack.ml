@@ -1777,7 +1777,7 @@ let extract_depend_list userhost pkg_path =
 	      (a.(1),None,None)::acc
 	    with Not_found -> acc))) []
       (System.read_lines
-	~filter:(Pcre.pmatch ~pat:"jet")
+	~filter:(Pcre.pmatch ~pat:(sprintf "^%s" (Params.get_param "pkg-prefix")))
 	(sprintf "ssh %s rpm -qRp %s" userhost pkg_path)))
 
 let name_of_pkg_path pkg_path =
@@ -1984,7 +1984,7 @@ let rec get_pack_depends ~default_branch table acc specdir =
   match
     (List.fold_left
       (fun acc (pkg,_,_) ->
-	if Hashtbl.mem table pkg || not (Pcre.pmatch ~pat:"jet" pkg) then
+	if Hashtbl.mem table pkg || not (Pcre.pmatch ~pat:(sprintf "^%s" (Params.get_param "pkg-prefix")) pkg) then
 	  acc
 	else
 	  begin
@@ -2473,14 +2473,25 @@ let fork ?(depth=0) top_specdir src dst =
   in
   
   let change_depends depends =
-    let change = function
-      | None -> None
-      | Some (op,ver) ->
-	  Some (op,major_increment ver)
+    let change pkgname ov_opt =
+      let specdir =
+	sprintf "%s/%s/%s" pack_dir pkgname src in
+      let local_depth = List.assoc specdir deplist in
+      match ov_opt with
+	| None -> None
+	| Some (op,ver) ->
+	    if local_depth > depth then
+	      Some (op,major_increment ver)
+	    else
+	      Some (op,minor_increment ver)
     in
-    List.map (fun (os,deplist) ->
-      os,(List.map (fun (pkgname,ov_opt,pkg_desc_opt) -> 
-	(pkgname,(change ov_opt),pkg_desc_opt)) deplist)) 
+    List.map
+      (fun (os,deplist) ->
+	os,(List.map (fun (pkgname,ov_opt,pkg_desc_opt) ->
+	  if Pcre.pmatch ~pat:(sprintf "^%s" (Params.get_param "pkg-prefix")) pkgname then
+	    (pkgname,(change pkgname ov_opt),pkg_desc_opt)
+	  else
+	    (pkgname,ov_opt,pkg_desc_opt)) deplist))
       depends
   in
 
