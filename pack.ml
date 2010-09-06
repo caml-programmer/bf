@@ -1574,36 +1574,91 @@ type 'a deptree =
   | Dep_val of 'a * 'a deptree
   | Dep_list of 'a deptree list
 
-(*
-let list_of_deptree tree =
+type 'a graph = ('a * 'a list) list
+
+exception Not_found_vertex
+
+let create_graph () = []
+
+let insert_vtx g v =
+  if List.mem_assoc v g then g
+  else (v,[])::g
+
+let insert_edge g a b =
+  if not (List.mem_assoc a g) then
+    raise Not_found_vertex;
+  if not (List.mem_assoc b g) then
+    raise Not_found_vertex;
+  List.map 
+    (fun (k,l) ->
+      if k = a then
+	if List.mem b l then
+	  (k,l)
+	else
+	  (k,b::l)
+      else
+	(k,l)) g
+
+let remove_vtx g v =
+  if List.mem_assoc v g then
+    List.map (fun (k,vl) -> k,(List.filter (fun x -> x <> v) vl))
+      (List.filter (fun (k,_) -> k <> v) g)
+  else g
+
+let has_edges_to g v =
+  if List.mem_assoc v g then
+    List.assoc v g
+  else raise Not_found_vertex
+
+let has_edges_from g v =
+  if List.mem_assoc v g then
+    begin
+      List.fold_left 
+	(fun acc (k,vl) ->
+	  if List.mem v vl then
+	    k::acc
+	  else acc) [] g
+    end
+  else raise Not_found_vertex
+  
+let find_finish_vtx g =
+  List.map fst (List.filter (fun (k,vl) -> vl = []) g)
+    
+let unwind g =
+  let acc = ref [] in
+  let work = ref g in
+  let remove g v =
+    acc := v :: !acc;
+    work := remove_vtx !work v;
+  in
+  while !work <> [] do
+    List.iter (remove !work)
+      (find_finish_vtx !work)
+  done;
+  (List.rev !acc)    
+
+let deplist_of_deptree tree =
   let rec make depth = function
     | Dep_val (x, Dep_list l) -> (List.flatten (List.map (make (succ depth)) l)) @ [x,depth]
     | _ -> assert false
-  in make 0 tree       
-     *)
-
-let list_of_deptree tree =
-  let map = Hashtbl.create 32 in
-  let rec make_map = function
-    | Dep_val (x, Dep_list l) ->
-	if Hashtbl.mem map x then
-	  Hashtbl.replace map x (succ (Hashtbl.find map x))
-	else
-	  Hashtbl.add map x 1;
-	List.iter make_map l
-    | _ -> assert false
-  in make_map tree;
-  let rec make depth = function
-    | Dep_val (x, Dep_list l) ->
-	(List.flatten (List.map (make (succ depth)) l))
-	@ [x,depth + 
-	  (try 
-	    Hashtbl.find map x
-	  with
-	      Not_found -> 0)]
-    | _ -> assert false
   in make 0 tree
 
+let list_of_deptree tree =
+  let g = ref (create_graph ()) in
+  let rec fill_graph parent = function
+    | Dep_val (x, Dep_list l) ->
+	(match parent with
+	  | Some p ->
+	      g := insert_vtx !g p;
+	      g := insert_vtx !g x;
+	      g := insert_edge !g p x;
+	  | None -> ());
+	List.iter (fill_graph (Some x)) l
+    | _ -> assert false
+  in fill_graph None tree;  
+  unwind !g
+
+(*
 let resort_depends l =
   let compare (pa,da,_) (pb,db,_) =
     let r = compare db da in
@@ -1638,6 +1693,7 @@ let max_uniquely l =
 	if Hashtbl.find m k = v then
 	  (Hashtbl.add t k v; true)
 	else false) l
+*)
 
 (* Clone suport *)
 
@@ -1959,14 +2015,12 @@ let pkg_clone userhost pkg_path mode =
   print_endline "Depends Tree:";
   print_depends 0 depends;
   match mode with
-    | "overwrite" -> clone_packages (resort_depends (max_uniquely (list_of_deptree depends)))
+    | "overwrite" -> clone_packages (list_of_deptree depends)
     | "depends"   ->
-	print_endline "Before Resort Order:";
-	List.iter (fun (x,depth) -> printf "%02d" depth; print_string " "; print_dep_val x) (list_of_deptree depends);
 	print_endline "After Resort Order:";
-	List.iter print_dep_val (resort_depends (max_uniquely (list_of_deptree depends)))
-    | "packages"  -> download_packages userhost (resort_depends (max_uniquely (list_of_deptree depends)))
-    | _           -> clone_packages (with_overwrite overwrite (resort_depends (max_uniquely (list_of_deptree depends))))
+	List.iter print_dep_val (list_of_deptree depends)
+    | "packages"  -> download_packages userhost (list_of_deptree depends)
+    | _           -> clone_packages (with_overwrite overwrite (list_of_deptree depends))
 
 let pack_branches pkgdir =
   List.filter (fun s -> s <> "hooks.scm")
@@ -2218,12 +2272,7 @@ let upgrade specdir upgrade_mode default_branch =
     log_message "make depends tree...";
     deptree_of_pack ~default_branch specdir in
   
-  log_message "1 phase";
-  List.iter (fun s -> printf "%s - %d\n" (fst s) (snd s)) (list_of_deptree deptree);
-  log_message "2 phase";
-  List.iter (fun s -> printf "%s - %d\n" (fst s) (snd s)) (max_uniquely (list_of_deptree deptree));
-  let depends =
-    resort_depends (max_uniquely (list_of_deptree deptree)) in
+  let depends = list_of_deptree deptree in  
   log_message "depend list...";
   List.iter print_endline depends;
   
@@ -2292,7 +2341,7 @@ let top ~recursive ~overwrite specdir =
       log_message "make depends tree...";
     toptree_of_specdir specdir in
   let depends =
-    resort_depends (max_uniquely (list_of_deptree deptree)) in
+    list_of_deptree deptree in
   
   let with_rec l =
     (if recursive then l else [last l]) in
@@ -2322,13 +2371,9 @@ let clone ?(vr=None) ~recursive ~overwrite specdir =
       log_message "make depends tree...";
     deptree_of_specdir ~vr specdir in
 
-  log_message "1 phase";
-  List.iter (fun ((s,_,_,_),n) -> printf "%s - %d\n" s n) (list_of_deptree deptree);
-  log_message "2 phase";
-  List.iter (fun ((s,_,_,_),n) -> printf "%s - %d\n" s n) (max_uniquely (list_of_deptree deptree));
-
   let depends =
-    resort_depends (max_uniquely (list_of_deptree deptree)) in
+    list_of_deptree deptree in
+  List.iter (fun (s,_,_,_) -> printf "%s\n" s) depends;  
   
   let with_rec l =
     (if recursive then l else [last l]) in
@@ -2434,9 +2479,8 @@ let fork ?(depth=0) top_specdir src dst =
   let dir = Filename.dirname in
   let pack_dir = dir (dir top_specdir) in
   let deptree = deptree_of_pack ~default_branch:(Some src) top_specdir in
-  let deplist = list_of_deptree deptree in
-  let depends =
-    resort_depends (max_uniquely deplist) in
+  let deplist = deplist_of_deptree deptree (* TODO: usnig move corrent depths *) in
+  let depends = list_of_deptree deptree in
   log_message "depend list...";
   List.iter print_endline depends;
 
@@ -2629,7 +2673,7 @@ let graph ?ver ?rev specdir =
 
   let tree = deptree_of_specdir ~vr specdir in
   let depends =  
-    resort_depends (max_uniquely (list_of_deptree tree)) in
+    list_of_deptree tree in
   
   List.iter 
     (fun (n,v,r,_) -> printf "%s %s %d\n" (pkgname_of_specdir n) v r) depends;
@@ -2698,10 +2742,10 @@ let diff_packages ?(changelog=false) specdir rev_a rev_b =
     deptree_of_specdir ~vr:(Some (vr_of_rev rev_b)) specdir in
   let depends_a =
     List.map (fun (p,v,r,s) -> p,(v,r))
-      (resort_depends (max_uniquely (list_of_deptree tree_a))) in
+      (list_of_deptree tree_a) in
   let depends_b =
     List.map (fun (p,v,r,s) -> p,(v,r))
-      (resort_depends (max_uniquely (list_of_deptree tree_b))) in  
+      (list_of_deptree tree_b) in  
   List.iter
     (fun (pkgname_b,(ver_b,rev_b)) ->
       (try
