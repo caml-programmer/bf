@@ -1624,6 +1624,8 @@ let has_edges_from g v =
 let find_finish_vtx g =
   List.map fst (List.filter (fun (k,vl) -> vl = []) g)
     
+exception Cannot_unwind_depends_graph
+
 let unwind g =
   let acc = ref [] in
   let work = ref g in
@@ -1631,11 +1633,16 @@ let unwind g =
     acc := v :: !acc;
     work := remove_vtx !work v;
   in
+  let counter = ref 0 in
   while !work <> [] do
-    List.iter (remove !work)
-      (find_finish_vtx !work)
+    incr counter;
+    if !counter > 1000000000 then
+      raise Cannot_unwind_depends_graph
+    else
+      List.iter (remove !work)
+	(find_finish_vtx !work)
   done;
-  (List.rev !acc)    
+  (List.rev !acc)
 
 let deplist_of_deptree tree =
   let rec make depth = function
@@ -2479,7 +2486,7 @@ let fork ?(depth=0) top_specdir src dst =
   let dir = Filename.dirname in
   let pack_dir = dir (dir top_specdir) in
   let deptree = deptree_of_pack ~default_branch:(Some src) top_specdir in
-  let deplist = deplist_of_deptree deptree (* TODO: usnig move corrent depths *) in
+  let deplist = deplist_of_deptree deptree (* TODO: using move corrent depths *) in
   let depends = list_of_deptree deptree in
   log_message "depend list...";
   List.iter print_endline depends;
