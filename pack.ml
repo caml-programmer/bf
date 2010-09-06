@@ -1574,9 +1574,33 @@ type 'a deptree =
   | Dep_val of 'a * 'a deptree
   | Dep_list of 'a deptree list
 
+(*
 let list_of_deptree tree =
   let rec make depth = function
     | Dep_val (x, Dep_list l) -> (List.flatten (List.map (make (succ depth)) l)) @ [x,depth]
+    | _ -> assert false
+  in make 0 tree       
+     *)
+
+let list_of_deptree tree =
+  let map = Hashtbl.create 32 in
+  let rec make_map = function
+    | Dep_val (x, Dep_list l) ->
+	if Hashtbl.mem map x then
+	  Hashtbl.replace map x (succ (Hashtbl.find map x))
+	else
+	  Hashtbl.add map x 1;
+	List.iter make_map l
+    | _ -> assert false
+  in make_map tree;
+  let rec make depth = function
+    | Dep_val (x, Dep_list l) ->
+	(List.flatten (List.map (make (succ depth)) l))
+	@ [x,depth + 
+	  (try 
+	    Hashtbl.find map x
+	  with
+	      Not_found -> 0)]
     | _ -> assert false
   in make 0 tree
 
@@ -2297,6 +2321,12 @@ let clone ?(vr=None) ~recursive ~overwrite specdir =
     if recursive then
       log_message "make depends tree...";
     deptree_of_specdir ~vr specdir in
+
+  log_message "1 phase";
+  List.iter (fun ((s,_,_,_),n) -> printf "%s - %d\n" s n) (list_of_deptree deptree);
+  log_message "2 phase";
+  List.iter (fun ((s,_,_,_),n) -> printf "%s - %d\n" s n) (max_uniquely (list_of_deptree deptree));
+
   let depends =
     resort_depends (max_uniquely (list_of_deptree deptree)) in
   
@@ -2530,7 +2560,6 @@ let fork ?(depth=0) top_specdir src dst =
     
     if Sys.file_exists (Filename.concat specdir "composite") && (not (Sys.file_exists (Filename.concat forkdir "composite"))) then
       write_composite (Filename.concat forkdir "composite") (change_components components);
-
 
     if Sys.file_exists (Filename.concat specdir "depends") then
       begin
