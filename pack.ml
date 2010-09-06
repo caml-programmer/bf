@@ -2486,7 +2486,7 @@ let fork ?(depth=0) top_specdir src dst =
   let dir = Filename.dirname in
   let pack_dir = dir (dir top_specdir) in
   let deptree = deptree_of_pack ~default_branch:(Some src) top_specdir in
-  let deplist = deplist_of_deptree deptree (* TODO: using move corrent depths *) in
+  let deplist = deplist_of_deptree deptree (* TODO: using more corrent depths *) in
   let depends = list_of_deptree deptree in
   log_message "depend list...";
   List.iter print_endline depends;
