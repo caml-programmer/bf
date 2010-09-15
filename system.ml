@@ -151,13 +151,18 @@ let copy_dir dir dest =
   
   transfer_dir dir dest
   
+let read_rest ch =
+  try
+    ignore(input_char ch);
+  with End_of_file -> ()
+
 let uname ?flag () =
   let ch = Unix.open_process_in 
     (match flag with 
       | Some c -> sprintf "uname -%c" c
       | None   -> "uname") in
   let name = String.lowercase (input_line ch) in
-  close_in ch; name
+  read_rest ch; close_in ch; name
 
 let arch () =
   match uname () with
@@ -169,12 +174,12 @@ let arch () =
 	with _ ->
 	  let ch = Unix.open_process_in "arch" in
 	  let name = input_line ch in
-	  close_in ch; name)
+	  read_rest ch; close_in ch; name)
 
 let hostname () =
   let ch = Unix.open_process_in "hostname" in
   let name = input_line ch in
-  close_in ch; name
+  read_rest ch; close_in ch; name
 
 let list_of_directory dir =
   let dh = Unix.opendir dir in
@@ -183,9 +188,11 @@ let list_of_directory dir =
     while true do
       let s = Unix.readdir dh in
       if s <> "." && s <> ".." then
-	acc := !acc @ [s];      
+	acc := !acc @ [s];
     done; []
-  with End_of_file -> !acc
+  with End_of_file -> 
+    Unix.closedir dh;
+    !acc
 
 let read_lines ?(env=Unix.environment()) ?(ignore_error=false) ?(filter=(fun _ -> true)) command =
   let (ch,out,err) = Unix.open_process_full command env in
