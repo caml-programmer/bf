@@ -44,6 +44,20 @@ let git_push ?(tags=false) ?refspec url =
 	let opts = if tags then ["--tags"] else [] in
 	log_command ~env "git" (["push"] @ opts @ [url])
 
+exception Unfinished_git_push_cycle
+
+let rec git_push_cycle ~refspec url depth =
+  if depth <= 0 then
+    raise Unfinished_git_push_cycle
+  else
+    try
+      git_push ~refspec url
+    with Logger.Error ->
+      log_message "git-push cycle: waiting 1 second";
+      Unix.sleep 1;
+      git_pull ~refspec url;
+      git_push_cycle ~refspec url (pred depth)
+
 let git_remote_update () =
   log_command ~env "git" ["remote";"prune";"origin"];
   log_command ~env "git" ["remote";"update"]

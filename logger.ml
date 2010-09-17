@@ -91,9 +91,11 @@ let linearization s =
       s.[i] <- ' ';
   done; s
 
+exception Error
+
 let log_error error =
   log_message ~key:"error" error;
-  exit 3
+  raise Error
 
 let log_command ?(low=false) ?env ?error_handler prog args =
   let out_buf = Buffer.create 256 in
