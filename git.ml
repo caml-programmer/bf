@@ -51,11 +51,19 @@ let rec git_push_cycle ~refspec url depth =
     raise Unfinished_git_push_cycle
   else
     try
-      git_push ~refspec url
+      (match refspec with
+	| Some refspec ->
+	    git_push ~refspec url
+	| None ->
+	    git_push url)
     with Logger.Error ->
       log_message "git-push cycle: waiting 1 second";
       Unix.sleep 1;
-      git_pull ~refspec url;
+      (match refspec with
+	| Some refspec ->
+	    git_pull ~refspec url
+	| None ->
+	    git_pull url);
       git_push_cycle ~refspec url (pred depth)
 
 let git_remote_update () =
