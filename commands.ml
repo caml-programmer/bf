@@ -954,6 +954,14 @@ let scm_env_append v =
 	  Env.update key (String.concat sep (cur::values));
 	Snull
     | _ -> Snull
+
+let scm_git_push_cycle url depth =
+  Git.git_push_cycle
+    ~refspec:None
+    (Scheme.string_of_sval url)
+    (Scheme.make_int depth);
+  Snull
+
 ;;
 
 (* Register global functions *)
@@ -1008,3 +1016,5 @@ Ocs_env.set_pf2 Scheme.env scm_write_scheme_value "write-scheme-value";;
 Ocs_env.set_pf2 Scheme.env scm_substring "substring?";;
 Ocs_env.set_pf2 Scheme.env scm_substrings "substrings";;
 Ocs_env.set_pfn Scheme.env scm_env_append "env-append";;
+
+Ocs_env.set_pf2 Scheme.env scm_git_push_cycle "git-push-cycle";;
