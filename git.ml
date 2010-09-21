@@ -164,7 +164,7 @@ let git_push_multicycle url depth =
 	Unix.sleep 1;
 	List.iter 
 	  (fun b ->
-	    git_checkout ~key:b ();
+	    git_checkout ~key:b ~force:true ();
 	    git_pull ~refspec:b url)
 	  lb;
 	make (pred depth)
