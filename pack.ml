@@ -1573,8 +1573,8 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode
   else
     begin    
       log_message 
-	(sprintf "start update: lazy-mode(%b), composite-changes(%b), pack-changes(%b)"
-	  lazy_mode have_composite_changes have_pack_changes);
+	(sprintf "start update: lazy-mode(%b), composite-changes(%b), pack-changes(%b), fs-changes(%b)"
+	  lazy_mode have_composite_changes have_pack_changes have_fs_changes);
       build ()
     end
 
