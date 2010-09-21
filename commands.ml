@@ -1017,4 +1017,4 @@ Ocs_env.set_pf2 Scheme.env scm_substring "substring?";;
 Ocs_env.set_pf2 Scheme.env scm_substrings "substrings";;
 Ocs_env.set_pfn Scheme.env scm_env_append "env-append";;
 
-Ocs_env.set_pf2 Scheme.env scm_git_push_cycle "git-push-cycle";;
+Ocs_env.set_pf2 Scheme.env scm_git_push_cycle "git-push-multicycle";;

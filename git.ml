@@ -151,6 +151,25 @@ let git_branch ?(filter=(fun _ -> true)) ?(raw_filter=(fun _ -> true)) ?(remote=
 	    (if remote then "git branch -r" else "git branch"))))
   with System.Error s -> log_error s
 
+let git_push_multicycle url depth =
+  let lb = git_branch () in  
+  let rec make depth =
+    if depth <= 0 then
+      raise Unfinished_git_push_cycle
+    else
+      try
+	git_push url
+      with Logger.Error ->
+	log_message "git-push multicycle: waiting 1 second";
+	Unix.sleep 1;
+	List.iter 
+	  (fun b ->
+	    git_checkout ~key:b ();
+	    git_pull ~refspec:b url)
+	  lb;
+	make (pred depth)
+  in make depth
+       
 let git_create_branch ?(start=None) s =
   match start with
     | Some start ->
