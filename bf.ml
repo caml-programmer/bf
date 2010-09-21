@@ -17,7 +17,7 @@ let usage () =
   print_endline "   or: bf review <composite> <since-date>";
   print_endline "   or: bf pack <specdir> <version> <release>";
   print_endline "   or: bf update <specdir> [lazy] [<version>] [<release>]";
-  print_endline "   or: bf upgrade <specdir> [lazy|complete] [<branch>]";
+  print_endline "   or: bf upgrade <specdir> [lazy|complete|full] [<branch>]";
   print_endline "   or: bf fork <specdir> <source-branch> <new-branch> [<single-rev-depth>]";
   print_endline "   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite|depends|packages]";
   print_endline "   or: bf clone <specdir> [overwrite] [norec] [<ver> <rev>]";
@@ -226,20 +226,23 @@ let main () =
 	| "upgrade" ->
 	    let (upgrade_mode,default_branch) =
 	      match len with
-		| 3 -> Upgrade_full, None
+		| 3 -> Upgrade_default, None
 		| 4 ->
 		    (match Sys.argv.(3) with
 		      | "lazy"     -> (Upgrade_lazy,None)
 		      | "complete" -> (Upgrade_complete,None)
-		      | _          -> (Upgrade_full,Some Sys.argv.(3)))
+		      | "full"     -> (Upgrade_full,None)
+		      | _          -> (Upgrade_default,Some Sys.argv.(3)))
 		| 5 ->
 		    (match Sys.argv.(3) with
 		      | "lazy"     -> (Upgrade_lazy,Some Sys.argv.(4))
 		      | "complete" -> (Upgrade_complete,Some Sys.argv.(4))
+		      | "full"     -> (Upgrade_full,Some Sys.argv.(4))
 		      | _          ->
 			  (match Sys.argv.(4) with
 			    | "lazy"     -> (Upgrade_lazy,Some Sys.argv.(3))
 			    | "complete" -> (Upgrade_complete,Some Sys.argv.(3))
+			    | "full"     -> (Upgrade_full,Some Sys.argv.(3))
 			    | _ -> usage ()))
 		| _ -> usage ()
 	    in Pack.upgrade Sys.argv.(2) upgrade_mode default_branch

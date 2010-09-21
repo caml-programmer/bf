@@ -43,6 +43,7 @@ type upgrade_mode =
   | Upgrade_full
   | Upgrade_lazy
   | Upgrade_complete
+  | Upgrade_default
 
 let make_component ?(label=Current) s =
   { name = s; label = Current; pkg = None }

@@ -1473,8 +1473,8 @@ let check_pack_component () =
 	      Git.git_pull "origin";
 	      Git.git_fetch ~tags:true "origin";
 	      log_error "current pack branch is not master, bf has fix it, try again")))
-	      
-let update ?ready_spec ~specdir ?(check_pack=true) ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
+
+let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
   let specdir = System.path_strip_directory specdir in
   
   check_specdir specdir;
@@ -1513,6 +1513,16 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(lazy_mode=false) ?(interact
 	  | None -> succ (find_pkg_revision ~interactive pkgname ver')
       in (ver',rev'))
   in
+
+  let have_fs_changes =
+    if check_fs then
+      begin
+	let pat = sprintf "%s-%s-%d" pkgname version revision in
+	not (List.exists (Pcre.pmatch ~pat) (System.list_of_directory "."))
+      end
+    else false
+  in
+
   let tag =
     mk_tag pkgname version revision in
   
@@ -1558,7 +1568,7 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(lazy_mode=false) ?(interact
     true
   in
 
-  if lazy_mode && not have_composite_changes && not have_pack_changes then
+  if lazy_mode && not have_composite_changes && not have_pack_changes && not have_fs_changes then
     (log_message "lazy update: noting to do"; false)
   else
     begin    
@@ -2307,6 +2317,28 @@ let upgrade specdir upgrade_mode default_branch =
     else
       (true,dep_paths)
   in
+
+  let complete_impl check_fs_packages =
+    List.iter
+      (fun specdir ->
+	let (lazy_mode,dep_paths) =
+	  eval_lazy_mode specdir in
+	log_message (sprintf "lazy-mode is %b for %s, dep-paths:" lazy_mode specdir);
+	List.iter log_message dep_paths;
+	let updated =
+	  update
+	    ~specdir
+	    ~lazy_mode
+	    ~check_pack:false
+	    ~check_fs:check_fs_packages
+	    ~interactive:true ()
+	in
+	Hashtbl.replace build_table specdir updated;
+	if updated then
+	  List.iter
+	    (fun s -> Hashtbl.replace mark_table s true) dep_paths)
+      depends    
+  in
   
   match upgrade_mode with
     | Upgrade_full ->
@@ -2320,24 +2352,9 @@ let upgrade specdir upgrade_mode default_branch =
 	    ignore(update ~specdir ~check_pack:false ~lazy_mode:true ~interactive:true ()))
 	  depends
     | Upgrade_complete ->
-	List.iter
-	  (fun specdir ->
-	    let (lazy_mode,dep_paths) =
-	      eval_lazy_mode specdir in
-	    log_message (sprintf "lazy-mode is %b for %s, dep-paths:" lazy_mode specdir);
-	    List.iter log_message dep_paths;
-	    let updated =
-	      update
-		~specdir
-		~lazy_mode
-		~check_pack:false
-		~interactive:true ()
-	    in
-	    Hashtbl.replace build_table specdir updated;
-	    if updated then
-	      List.iter
-		(fun s -> Hashtbl.replace mark_table s true) dep_paths)
-	  depends
+	complete_impl false;
+    | Upgrade_default ->
+	complete_impl true
 
 let top ~recursive ~overwrite specdir =
   let specdir = System.path_strip_directory specdir in
