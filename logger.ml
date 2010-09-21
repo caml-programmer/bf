@@ -149,17 +149,17 @@ let log_command ?(low=false) ?env ?error_handler prog args =
 			  Some f -> f ps
 			| None ->
 			    log_message ~logger (sprintf "failed: %d" rc);
-			    exit rc)
+			    raise Error)
 		  | Unix.WSIGNALED n -> 
 		      (match error_handler with
 			  Some f -> f ps
 			| None ->
 			    log_message ~logger (sprintf "killed: %d" n);
-			    exit n)
+			    raise Error)
 		  | Unix.WSTOPPED n ->
 		      (match error_handler with
 			  Some f -> f ps
 			| None ->
 			    log_message ~logger (sprintf "stopped: %d" n);
-			    exit n)))
+			    raise Error)))
 	      errors)
