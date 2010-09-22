@@ -168,6 +168,7 @@ let main () =
 	      begin
 		let check_rec s = if s = "norec" then false else usage () in
 		let check_over s = if s = "overwrite" then true else usage () in
+		let is_opt s = s = "overwrite" || s = "norec" in
 		let (recursive,overwrite,vr) =
 		  if len = 3 then
 		    (true,false,None)
@@ -181,10 +182,17 @@ let main () =
 		      | "overwrite" -> (check_rec Sys.argv.(4),true,None)
 		      | "norec" -> (false,check_over Sys.argv.(4),None)
 		      | _ -> (true,false,Some (Sys.argv.(3), make_int Sys.argv.(4))))
+		  else if len = 6 then
+		    if is_opt Sys.argv.(3) && is_opt Sys.argv.(4) then
+		      (false,true,None)
+		    else
+		      (match Sys.argv.(3) with
+			| "overwrite" -> (true,true,Some (Sys.argv.(4), make_int Sys.argv.(5)))
+			| "norec" -> (false,false,Some (Sys.argv.(4), make_int Sys.argv.(5)))
+			| _ -> (true,false,Some (Sys.argv.(4), make_int Sys.argv.(5))))
 		  else if len = 7 then
 		    (match Sys.argv.(3) with
-		      | "overwrite" -> (check_rec
-			  Sys.argv.(4),true,Some (Sys.argv.(5), make_int Sys.argv.(6)))
+		      | "overwrite" -> (check_rec Sys.argv.(4),true,Some (Sys.argv.(5), make_int Sys.argv.(6)))
 		      | "norec" -> (false,check_over Sys.argv.(4),Some (Sys.argv.(5), make_int Sys.argv.(6)))
 		      | _ -> usage ())
 		  else
