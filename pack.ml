@@ -1545,7 +1545,9 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode
     match ready_spec with
       | None ->
 	  update components
-      | _ -> false
+      | _ -> 
+	  update components;
+	  false
   in
 
   let build () =
