@@ -337,6 +337,14 @@ let update_component component =
 let update components =
   List.exists (fun x -> x) (List.map update_component components)
 
+let fetch_tags component =
+  ignore
+    (with_component_dir ~strict:false component
+      (fun () ->
+	git_fetch "origin";
+	git_fetch ~tags:true "origin";
+	git_track_new_branches ()))    
+
 (* Pack update support *)
 
 exception Pack_current_branch_is_not_set

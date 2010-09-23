@@ -1546,7 +1546,7 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode
       | None ->
 	  update components
       | _ -> 
-	  update components;
+	  List.iter fetch_tags components;
 	  false
   in
 
