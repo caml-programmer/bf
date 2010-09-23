@@ -637,6 +637,9 @@ let only_local components =
   List.filter
     (fun c -> c.pkg = None) components
 
+let as_current l =
+  List.map (fun c -> { name = c.name; label = Current; pkg = c.pkg }) l
+
 let tag_ready ~tag composite =
   List.for_all
     (fun component ->
@@ -645,7 +648,7 @@ let tag_ready ~tag composite =
 	(with_component_dir ~strict:false component
 	  (fun () -> res := List.mem tag (git_tag_list ())));
       !res)
-    (only_local (Rules.components_of_composite composite))
+    (as_current (only_local (Rules.components_of_composite composite)))
 
 let prepare_composite ?tag composite =
   log_message ("=> prepare-composite " ^ composite);
