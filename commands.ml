@@ -429,7 +429,7 @@ let tag_of_specdir specdir =
       (Printexc.to_string exn));
     None
 
-let update_pack ~specdir component =
+let update_pack ?specdir component =
   let remote_changes = ref false in
   let local_changes =
     with_component_dir ~strict:true component
@@ -469,30 +469,33 @@ let update_pack ~specdir component =
     sl > xl && String.sub s (sl - xl) xl = x      
   in
 
-  let tag_changes =
-    let tag' = tag_of_specdir specdir in
-    with_dir component.name
-      (fun () ->
-	match git_current_branch () with
-	  | Some cur ->
-	      (match tag' with
-		  Some tag ->
-		    let rex = Pcre.regexp (pkgname_of_specdir specdir) in
-		    (try
-		      List.exists (fun s ->
-			let r =
-			  (Pcre.pmatch ~rex s) && not (is_release s) in
-			log_message (sprintf "%s - %b" s r); r)
-			(git_changes tag cur)
-		    with Key_not_found key ->
-		      log_message (sprintf "Warning: git-key (%s) is not found in pack" key);
-		      true)
-		| None -> 
-		    log_message (sprintf "Warning: cannot find current tag by specdir(%s)" specdir);
-		    true)
-	  | None -> raise Pack_current_branch_is_not_set)
-  in tag_changes (* || local_changes || !remote_changes *)
-       
+  match specdir with
+    | Some specdir ->
+	let tag_changes =
+	  let tag' = tag_of_specdir specdir in
+	  with_dir component.name
+	    (fun () ->
+	      match git_current_branch () with
+		| Some cur ->
+		    (match tag' with
+			Some tag ->
+			  let rex = Pcre.regexp (pkgname_of_specdir specdir) in
+			  (try
+			    List.exists (fun s ->
+			      let r =
+				(Pcre.pmatch ~rex s) && not (is_release s) in
+			      log_message (sprintf "%s - %b" s r); r)
+			      (git_changes tag cur)
+			  with Key_not_found key ->
+			    log_message (sprintf "Warning: git-key (%s) is not found in pack" key);
+			    true)
+		      | None -> 
+			  log_message (sprintf "Warning: cannot find current tag by specdir(%s)" specdir);
+			  true)
+		| None -> raise Pack_current_branch_is_not_set)
+	in tag_changes
+    | None -> (local_changes || !remote_changes)
+
 let status_component ?(max_component_length=0) ?(max_label_length=0) component =
   let build =
     Sys.file_exists

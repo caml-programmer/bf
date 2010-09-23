@@ -1484,8 +1484,15 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode
   let pkgname = pkgname_of_specdir specdir in
   let branch = branch_of_specdir specdir in
 
+  let clone_mode =
+    match ready_spec with None -> false | _ -> true in
+
   let have_pack_changes =
-    update_pack ~specdir (make_component ~label:(Branch "master") "pack") in
+    if clone_mode then
+      (ignore(update_pack (make_component ~label:(Branch "master") "pack")); false)
+    else
+      update_pack ~specdir (make_component ~label:(Branch "master") "pack")
+  in
 
   let conv_revision r =
     try int_of_string r with _ -> raise (Revision_must_be_digital r) in
