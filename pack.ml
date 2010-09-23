@@ -1532,20 +1532,32 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode
     else None
   in
 
-  let composite =
-    Filename.concat specdir "composite" in
-
+  let components =
+    match ready_spec with
+      | None ->
+	  let composite =
+	    Filename.concat specdir "composite" in
+	  (Rules.components_of_composite composite)
+      | Some spec -> spec.components
+  in
+  
   let have_composite_changes =
-    update_composite composite in
+    match ready_spec with
+      | None ->
+	  update components
+      | _ -> false
+  in
 
   let build () =
-    if not (tag_ready ~tag composite) then
+    if not (tag_ready ~tag components) then
       begin
-	install_composite composite;
-	tag_composite composite tag;
+	install components;
+	make_tag tag 
+	  (only_local components)
       end;
     
-    install_composite ~tag composite;
+    install (with_tag (Some tag) components);
+    
     (try
       build_package ~ready_spec
 	[specdir;version;string_of_int revision];
@@ -1561,7 +1573,7 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode
     (match old_tag with
       | Some old ->
 	  (try
-	    changelog_composite composite old tag
+	    changelog_components components old tag
 	  with exn ->
 	    log_message (Printexc.to_string exn))
       | None -> ());
