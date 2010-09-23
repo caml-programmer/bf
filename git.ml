@@ -132,14 +132,25 @@ let git_checkout
   log_command ~low ~env "git" !args
 
 let git_branch ?(filter=(fun _ -> true)) ?(raw_filter=(fun _ -> true)) ?(remote=false) () =
+  let remotes_cleaner s =
+    let a = "remotes/origin/" in
+    let b = "remotes/" in
+    let al = String.length a in
+    let bl = String.length b in
+    let sl = String.length s in
+    if sl > al && String.sub s 0 al = a then
+      String.sub s bl (sl - bl)
+    else s
+  in
   let branch_cleaner s =
-    try
-      let pos = String.index s '>' in
-      let len = pos - 2 in
-      if len > 0 then
-	String.sub s 0 len
-      else s
-    with Not_found -> s
+    remotes_cleaner 
+      (try
+	let pos = String.index s '>' in
+	let len = pos - 2 in
+	if len > 0 then
+	  String.sub s 0 len
+	else s
+      with Not_found -> s)
   in
   try
     List.filter filter
