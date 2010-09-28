@@ -371,7 +371,7 @@ let reg_pkg_release specdir ver rev =
       Git.git_commit ~empty:true
 	(sprintf "reg pkg release %s %s %s %d" 
 	  (pkgname_of_specdir specdir) (branch_of_specdir specdir) ver rev);      
-      Git.git_push_cycle ~refspec:None "origin" 5)
+      Git.git_push_cycle ~tags:false ~refspec:None "origin" 5)
    
 exception Pkg_release_not_found of string
 
@@ -562,18 +562,18 @@ let tag_component tag component =
 	    Some branch ->
 	      (match git_make_tag tag with
 		| Tag_created ->
-		    git_push ~tags:true ~refspec:tag url;
-		    git_pull ~refspec:branch url
-		| Tag_already_exists -> ()
-		| Tag_creation_problem -> exit 2)
+		    git_push_cycle ~tags:true ~refspec:(Some tag) url
+		| Tag_already_exists -> 
+		    git_push_cycle ~tags:true ~refspec:(Some tag) url
+		| Tag_creation_problem -> raise Logger.Error)
 	  | None ->
 	      (* log_error ("cannot find current branch for " ^ component.name) *)
 	      (match git_make_tag tag with
 		| Tag_created ->
-		    git_push ~tags:true ~refspec:tag url;
-		    git_pull url
-		| Tag_already_exists -> ()
-		| Tag_creation_problem -> exit 2)))
+		    git_push_cycle ~tags:true ~refspec:(Some tag) url
+		| Tag_already_exists -> 
+		    git_push_cycle ~tags:true ~refspec:(Some tag) url
+		| Tag_creation_problem -> raise Logger.Error)))
 
 let make_tag tag components =
   non_empty_iter (tag_component tag) components
@@ -975,17 +975,11 @@ let scm_env_append v =
 
 let scm_git_push_cycle url depth =
   Git.git_push_cycle
+    ~tags:false
     ~refspec:None
     (Scheme.string_of_sval url)
     (Scheme.make_int depth);
   Snull
-
-let scm_git_push_multicycle url depth =
-  Git.git_push_multicycle
-    (Scheme.string_of_sval url)
-    (Scheme.make_int depth);
-  Snull
-
 ;;
 
 (* Register global functions *)
@@ -1041,4 +1035,4 @@ Ocs_env.set_pf2 Scheme.env scm_substring "substring?";;
 Ocs_env.set_pf2 Scheme.env scm_substrings "substrings";;
 Ocs_env.set_pfn Scheme.env scm_env_append "env-append";;
 
-Ocs_env.set_pf2 Scheme.env scm_git_push_multicycle "git-push-cycle";;
+Ocs_env.set_pf2 Scheme.env scm_git_push_cycle "git-push-cycle";;
