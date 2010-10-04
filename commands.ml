@@ -482,9 +482,11 @@ let update_pack ?specdir component =
 			  let rex = Pcre.regexp (pkgname_of_specdir specdir) in
 			  (try
 			    List.exists (fun s ->
-			      let r =
+			      let changed =
 				(Pcre.pmatch ~rex s) && not (is_release s) in
-			      log_message (sprintf "%s - %b" s r); r)
+			      if changed then
+				log_message (sprintf "%s is changed" s); 
+			      changed)
 			      (git_changes tag cur)
 			  with Key_not_found key ->
 			    log_message (sprintf "Warning: git-key (%s) is not found in pack" key);
@@ -567,7 +569,7 @@ let tag_component tag component =
 		    git_push_cycle ~tags:true ~refspec:(Some tag) url
 		| Tag_creation_problem -> raise Logger.Error)
 	  | None ->
-	      (* log_error ("cannot find current branch for " ^ component.name) *)
+	      log_message ("Warning: cannot find current branch for " ^ component.name);
 	      (match git_make_tag tag with
 		| Tag_created ->
 		    git_push_cycle ~tags:true ~refspec:(Some tag) url
