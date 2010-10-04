@@ -472,7 +472,11 @@ let update_pack ?specdir component =
 		| Some cur ->
 		    (match tag' with
 			Some tag ->
-			  let rex = Pcre.regexp (pkgname_of_specdir specdir) in
+			  let rex = Pcre.regexp 
+			    (sprintf "%s/%s/"
+			      (pkgname_of_specdir specdir)
+			      (branch_of_specdir specdir))
+			  in
 			  (try
 			    List.exists (fun s ->
 			      let changed =
