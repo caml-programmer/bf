@@ -960,9 +960,9 @@ let build_package_impl ?(ready_spec=None) os platform args =
 			      let k =
 				mk_tag (pkgname_of_specdir abs_specdir) version (int_of_string release) in
 			      let tag_exists = ref false in
-			      with_component_dir ~strict:false c
+			      ignore(with_component_dir ~strict:false c
 				(fun () -> 
-				  tag_exists := List.mem k (Git.git_tag_list ()));
+				  tag_exists := List.mem k (Git.git_tag_list ())));
 			      if !tag_exists then
 				Some k
 			      else None
@@ -1135,7 +1135,7 @@ let build_package_impl ?(ready_spec=None) os platform args =
 		      | "name" -> Hashtbl.find spec.params "summary"
 		      | k -> Hashtbl.find spec.params k
 		    in
-		    let pkginfo =
+		    let _ =
 		      with_out "pkginfo"
 			(fun out -> 
 			  let gen_param k =
@@ -1151,7 +1151,7 @@ let build_package_impl ?(ready_spec=None) os platform args =
 			  gen_param "category";
 			  gen_param "email")
 		    in
-		    let prototype =
+		    let _ =
 		      with_out "prototype"
 			(fun out ->
 			  let make_pkgtrans_line s =
@@ -1364,7 +1364,7 @@ let build_package_impl ?(ready_spec=None) os platform args =
 			  | Some content ->
 			      write_script "prerm" content);
 
-			let copyright =
+			let _ =
 			  with_out (Filename.concat doc_location "copyright")
 			    (fun out ->
 			      out (find_value "email"))
@@ -1383,7 +1383,7 @@ let build_package_impl ?(ready_spec=None) os platform args =
 			      out (find_value "email");
 			      out "\n")
 			in
-			let control =
+			let _ =
 			  with_out "debian/DEBIAN/control"
 			    (fun out ->
 			      let gen_param k =
@@ -1895,7 +1895,7 @@ let extract_depend_list userhost pkg_path =
 	    (try 
 	      let a = Pcre.extract ~rex:without_ver_require s in
 	      let pkg_name = a.(1) in
-	      (a.(1),None,None)::acc
+	      (pkg_name,None,None)::acc
 	    with Not_found -> acc))) []
       (System.read_lines
 	~filter:(Pcre.pmatch ~pat:(sprintf "^%s" (Params.get_param "pkg-prefix")))
@@ -2543,10 +2543,10 @@ let fork ?(depth=0) top_specdir src dst =
 	in
 	(match c.label with
 	  | Current ->
-	      log_error (sprintf "used current branch for %s component forking\n%!" c.name)
+	      log_error (sprintf "used current branch for %s component forking\n%!" component_location)
 	  | Branch start -> ()
 	  | Tag s ->
-	      log_message (sprintf "Warning: tag %s unchanged while %s component forking\n%!" s c.name);
+	      log_message (sprintf "Warning: tag %s unchanged while %s component forking\n%!" s component_location);
 	      ()))
   in
 
@@ -2783,7 +2783,6 @@ let vr_of_rev s =
   with _ -> raise (Invalid_argument s)
 
 let diff_packages ?(changelog=false) specdir rev_a rev_b =
-  let pkgname = pkgname_of_specdir specdir in
   let tree_a =
     deptree_of_specdir ~vr:(Some (vr_of_rev rev_a)) specdir in
   let tree_b =

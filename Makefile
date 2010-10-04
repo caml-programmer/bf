@@ -23,8 +23,8 @@ $(XARCHIVE): $(XOBJECTS)
 	$(OCAMLOPT) -a -o $(XARCHIVE) $(XOBJECTS)
 
 OPTIONS   = -syntax camlp4o -package camlp4
-OCAMLC    = $(OCAMLFIND) ocamlc   -w ys $(OPTIONS) -package "$(REQUIRES)"
-OCAMLOPT  = $(OCAMLFIND) ocamlopt -w ys $(OPTIONS) -package "$(REQUIRES)"
+OCAMLC    = $(OCAMLFIND) ocamlc   -w YS $(OPTIONS) -package "$(REQUIRES)"
+OCAMLOPT  = $(OCAMLFIND) ocamlopt -w YS $(OPTIONS) -package "$(REQUIRES)"
 OCAMLDEP  = $(OCAMLFIND) ocamldep $(OPTIONS)
 OCAMLLEX  = ocamllex
 OCAMLFIND = ocamlfind

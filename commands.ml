@@ -31,11 +31,11 @@ let clone_component component =
 let origin s = 
   "origin/" ^ s
 
-let with_component_dir ?(low=false) ?(strict=true) component thunk =
+let with_component_dir ?(low=false) ?(strict=true) component (thunk : unit -> unit) =
   let curdir = Sys.getcwd () in
 
   let with_dir f =
-    Sys.chdir component.name;     
+    Sys.chdir component.name;
     let with_changes = f () in
     thunk ();
     Sys.chdir curdir;
@@ -54,9 +54,6 @@ let with_component_dir ?(low=false) ?(strict=true) component thunk =
   log_message ~low
     (Printf.sprintf "=> component (%s %s [%s])"
       (curdir ^ "/" ^ component.name) label_type label);
-
-  let composite_mode =
-    Params.used_composite_mode () in
 
   match git_component_status ~strict component with
     | Tree_not_exists ->
@@ -305,8 +302,6 @@ let update_component component =
   let local_changes =
     with_component_dir ~strict:false component
       (fun () ->
-	let repos =
-	  Filename.concat (git_create_url component) component.name in
 	let start = git_current_branch () in
 	git_fetch "origin";
 	git_fetch ~tags:true "origin";
@@ -434,8 +429,6 @@ let update_pack ?specdir component =
   let local_changes =
     with_component_dir ~strict:true component
       (fun () ->
-	let repos =
-	  Filename.concat (git_create_url component) component.name in
 	let start = git_current_branch () in
 	git_fetch "origin";
 	git_fetch ~tags:true "origin";
@@ -485,7 +478,7 @@ let update_pack ?specdir component =
 			      let changed =
 				(Pcre.pmatch ~rex s) && not (is_release s) in
 			      if changed then
-				log_message (sprintf "%s is changed" s); 
+				log_message (sprintf "%s is changed" s);
 			      changed)
 			      (git_changes tag cur)
 			  with Key_not_found key ->
@@ -554,28 +547,28 @@ let status components =
     components
 
 let tag_component tag component =
-  ignore
-    (with_component_dir ~strict:false component
-      (fun () ->
-	let url = 
-	  Filename.concat
-	    (git_create_url component) component.name in
-	match git_current_branch () with
-	    Some branch ->
-	      (match git_make_tag tag with
-		| Tag_created ->
-		    git_push_cycle ~tags:true ~refspec:(Some tag) url
-		| Tag_already_exists -> 
-		    git_push_cycle ~tags:true ~refspec:(Some tag) url
-		| Tag_creation_problem -> raise Logger.Error)
-	  | None ->
-	      log_message ("Warning: cannot find current branch for " ^ component.name);
-	      (match git_make_tag tag with
-		| Tag_created ->
-		    git_push_cycle ~tags:true ~refspec:(Some tag) url
-		| Tag_already_exists -> 
-		    git_push_cycle ~tags:true ~refspec:(Some tag) url
-		| Tag_creation_problem -> raise Logger.Error)))
+  let call () =
+    let url = 
+      Filename.concat
+	(git_create_url component) component.name in
+    match git_current_branch () with
+	Some branch ->
+	  (match git_make_tag tag with
+	    | Tag_created ->
+		git_push_cycle ~tags:true ~refspec:(Some tag) url 10
+	    | Tag_already_exists -> 
+		git_push_cycle ~tags:true ~refspec:(Some tag) url 10
+	    | Tag_creation_problem -> raise Logger.Error)
+      | None ->
+	  log_message ("Warning: cannot find current branch for " ^ component.name);
+	  (match git_make_tag tag with
+	    | Tag_created ->
+		git_push_cycle ~tags:true ~refspec:(Some tag) url 10
+	    | Tag_already_exists -> 
+		git_push_cycle ~tags:true ~refspec:(Some tag) url 10
+	    | Tag_creation_problem -> raise Logger.Error)    
+  in ignore 
+       (with_component_dir ~strict:false component call)
 
 let make_tag tag components =
   non_empty_iter (tag_component tag) components
@@ -657,7 +650,7 @@ let tag_ready ~tag components =
   List.for_all
     (fun component ->
       let res = ref false in
-      ignore 
+      ignore
 	(with_component_dir ~strict:false component
 	  (fun () -> res := List.mem tag (git_tag_list ())));
       !res)
