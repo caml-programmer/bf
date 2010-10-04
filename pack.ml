@@ -952,23 +952,26 @@ let build_package_impl ?(ready_spec=None) os platform args =
 		      if Sys.file_exists bf_list then
 			add out bf_list
 		      else
-			begin
-			  log_message
-			    (sprintf "bf list for (%s) is not found -> need installing" name);
-			  let tag =
-			    let k =
-			      mk_tag (pkgname_of_specdir abs_specdir) version (int_of_string release) in
-			    let tag_exists = ref false in
-			    with_component_dir ~strict:false c
-			      (fun () -> 
-				tag_exists := List.mem k (Git.git_tag_list ()));
-			    if !tag_exists then
-			      Some k
-			    else None
-			  in
-			  reinstall (with_tag tag [c]);
-			  add_with_check ()
-			end
+			(if Params.get_param "autopkg" <> "false" then
+			  begin
+			    log_message
+			      (sprintf "bf list for (%s) is not found -> need installing" name);
+			    let tag =
+			      let k =
+				mk_tag (pkgname_of_specdir abs_specdir) version (int_of_string release) in
+			      let tag_exists = ref false in
+			      with_component_dir ~strict:false c
+				(fun () -> 
+				  tag_exists := List.mem k (Git.git_tag_list ()));
+			      if !tag_exists then
+				Some k
+			      else None
+			    in
+			    reinstall (with_tag tag [c]);
+			    add_with_check ()
+			  end
+			else
+			  log_error (sprintf "bf list for (%s) is not found. Check your .bf-params and other configurations." name))
 		    in add_with_check ())
 		  (List.filter 
 		    (fun c -> c.pkg = None)
