@@ -306,15 +306,29 @@ let update_component component =
 	git_fetch "origin";
 	git_fetch ~tags:true "origin";
 	git_track_new_branches ();
+	let update branch =
+	  if git_changed branch (origin branch) then
+	    begin
+	      git_checkout ~force:true ~key:branch ();
+	      git_clean ();
+	      git_merge (origin branch);
+	      remote_changes := true
+	    end
+	in
 	List.iter
-	  (fun branch ->
-	    if git_changed branch (origin branch) then
-	      begin
-		git_checkout ~force:true ~key:branch ();
-		git_clean ();
-		git_merge (origin branch);
-		remote_changes := true
-	      end)
+	  (fun branch ->	    
+	    (match component.label with
+	      | Branch b ->
+		  if branch = b then
+		    update branch
+	      | Tag _ -> ()
+	      | Current ->
+		  (match start with
+		    | None ->
+			update branch
+		    | Some s ->
+			if branch = s then
+			  update branch)))
 	  (git_branch ());
 	let stop = git_current_branch () in
 	match start, stop with
