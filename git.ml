@@ -250,7 +250,7 @@ let git_changed key_a key_b =
 
 let git_diff_view ~tag_a ~tag_b =
   let cmd =
-    sprintf "git diff %s %s" tag_a tag_b in
+    sprintf "git diff -M %s %s" tag_a tag_b in
   let buf = Buffer.create 64 in
   let ch = Unix.open_process_in cmd in
   (try
@@ -313,20 +313,15 @@ let git_branch_status ~strict component =
     | Current  -> assert false
     | Tag _ -> assert false
     | Branch m ->
-	let current = git_current_branch () in
-	let branches = git_branch ~remote:false () in
-	if not (List.mem m branches) then
-	  Tree_exists_with_other_key "unknown"
-	else
-	  match git_current_branch () with
-	    | Some cur ->
-		if cur = m then
-		  Tree_exists_with_given_key (git_worktree_status ~strict component)
-		else
-		  Tree_exists_with_other_key cur
-	    | None ->
-		Tree_exists_with_other_key "unknown"
-
+	match git_current_branch () with
+	  | Some cur ->
+	      if cur = m then
+		Tree_exists_with_given_key (git_worktree_status ~strict component)
+	      else
+		Tree_exists_with_other_key cur
+	  | None ->
+	      Tree_exists_with_other_key "unknown"
+		
 let git_key_status ~strict component =
   match component.label with
     | Current  -> Tree_exists_with_given_key (git_worktree_status ~strict component)
