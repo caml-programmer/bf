@@ -1527,7 +1527,7 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode
   let have_fs_changes =
     if check_fs then
       begin
-	let pat = sprintf "%s-%s-%d" pkgname version revision in
+	let pat = sprintf "%s-%s-%d" pkgname version (pred revision) in
 	not (List.exists (Pcre.pmatch ~pat) (System.list_of_directory "."))
       end
     else false
@@ -1537,7 +1537,7 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode
     mk_tag pkgname version revision in
   
   let old_tag =
-    if  revision > 0 then
+    if revision > 0 then
       Some (mk_tag pkgname version (pred revision))
     else None
   in
@@ -1560,7 +1560,7 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode
 	  false
   in
 
-  let build () =
+  let build ~tag =
     if not (tag_ready ~tag components) then
       begin
 	install components;
@@ -1591,15 +1591,22 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode
       | None -> ());
     true
   in
-
-  if lazy_mode && not have_composite_changes && not have_pack_changes && not have_fs_changes then
-    (log_message "lazy update: noting to do"; false)
+  if lazy_mode && not have_composite_changes && not have_pack_changes then
+    begin
+      if have_fs_changes then
+	match old_tag with
+	  | Some old -> build ~tag:old
+	  | None ->
+	      (log_message "lazy update: noting to do"; false)
+      else
+	(log_message "lazy update: noting to do"; false)
+    end
   else
     begin    
       log_message 
 	(sprintf "start update: lazy-mode(%b), composite-changes(%b), pack-changes(%b), fs-changes(%b)"
 	  lazy_mode have_composite_changes have_pack_changes have_fs_changes);
-      build ()
+      build ~tag
     end
 
 (* Depend tree support *)

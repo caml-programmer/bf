@@ -321,7 +321,7 @@ let git_branch_status ~strict component =
 		Tree_exists_with_other_key cur
 	  | None ->
 	      Tree_exists_with_other_key "unknown"
-		
+
 let git_key_status ~strict component =
   match component.label with
     | Current  -> Tree_exists_with_given_key (git_worktree_status ~strict component)
