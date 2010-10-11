@@ -1595,17 +1595,23 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode
     begin
       if have_fs_changes then
 	match old_tag with
-	  | Some old -> build ~tag:old
+	  | Some prev ->
+	      log_message 
+		(sprintf "pkg update (%s/%s): lazy-mode(%b), composite-changes(%b), pack-changes(%b), fs-changes(%b) -> prev-build(%s)"
+		  pkgname branch lazy_mode have_composite_changes have_pack_changes have_fs_changes prev);
+	      build ~tag:prev
 	  | None ->
-	      (log_message "lazy update: noting to do"; false)
+	      (log_message (sprintf "pkg update (%s/%s): noting to do" pkgname branch);
+	      false)
       else
-	(log_message "lazy update: noting to do"; false)
+	(log_message (sprintf "pkg update (%s/%s): noting to do" pkgname branch);	
+	false)
     end
   else
     begin    
       log_message 
-	(sprintf "start update: lazy-mode(%b), composite-changes(%b), pack-changes(%b), fs-changes(%b)"
-	  lazy_mode have_composite_changes have_pack_changes have_fs_changes);
+	(sprintf "pkg update (%s/%s): lazy-mode(%b), composite-changes(%b), pack-changes(%b), fs-changes(%b) -> new-build(%s)"
+	  pkgname branch lazy_mode have_composite_changes have_pack_changes have_fs_changes tag);
       build ~tag
     end
 
