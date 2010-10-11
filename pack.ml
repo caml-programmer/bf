@@ -958,7 +958,7 @@ let build_package_impl ?(ready_spec=None) os platform args =
 			      (sprintf "bf list for (%s) is not found -> need installing" name);
 			    let tag =
 			      let k =
-				mk_tag (pkgname_of_specdir abs_specdir) version (int_of_string release) in
+				mk_tag ((pkgname_of_specdir abs_specdir), version, (int_of_string release)) in
 			      let tag_exists = ref false in
 			      ignore(with_component_dir ~strict:false c
 				(fun () -> 
@@ -1534,11 +1534,11 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode
   in
 
   let tag =
-    mk_tag pkgname version revision in
+    (pkgname,version,revision) in
   
-  let old_tag =
+  let prev_tag =
     if revision > 0 then
-      Some (mk_tag pkgname version (pred revision))
+      Some (pkgname,version,(pred revision))
     else None
   in
 
@@ -1560,32 +1560,33 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode
 	  false
   in
 
-  let build ~tag =
-    if not (tag_ready ~tag components) then
+  let build ?(prev=false) tag =
+    let (pkgname,version,revision) = tag in
+    if not (tag_ready ~tag:(mk_tag tag) components) then
       begin
 	install components;
-	make_tag tag 
+	make_tag (mk_tag tag)
 	  (only_local components)
       end;
     
-    install (with_tag (Some tag) components);
+    install (with_tag (Some (mk_tag tag)) components);
     
     (try
       build_package ~ready_spec
 	[specdir;version;string_of_int revision];
-      if not !custom_revision then
+      if not !custom_revision && not prev then
 	ignore(reg_pkg_release specdir version revision)
     with
       | Permanent_error s ->
-	  if not !custom_revision then
+	  if not !custom_revision && not prev then
 	    ignore(reg_pkg_release specdir version revision);
 	  log_error s;
       | exn -> log_error (Printexc.to_string exn));
     
-    (match old_tag with
+    (match prev_tag with
       | Some old ->
 	  (try
-	    changelog_components components old tag
+	    changelog_components components (mk_tag old) (mk_tag tag)
 	  with exn ->
 	    log_message (Printexc.to_string exn))
       | None -> ());
@@ -1594,12 +1595,12 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode
   if lazy_mode && not have_composite_changes && not have_pack_changes then
     begin
       if have_fs_changes then
-	match old_tag with
-	  | Some prev ->
+	match prev_tag with
+	  | Some tag ->
 	      log_message 
 		(sprintf "pkg update (%s/%s): lazy-mode(%b), composite-changes(%b), pack-changes(%b), fs-changes(%b) -> previous-build(%s)"
-		  pkgname branch lazy_mode have_composite_changes have_pack_changes have_fs_changes prev);
-	      build ~tag:prev
+		  pkgname branch lazy_mode have_composite_changes have_pack_changes have_fs_changes (mk_tag tag));
+	      build ~prev:true tag
 	  | None ->
 	      (log_message (sprintf "pkg update (%s/%s): noting to do" pkgname branch);
 	      false)
@@ -1611,8 +1612,8 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode
     begin    
       log_message 
 	(sprintf "pkg update (%s/%s): lazy-mode(%b), composite-changes(%b), pack-changes(%b), fs-changes(%b) -> first-build(%s)"
-	  pkgname branch lazy_mode have_composite_changes have_pack_changes have_fs_changes tag);
-      build ~tag
+	  pkgname branch lazy_mode have_composite_changes have_pack_changes have_fs_changes (mk_tag tag));
+      build tag
     end
 
 (* Depend tree support *)
@@ -2255,7 +2256,7 @@ let deptree_of_specdir ~vr specdir : clone_tree =
 	let key =
 	  let pkgname =
 	    pkgname_of_specdir specdir in
-	  mk_tag pkgname ver rev in
+	  mk_tag (pkgname, ver, rev) in
 
 	checkout_pack key;
 

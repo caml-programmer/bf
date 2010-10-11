@@ -425,14 +425,14 @@ let read_pkg_release ?(next=false) ?version specdir =
     else raise Exit
   with _ -> raise (Pkg_release_not_found specdir))
 
-let mk_tag pkgname ver rev =
+let mk_tag (pkgname,ver,rev) =
   sprintf "%s/%s-%d" pkgname ver rev
 
 let tag_of_specdir specdir =
   try
     let pkgname = pkgname_of_specdir specdir in
     let (ver,rev) = read_pkg_release specdir in
-    Some (mk_tag pkgname ver rev)
+    Some (mk_tag (pkgname, ver, rev))
   with exn -> log_message
     (sprintf "Warning: cannot parse release file from %s by error (%s)" specdir
       (Printexc.to_string exn));
