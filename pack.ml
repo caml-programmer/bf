@@ -1311,6 +1311,8 @@ let build_package_impl ?(ready_spec=None) os platform args =
 			      let dst = Filename.concat 
 				(Filename.concat abs_specdir "debian") 
 				(System.strip_root src) in
+                              let dir = Filename.dirname dst in
+			      make_directory [dir];
 			      System.link_or_copy
 				(match dest_dir () with
 				  | Some d -> Filename.concat d src
