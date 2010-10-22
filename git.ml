@@ -87,7 +87,7 @@ let git_log ?(diff=false) ?(since=None) tag_a tag_b =
 	end;
       Buffer.add_string buf s;
       Buffer.add_string buf "\n";
-    done; close_in ch
+    done; ignore(Unix.close_process_in ch)
   with End_of_file ->
     close_in ch);
   chunks := (Buffer.contents buf)::!chunks;
@@ -257,7 +257,7 @@ let git_diff_view ~tag_a ~tag_b =
     while true do
       Buffer.add_string buf (input_line ch);
       Buffer.add_string buf "\n";
-    done; close_in ch
+    done; ignore(Unix.close_process_in ch)
   with End_of_file ->
     close_in ch);
   Buffer.contents buf
