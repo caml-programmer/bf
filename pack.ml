@@ -1331,7 +1331,7 @@ let build_package_impl ?(ready_spec=None) os platform args =
 			Filename.concat 
 			  (Filename.concat abs_specdir "debian/DEBIAN") name in
 		      System.write_string
-			~file ~string:(resolve_params find_value content);
+			~file ~string:(resolve_params find_value (sprintf "#!/bin/sh\n%s\n" content));
 		      Unix.chmod file 0o755
 		    in
 
@@ -1346,7 +1346,7 @@ let build_package_impl ?(ready_spec=None) os platform args =
 			  "debian/DEBIAN";
 			  man_location;
 			  doc_location;
-			];			
+			];
 			
 			(match spec.pre_install with
 			  | None -> ()
@@ -1355,8 +1355,7 @@ let build_package_impl ?(ready_spec=None) os platform args =
 				| None ->
 				    write_script "preinst" content
 				| Some upd ->
-				    write_script "preinst"
-				      (content ^ "\n" ^  upd)));
+				    write_script "preinst" (content ^ "\n" ^  upd)));
 			(match spec.post_install with
 			  | None -> ()
 			  | Some content ->
