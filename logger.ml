@@ -98,8 +98,6 @@ let log_error error =
   raise Error
 
 let log_command ?(low=false) ?env ?error_handler prog args =
-  let out_buf = Buffer.create 256 in
-  let err_buf = Buffer.create 256 in
   with_logger
     (fun logger ->
       try

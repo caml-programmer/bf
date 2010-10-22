@@ -1328,7 +1328,7 @@ let build_package_impl ?(ready_spec=None) os platform args =
 		    		    
 		    let write_script name content =
 		      let file =
-			Filename.concat 
+			Filename.concat
 			  (Filename.concat abs_specdir "debian/DEBIAN") name in
 		      System.write_string
 			~file ~string:(resolve_params find_value (sprintf "#!/bin/sh\n%s\n" content));
