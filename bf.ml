@@ -21,6 +21,7 @@ let usage () =
   print_endline "   or: bf fork <specdir> <source-branch> <new-branch> [<single-rev-depth>]";
   print_endline "   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite|depends|packages]";
   print_endline "   or: bf clone <specdir> [overwrite] [norec] [<ver> <rev>]";
+  print_endline "   or: bf link <pkg-path> [symlink]";
   print_endline "   or: bf top <specdir> [overwrite] [norec]";
   print_endline "   or: bf graph <specdir> [<ver> <rev>]";
   print_endline "   or: bf tag <composite> <tag>";
@@ -291,6 +292,13 @@ let main () =
 	      else
 		Pack.changelog_packages Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	    else usage ()
+	| "link" ->
+	    if len = 3 then
+	      Pack.link ~hard:true Sys.argv.(2)
+	    else
+	      if len = 4 && Sys.argv.(3) = "symlink" then
+		Pack.link ~hard:false Sys.argv.(1)
+	      else usage ()
 	| _ ->
 	    analyze ()
     else usage ()

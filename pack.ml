@@ -1867,10 +1867,15 @@ let new_only e =
 let with_overwrite ow l =
   if ow then l else List.filter new_only l
 
-let extract_packbranch userhost pkg_path =
-  match (System.read_lines
-	  ~filter:(Pcre.pmatch ~pat:"packbranch-")
-    (sprintf "ssh %s rpm -qp --provides %s" userhost pkg_path))
+let extract_packbranch ~userhost pkg_path =
+  match
+    (match userhost with
+      | Some auth ->
+	  (System.read_lines ~filter:(Pcre.pmatch ~pat:"packbranch-")
+	    (sprintf "ssh %s rpm -qp --provides %s" auth pkg_path))
+      | None ->
+	  (System.read_lines ~filter:(Pcre.pmatch ~pat:"packbranch-")
+	    (sprintf "rpm -qp --provides %s" pkg_path)))
   with [] -> raise (Pack_branch_is_not_found pkg_path)
     | hd::_ ->
 	let pos = String.index hd '-' in
@@ -1890,7 +1895,7 @@ let without_rev_require =
 let without_ver_require =
   Pcre.regexp "(.+)"
 
-let extract_depend_list userhost pkg_path =
+let extract_depend_list ~userhost pkg_path =
   List.rev
     (List.fold_left
       (fun acc s ->
@@ -1914,7 +1919,11 @@ let extract_depend_list userhost pkg_path =
 	    with Not_found -> acc))) []
       (System.read_lines
 	~filter:(Pcre.pmatch ~pat:(sprintf "^%s" (Params.get_param "pkg-prefix")))
-	(sprintf "ssh %s rpm -qRp %s" userhost pkg_path)))
+	(match userhost with
+	  | Some auth ->
+	      (sprintf "ssh %s rpm -qRp %s" auth pkg_path)
+	  | None -> 
+	      (sprintf "rpm -qRp %s" pkg_path))))
 
 let name_of_pkg_path pkg_path =
   let pkg = Filename.basename pkg_path in
@@ -1925,7 +1934,7 @@ let name_of_pkg_path pkg_path =
   let version = extract_version (sprintf "-%d.%s.%s.%s" revision (string_of_platform platform) arch extension) pkg in
   extract_name (sprintf "-%s-%d.%s.%s.%s" version revision (string_of_platform platform) arch extension) pkg  
 
-let parse_pkg_path userhost pkg_path =
+let parse_pkg_path ~userhost pkg_path =
   let pkg_dir = Filename.dirname pkg_path in
   let pkg = Filename.basename pkg_path in
   let platform = extract_platform pkg in
@@ -1938,7 +1947,7 @@ let parse_pkg_path userhost pkg_path =
   let pkg_name =
     extract_name (sprintf "-%s-%d.%s.%s.%s" version revision (string_of_platform platform) arch extension) pkg in
   let pack_branch =
-    extract_packbranch userhost pkg_path in
+    extract_packbranch ~userhost pkg_path in
   { 
     pkg_path = pkg_path;
     pkg_dir = pkg_dir;
@@ -1952,14 +1961,14 @@ let parse_pkg_path userhost pkg_path =
     pkg_branch = pack_branch;    
   }
 
-let deptree_of_package userhost pkg_path : pkg_clone_tree =
+let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
   let pre_table = Hashtbl.create 32 in
   
   let rec scan pkg_path =
     log_message (sprintf "scanning %s" pkg_path);
-    let e = parse_pkg_path userhost pkg_path in
+    let e = parse_pkg_path ~userhost pkg_path in
     let deps =
-      extract_depend_list userhost pkg_path in
+      extract_depend_list ~userhost pkg_path in
     
     Hashtbl.add pre_table e.pkg_name (e,deps);
 
@@ -2050,7 +2059,7 @@ let rec print_depends depth = function
 let print_dep_val e =
   printf "%s-%s-%d.%s.%s %s\n"
     e.pkg_name e.pkg_version e.pkg_revision e.pkg_arch e.pkg_extension e.pkg_branch
-
+    
 let clone_packages l =
   List.iter (fun e ->
     let specdir =
@@ -2067,7 +2076,7 @@ let rec download_packages userhost l =
 let pkg_clone userhost pkg_path mode =
   let overwrite = mode <> "default" in
   let depends =
-    deptree_of_package userhost pkg_path in
+    deptree_of_package ~userhost pkg_path in
 
   print_endline "Depends Tree:";
   print_depends 0 depends;
@@ -2079,6 +2088,36 @@ let pkg_clone userhost pkg_path mode =
     | "packages"  -> download_packages userhost (list_of_deptree depends)
     | _           -> clone_packages (with_overwrite overwrite (list_of_deptree depends))
 
+
+let link ~hard pkg_path =
+  let depends =
+    deptree_of_package pkg_path in
+  let pkg_dir = Filename.dirname pkg_path in
+  List.iter (fun e ->
+    let name = 
+      sprintf "%s-%s-%d.%s.%s"
+	e.pkg_name e.pkg_version 
+	e.pkg_revision e.pkg_arch
+	e.pkg_extension 
+    in
+    let file =
+      Filename.concat pkg_dir name in
+    let do_symlink () =
+      Unix.symlink file name in
+    let do_hardlink () =
+      Unix.link file name in
+    if hard then
+      begin 
+	try 
+	  do_hardlink ()
+	with exn ->
+	  log_message (sprintf "warning: cannot create hardlink: %s by %s\n" name (Printexc.to_string exn));
+	  do_symlink ();
+      end
+    else
+      do_symlink ())
+  (list_of_deptree depends)
+  
 let pack_branches pkgdir =
   List.filter (fun s -> s <> "hooks.scm")
     (System.list_of_directory pkgdir)
