@@ -2095,9 +2095,9 @@ let link ~hard pkg_path =
   let pkg_dir = Filename.dirname pkg_path in
   List.iter (fun e ->
     let name = 
-      sprintf "%s-%s-%d.%s.%s"
+      sprintf "%s-%s-%d.%s.%s.%s"
 	e.pkg_name e.pkg_version 
-	e.pkg_revision e.pkg_arch
+	e.pkg_revision (string_of_platform e.pkg_platform) e.pkg_arch
 	e.pkg_extension 
     in
     let file =
