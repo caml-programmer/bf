@@ -223,5 +223,5 @@ let send_message
     raise (Smtp_error (string_of_exn exn))
 
 let package_build_message ~host ~location ~pkgname ~storage =
-  sprintf "Package %s/%s built on %s and copied to %s\n"
+  sprintf "Package %s/%s was build on %s and copied to %s\n"
     location pkgname host storage
