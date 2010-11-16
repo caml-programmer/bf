@@ -2048,7 +2048,8 @@ let rec print_depends depth = function
       print_depends (succ depth) tree
 
 let print_dep_val e =
-  printf "%s %s %s %d\n" e.pkg_name e.pkg_branch e.pkg_version e.pkg_revision
+  printf "%s-%s-%d.%s.%s %s\n"
+    e.pkg_name e.pkg_version e.pkg_revision e.pkg_arch e.pkg_extension e.pkg_branch
 
 let clone_packages l =
   List.iter (fun e ->
