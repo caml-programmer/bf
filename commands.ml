@@ -250,7 +250,7 @@ let install_component component =
 	ignore
 	  (with_component_dir ~strict:false component
 	    (fun () ->
-	      if Sys.file_exists ".bf-install" then
+	      if Sys.file_exists ".bf-install" && Sys.file_exists ".bf-build" then
 		log_message (component.name ^ " already installed, noting to do")
 	      else
 		begin
