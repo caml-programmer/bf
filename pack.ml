@@ -1464,38 +1464,33 @@ let check_specdir specdir =
     raise (Bad_specdir specdir)
 
 let check_pack_component () =
-  ignore 
-    (with_component_dir ~low:true ~strict:false (make_component "pack")
+  let component = 
+    make_component ~label:(Branch "master") "pack" in
+  ignore(update_pack component);
+  ignore
+    (with_dir component.name
       (fun () ->
 	(match Git.git_current_branch () with
-	  | Some "master" ->
-	      Git.git_pull "origin";
-	      Git.git_fetch ~tags:true "origin";
-	  | _ ->
-	      Git.git_checkout
-		~force:true ~key:"master" ();
-	      Git.git_pull "origin";
-	      Git.git_fetch ~tags:true "origin";
-	      log_error "current pack branch is not master, bf has fix it, try again")))
+	  | Some "master" -> ()
+	  | _ -> Git.git_checkout ~force:true ~key:"master" ())))
 
 let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
   let specdir = System.path_strip_directory specdir in
-  
+
   check_specdir specdir;
   if check_pack then
     check_pack_component ();
 
   let pkgname = pkgname_of_specdir specdir in
   let branch = branch_of_specdir specdir in
-
   let clone_mode =
     match ready_spec with None -> false | _ -> true in
 
   let have_pack_changes =
     if clone_mode then
-      (ignore(update_pack (make_component ~label:(Branch "master") "pack")); false)
+      false
     else
-      update_pack ~specdir (make_component ~label:(Branch "master") "pack")
+      pack_changes specdir (make_component ~label:(Branch "master") "pack")
   in
 
   let conv_revision r =
