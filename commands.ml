@@ -105,6 +105,10 @@ let non_empty_map f = function
     []   -> log_error "don't know what to do"
   | list -> List.map f list
 
+let non_empty_list = function
+    []   -> log_error "don't know what to do"
+  | list -> list
+
 
 (* Projects support *)
 
@@ -245,11 +249,19 @@ let install_component component =
   match component.label, component.pkg with
     | Tag _, Some pkg ->
 	log_message
-	  (component.name ^ (sprintf " must be installed by package (%s), noting to do" pkg))
+	  (component.name ^ (sprintf " must be installed by package (%s), noting to do" pkg));
+	false
     | _ ->
+	let result = ref false in
 	ignore
 	  (with_component_dir ~strict:false component
 	    (fun () ->
+	      if Sys.file_exists ".bf-installing" then
+		begin
+		  log_message
+		    (sprintf "warning: previous component(%s) installion is breaked" component.name);
+		  Unix.unlink ".bf-installing"
+		end;
 	      if Sys.file_exists ".bf-install" && Sys.file_exists ".bf-build" then
 		log_message (component.name ^ " already installed, noting to do")
 	      else
@@ -277,20 +289,31 @@ let install_component component =
 		  generate_changes top_dir
 		    state (create_top_state real_dir);
 		  log_message (component.name ^ " installed");
-		  let ch = open_out ".bf-install" in
+		  let ch = open_out ".bf-installing" in
 		  output_string ch (string_of_float (Unix.gettimeofday ()));
 		  output_string ch "\n";
-		  close_out ch
-		end))
-
+		  close_out ch;
+		  Unix.rename ".bf-installing" ".bf-install";
+		  result := true;
+		end));
+	!result
+	  
 let install components =
-  non_empty_iter install_component components
+  List.fold_left
+    (fun acc component ->
+      let reinstalled =
+	install_component component in
+      if reinstalled then
+	component::acc
+      else
+	acc)
+    [] (non_empty_list components)
 
 let reinstall_component component =
   let file = component.name ^ "/.bf-install" in
   if Sys.file_exists file then
     Sys.remove file;
-  install_component component
+  ignore(install_component component)
 
 let reinstall components =
   non_empty_iter reinstall_component components
@@ -384,7 +407,7 @@ let reg_pkg_release specdir ver rev =
 	  (pkgname_of_specdir specdir) (branch_of_specdir specdir) ver rev);      
       Git.git_push_cycle ~tags:false ~refspec:None "origin" 5)
    
-exception Pkg_release_not_found of string
+exception Pkg_release_not_found of (string * exn)
 
 let rec last = function
   | [] -> raise Not_found
@@ -425,7 +448,8 @@ let read_pkg_release ?(next=false) ?version specdir =
 	  (List.map make (System.list_of_channel ch))) in
       close_in ch; vr
     else raise Exit
-  with _ -> raise (Pkg_release_not_found specdir))
+  with exn -> 
+    raise (Pkg_release_not_found (specdir,exn)))
 
 let mk_tag (pkgname,ver,rev) =
   sprintf "%s/%s-%d" pkgname ver rev
@@ -467,7 +491,8 @@ let update_pack component =
 	  | Some start_key, None ->
 	      git_checkout ~force:true ~key:start_key ()
 	  | None, _ -> ())
-  in install_component component; (* need for create .bf-build and .bf-install *)
+  in ignore
+       (install_component component); (* need for create .bf-build and .bf-install *)
   (local_changes || !remote_changes)
 
 let pack_changes specdir component =
@@ -657,6 +682,10 @@ let only_local components =
   List.filter
     (fun c -> c.pkg = None) components
 
+let only_external components =
+  List.filter
+    (fun c -> c.pkg <> None) components
+
 let as_current l =
   List.map (fun c -> { name = c.name; label = Current; pkg = c.pkg }) l
 
@@ -758,7 +787,7 @@ let scm_rebuild v =
 let scm_install v =
   with_dir ".."
     (fun () ->
-      install (Scheme.components_of_sval_array v)); Snull
+      ignore (install (Scheme.components_of_sval_array v))); Snull
 
 let scm_reinstall v =
   with_dir ".."

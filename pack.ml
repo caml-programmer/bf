@@ -493,6 +493,11 @@ let string_of_op = function
   | Pkg_last -> "last"
   | v -> string_of_pkg_op v
 
+let string_of_pkgexn = function
+  | Commands.Pkg_release_not_found (s,exn) ->
+      sprintf "Pkg_release_not_found(%s,%s)" s (Printexc.to_string exn)
+  | exn -> Printexc.to_string exn
+
 let make_depends ?(interactive=false) ?(ignore_last=false) file =
   let acc = ref ([] : depend list) in
   let add_depend v = acc := v::!acc in
@@ -535,7 +540,7 @@ let make_depends ?(interactive=false) ?(ignore_last=false) file =
 			    (snd (read_pkg_release ~version:ver specdir))
 			    (string_of_platform platform))))
 		    with exn ->
-		      log_message (sprintf "Warning: %s -> try using local pkg archive for search last pkg revision" (Printexc.to_string exn));
+		      log_message (sprintf "Warning: %s -> try using local pkg archive for search last pkg revision" (string_of_pkgexn exn));
 		      pkg_ver := Some (sprintf "%s-%d.%s" ver
 			(find_pkg_revision ~interactive (match !pkg_name with Some s -> s | None -> raise Not_found) ver)
 			(string_of_platform platform))))
@@ -1474,6 +1479,10 @@ let check_pack_component () =
 	  | Some "master" -> ()
 	  | _ -> Git.git_checkout ~force:true ~key:"master" ())))
 
+
+let reinstalled_components = (* for update and upgrade actions *)
+  Hashtbl.create 32;;
+
 let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
   let specdir = System.path_strip_directory specdir in
 
@@ -1555,17 +1564,42 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode
 	  List.iter fetch_tags components;
 	  false
   in
+  
+  let have_external_components_changes =
+    List.exists
+      (fun component -> 
+	Hashtbl.mem reinstalled_components component.name)
+      (only_external components)
+  in
 
+  let add_reinstall c =
+    Hashtbl.replace reinstalled_components c.name false in
+
+  let force_rebuild c =
+    log_message
+      (sprintf "force %s rebuilding by external components changes" c.name);
+    with_dir c.name
+      (fun () ->
+	if Sys.file_exists ".bf-build" then
+	  Unix.unlink ".bf-build";
+	if Sys.file_exists ".bf-install" then
+	  Unix.unlink ".bf-install")
+  in
+  
   let build ?(prev=false) tag =
     let (pkgname,version,revision) = tag in
+
+    if have_external_components_changes then
+      List.iter force_rebuild (only_local components);
+    
     if not (tag_ready ~tag:(mk_tag tag) components) then
       begin
-	install components;
-	make_tag (mk_tag tag)
-	  (only_local components)
+	List.iter add_reinstall (install components);
+	make_tag (mk_tag tag) (only_local components)
       end;
     
-    install (with_tag (Some (mk_tag tag)) components);
+    List.iter add_reinstall
+      (install (with_tag (Some (mk_tag tag)) components));
     
     (try
       build_package ~ready_spec
@@ -2411,7 +2445,7 @@ let upgrade specdir upgrade_mode default_branch =
 	if updated then
 	  List.iter
 	    (fun s -> Hashtbl.replace mark_table s true) dep_paths)
-      depends    
+      depends
   in
   
   match upgrade_mode with

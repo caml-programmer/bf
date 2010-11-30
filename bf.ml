@@ -80,7 +80,7 @@ let main () =
 		| "prepare"   -> Commands.prepare   components
 		| "build"     -> Commands.build     components
 		| "rebuild"   -> Commands.rebuild   components
-		| "install"   -> Commands.install   components
+		| "install"   -> ignore(Commands.install components)
 		| "reinstall" -> Commands.reinstall components
 		| "update"    -> ignore(Commands.update components)
 		| "forward"   -> Commands.forward   components
@@ -91,7 +91,7 @@ let main () =
 		| "prepare"   -> Commands.prepare   [component]
 		| "build"     -> Commands.build     [component]
 		| "rebuild"   -> Commands.rebuild   [component]
-		| "install"   -> Commands.install   [component]
+		| "install"   -> ignore(Commands.install [component])
 		| "reinstall" -> Commands.reinstall [component]
 		| "update"    -> ignore(Commands.update [component])
 		| "forward"   -> Commands.forward   [component]
@@ -103,7 +103,7 @@ let main () =
 		| "prepare"   -> Commands.prepare_composite   composite
 		| "build"     -> Commands.build_composite     composite
 		| "rebuild"   -> Commands.rebuild_composite   composite
-		| "install"   -> Commands.install_composite   composite
+		| "install"   -> ignore(Commands.install_composite composite)
 		| "reinstall" -> Commands.reinstall_composite composite
 		| "update"    -> ignore(Commands.update_composite composite)
 		| "forward"   -> Commands.forward_composite   composite
@@ -115,7 +115,7 @@ let main () =
 		| "prepare"   -> Commands.prepare_composite   ~tag composite
 		| "build"     -> Commands.build_composite     ~tag composite
 		| "rebuild"   -> Commands.rebuild_composite   ~tag composite
-		| "install"   -> Commands.install_composite   ~tag composite
+		| "install"   -> ignore(Commands.install_composite  ~tag composite)
 		| "reinstall" -> Commands.reinstall_composite ~tag composite
 		| "update"    -> ignore(Commands.update_composite ~tag composite)
 		| "forward"   -> Commands.forward_composite   ~tag composite
