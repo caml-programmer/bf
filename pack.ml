@@ -2386,7 +2386,7 @@ let stop_delay n =
     flush stdout;
   done;
   print_endline " go"
-   
+
 let upgrade specdir upgrade_mode default_branch =
   let specdir = System.path_strip_directory specdir in
 

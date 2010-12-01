@@ -95,3 +95,5 @@ set_param ~default:"microball.lpr.jet.msk.su" "pkg-storage";;
 set_param ~default:"" "http-proxy";;
 
 set_param ~default:"jet" "pkg-prefix";;
+set_param ~default:"bf.session.log" "session-log";;
+set_param ~default:"bf.lock" "lock-file";;

@@ -372,21 +372,14 @@ let send_file_over_ssh src dst =
   log_command "scp" [src;dst]
 
 
-(* Log wizor *)
+(* Log viewer *)
 
-type log_status = {
-  mtime: float;
-  lname: string;
-}
-
-let log_wizor dir =
-  let read_logs () =
-    List.map
-      (fun dir ->
-	let st = Unix.stat dir in
-	{ mtime = st.Unix.st_mtime; lname = dir })
-    (System.list_of_directory dir)
-  in ()
+let log_viewer () =
+  exit (Sys.command
+    (sprintf "tail -f %s" (Params.get_param "session-log")))
+  
+  
+  
 
 
 

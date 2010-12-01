@@ -8,6 +8,12 @@ type logger = {
   start_time: float;
 }
 
+let session_port = (* for common session logfile *)
+  open_out_gen
+    [Open_wronly;Open_append;Open_creat;Open_trunc]
+    0o644 (Params.get_param "session-log")
+;;
+
 let current_time () = Unix.gettimeofday ()
 
 let open_logfile () =
@@ -47,12 +53,15 @@ let log_message ?(low=false) ?key ?logger message =
   in 
   let s =
     match key with
-      | None   -> (sprintf "%s> %s\n"      (human_timestamp timestamp) message)
-      | Some k -> (sprintf "%s> [%s] %s\n" (human_timestamp timestamp) k message)
+      | None   -> (sprintf "%s(%0.3f)> %s\n"      (human_timestamp timestamp) (timestamp -. starttime) message)
+      | Some k -> (sprintf "%s(%0.3f)> [%s] %s\n" (human_timestamp timestamp) (timestamp -. starttime) k message)
   in
-  output_string port s; flush port;
-  if not low then 
-    ( output_string stdout s; flush stdout );
+  let write p s =
+    output_string p s; flush p in
+  write session_port s;
+  write port s;
+  if not low then
+    ( write stdout s );
   match logger with
     | Some l ->	flush port
     | None   ->	close_out port

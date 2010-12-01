@@ -2,6 +2,28 @@
 
 open Types
 
+(* Locking *)
+
+let fd_lock =
+  Unix.openfile (Params.get_param "lock-file")
+    [Unix.O_CREAT;Unix.O_RDONLY;Unix.O_WRONLY] 0o644
+;;
+
+let lock () =
+  print_string "locking...";
+  Unix.lockf fd_lock Unix.F_LOCK 1;
+  print_endline "ok"
+
+let unlock () =
+  print_string "unlocking...";
+  Unix.lockf fd_lock Unix.F_ULOCK 1;
+  Unix.close fd_lock;
+  print_endline "ok"
+
+let with_lock f =
+  lock (); f (); unlock ()
+
+
 type analyze_result =
   | Is_components of component list
   | Is_component_with_label of component
@@ -165,14 +187,15 @@ let main () =
 		else None
 	      in
 	      if Sys.file_exists version then
-		ignore (Pack.update ~specdir ~lazy_mode ~ver ~rev ())
+		with_lock (fun () ->
+		  ignore (Pack.update ~specdir ~lazy_mode ~ver ~rev ()))
 	      else
 		analyze ()
 	    else
 	      analyze ()
 	| "log" ->
-	    if len = 3 then
-	      Rules.log_wizor Sys.argv.(2)
+	    if len = 2 then
+	      Rules.log_viewer ()
 	    else usage ()
 	| "clone" ->
 	    if Sys.file_exists Sys.argv.(2) then
@@ -213,10 +236,10 @@ let main () =
 	    else
 	      begin
 		if len = 4 then
-		  Pack.pkg_clone Sys.argv.(2) Sys.argv.(3) "default"
+		  with_lock (fun () -> Pack.pkg_clone Sys.argv.(2) Sys.argv.(3) "default")
 		else
 		  if len = 5 then
-		    Pack.pkg_clone Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
+		    with_lock (fun () -> Pack.pkg_clone Sys.argv.(2) Sys.argv.(3) Sys.argv.(4))
 		  else
 		    usage ()
 	      end
@@ -264,25 +287,33 @@ let main () =
 			    | "full"     -> (Upgrade_full,Some Sys.argv.(3))
 			    | _ -> usage ()))
 		| _ -> usage ()
-	    in Pack.upgrade Sys.argv.(2) upgrade_mode default_branch
+	    in
+	    with_lock
+	      (fun () ->
+		Pack.upgrade Sys.argv.(2) upgrade_mode default_branch)
 	| "fork" ->
 	    if len <> 5 then
 	      if len <> 6 then
 		usage ()
 	      else
-		Pack.fork ~depth:(make_int Sys.argv.(5)) Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
-	    else Pack.fork Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
+		with_lock (fun () ->
+		  Pack.fork ~depth:(make_int Sys.argv.(5)) Sys.argv.(2) Sys.argv.(3) Sys.argv.(4))
+	    else
+	      with_lock (fun () ->
+		Pack.fork Sys.argv.(2) Sys.argv.(3) Sys.argv.(4))
 	| "graph" ->
 	    if len <> 3 then
 	      if len <> 5 then
 		usage ()
 	      else
-		Pack.graph ~ver:Sys.argv.(3) ~rev:(make_int Sys.argv.(4)) Sys.argv.(2)
+		with_lock (fun () ->
+		  Pack.graph ~ver:Sys.argv.(3) ~rev:(make_int Sys.argv.(4)) Sys.argv.(2))
 	    else
-		Pack.graph Sys.argv.(2)
+	      with_lock (fun () -> Pack.graph Sys.argv.(2))
 	| "tag" ->
 	    if len = 4 then
-	      Commands.tag_composite Sys.argv.(2) Sys.argv.(3)
+	      with_lock (fun () ->
+		Commands.tag_composite Sys.argv.(2) Sys.argv.(3))
 	    else usage ()
 	| "review" ->
 	    if len = 4 then
