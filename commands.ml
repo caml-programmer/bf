@@ -134,7 +134,7 @@ let build_component_native component =
   else
     begin
       log_message ("building " ^ component.name);
-      Rules.build_rules ();
+      Rules.build_rules component.rules;
       log_message (component.name ^ " built");
       let ch = open_out ".bf-build" in
       output_string ch (string_of_float (Unix.gettimeofday ()));
@@ -256,12 +256,6 @@ let install_component component =
 	ignore
 	  (with_component_dir ~strict:false component
 	    (fun () ->
-	      if Sys.file_exists ".bf-installing" then
-		begin
-		  log_message
-		    (sprintf "warning: previous component(%s) installion is breaked" component.name);
-		  Unix.unlink ".bf-installing"
-		end;
 	      if Sys.file_exists ".bf-install" && Sys.file_exists ".bf-build" then
 		log_message (component.name ^ " already installed, noting to do")
 	      else
@@ -284,16 +278,15 @@ let install_component component =
 		    create_top_state real_dir in
 		  if dest_dir <> "" then
 		    Params.update_param "top-dir" real_dir;
-		  Rules.install_rules ();
+		  Rules.install_rules component.rules;
 		  Params.update_param "top-dir" top_dir;
 		  generate_changes top_dir
 		    state (create_top_state real_dir);
 		  log_message (component.name ^ " installed");
-		  let ch = open_out ".bf-installing" in
+		  let ch = open_out ".bf-install" in
 		  output_string ch (string_of_float (Unix.gettimeofday ()));
 		  output_string ch "\n";
 		  close_out ch;
-		  Unix.rename ".bf-installing" ".bf-install";
 		  result := true;
 		end));
 	!result
@@ -675,7 +668,12 @@ let with_tag tag components =
     | Some tag_name ->
 	List.map
 	  (fun component ->
-	    { name = component.name; label = Tag tag_name; pkg = component.pkg })
+	    {
+	      name = component.name; 
+	      label = Tag tag_name; 
+	      pkg = component.pkg; 
+	      rules = component.rules;
+	    })
 	  components
 
 let only_local components =
@@ -687,7 +685,13 @@ let only_external components =
     (fun c -> c.pkg <> None) components
 
 let as_current l =
-  List.map (fun c -> { name = c.name; label = Current; pkg = c.pkg }) l
+  List.map (fun c -> 
+    { 
+      name = c.name; 
+      label = Current; 
+      pkg = c.pkg; 
+      rules = c.rules;
+    }) l
 
 let tag_ready ~tag components =
   List.for_all

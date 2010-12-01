@@ -10,8 +10,12 @@ let debug =
     ignore(Sys.getenv "DEBUG"); true
   with Not_found -> false
 
-let rules_file () =
-  Filename.concat (Sys.getcwd()) ".bf-rules"
+let rules_file name =
+  match name with
+    | None ->
+	Filename.concat (Sys.getcwd()) ".bf-rules"
+    | Some s ->
+	Filename.concat (Sys.getcwd()) (".bf-rules." ^ s)
 
 let load_plugins () =
   if debug then print_string "load ac-configure...";
@@ -105,6 +109,12 @@ let write_composite file components =
 	  out " (package \"";
 	  out s;
 	  out "\")");
+    (match c.Types.rules with
+      | None -> ()
+      | Some s ->
+	  out " (rules \"";
+	  out s;
+	  out "\")");   
     out ")\n";
   in
   out "(define (composite)\n'(";
@@ -125,20 +135,20 @@ let components_of_composite composite =
     | _ -> log_error "invalid composition"
   in iter [] composite
 
-let build_rules () =
+let build_rules name =
   load_plugins ();
   Env.prepare ();
   print_string "load rules...";
-  Scheme.eval_file (rules_file ());
+  Scheme.eval_file (rules_file name);
   print_endline "ok";
   Scheme.eval_code (fun _ -> ()) "(build ())";
   Env.prepare ()
 
-let install_rules () =
+let install_rules name =
   load_plugins ();
   Env.prepare ();
   print_string "load rules...";
-  Scheme.eval_file (rules_file ());
+  Scheme.eval_file (rules_file name);
   print_endline "ok";
   if Sys.file_exists ".bf-build" then
     begin

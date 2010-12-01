@@ -88,6 +88,7 @@ let component_of_sval s =
 	    | x -> error x)
 	in
 	let pkg = ref None in
+	let rules = ref None in
 	let label = ref Current in
 	let rec scan = function
 	  | Spair v ->
@@ -100,6 +101,8 @@ let component_of_sval s =
 			  label := Tag (match fst x.cdr with Sstring s ->  s | x -> error x)
 		      | Ssymbol "package" ->
 			  pkg := Some (match fst x.cdr with Sstring s ->  s | x -> error x)
+		      | Ssymbol "rules" ->
+			  rules := Some (match fst x.cdr with Sstring s ->  s | x -> error x)
 		      | x -> error x)
 		| Snull -> ()
 		| x -> error x);
@@ -111,6 +114,7 @@ let component_of_sval s =
 	  name = name; 
 	  label = !label;
 	  pkg = !pkg;
+	  rules = !rules;
 	}
     | x -> error x
  

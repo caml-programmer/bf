@@ -31,6 +31,11 @@ let usage () =
 let make_int s =
   try int_of_string s with _ -> usage ()
 
+let make_rules () =
+  try
+    Some (Sys.getenv "RULES")
+  with Not_found -> None
+    
 let analyze_arguments () =
   match Array.length Sys.argv with
     | 1 | 2 -> usage ()
@@ -54,10 +59,15 @@ let analyze_arguments () =
 	(match  Sys.argv.(3) with
 	  | "branch" ->
 	      Is_component_with_label
-		{ name = Sys.argv.(2); label = (Branch Sys.argv.(4)); pkg = None }
+		{ 
+		  name = Sys.argv.(2); 
+		  label = (Branch Sys.argv.(4));
+		  pkg = None; 
+		  rules = make_rules ();
+		}
 	  | "tag" ->
 	      Is_component_with_label
-		{ name = Sys.argv.(2); label = (Tag Sys.argv.(4)); pkg = None }
+		{ name = Sys.argv.(2); label = (Tag Sys.argv.(4)); pkg = None; rules = make_rules () }
 	  |  _ ->
 	       Is_components
 		[ 
