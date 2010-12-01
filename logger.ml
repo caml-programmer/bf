@@ -8,26 +8,31 @@ type logger = {
   start_time: float;
 }
 
+let need_truncate file =
+  if Sys.file_exists file then
+    let size =
+      (Unix.stat file).Unix.st_size in
+    size >= 8388608
+  else false
+    
+let prepare file =
+  create_directory_r (Filename.dirname file);
+  if need_truncate file then
+    open_out file
+  else open_out_gen [Open_wronly; Open_append; Open_creat] 0o644 file
+
 let session_port = (* for common session logfile *)
-  open_out_gen
-    [Open_wronly;Open_append;Open_creat;Open_trunc]
-    0o644 (Params.get_param "session-log")
+  prepare (Params.get_param "session-log")
 ;;
 
 let current_time () = Unix.gettimeofday ()
 
 let open_logfile () =
-  let logfile =
-    Filename.concat
-      (Params.get_param "start-dir")
-      (Filename.concat
-	(Params.get_param "log-dir")
-	(Params.get_param "component"))
-  in
-  create_directory_r (path_directory logfile);
-  open_out_gen
-    [Open_wronly;Open_append;Open_creat(*;Open_trunc*)]
-    0o644 logfile
+  prepare (Filename.concat
+    (Params.get_param "start-dir")
+    (Filename.concat
+      (Params.get_param "log-dir")
+      (Params.get_param "component")))
 
 let open_logger () =
   { port = open_logfile (); start_time = current_time () }

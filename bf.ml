@@ -47,7 +47,7 @@ let usage () =
   print_endline "   or: bf top <specdir> [overwrite] [norec]";
   print_endline "   or: bf graph <specdir> [<ver> <rev>]";
   print_endline "   or: bf tag <composite> <tag>";
-  print_endline "   or: bf log <logdir>";
+  print_endline "   or: bf log";
   exit 1
 
 let make_int s =
