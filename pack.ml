@@ -1809,8 +1809,8 @@ type top_tree =
 type clone_tree =
     clone_val deptree
 
-type string_tree =
-    string deptree
+type pack_tree =
+    (string * (Types.version * Types.revision option) option) deptree
      
 exception Cannot_extract_arch of string
 exception Cannot_extract_platform of string
@@ -2200,7 +2200,7 @@ let rec get_pack_depends ~default_branch table acc specdir =
     | l  ->
 	(specdir::(List.flatten (List.map (fun pkg -> (get_pack_depends ~default_branch table [] (specdir_of_pkg ~default_branch pkgdir pkg))) l)))
 
-let deptree_of_pack ~default_branch specdir : string_tree =
+let deptree_of_pack ~default_branch specdir : pack_tree =
   let table = Hashtbl.create 32 in
   let pkgdir =
     Filename.dirname (Filename.dirname specdir) in
@@ -2208,11 +2208,12 @@ let deptree_of_pack ~default_branch specdir : string_tree =
     log_message (sprintf "%s warning: %s already scanned" (String.make depth ' ') specdir) in
   let resolve depth specdir =
     log_message (sprintf "%s resolve %s" (String.make depth ' ') specdir) in
-  let rec make depth specdir =
+  let rec make depth value =
+    let specdir = fst value in
     if Hashtbl.mem table specdir then
       begin
 	warning depth specdir;
-	Dep_val (specdir, Dep_list [])
+	Dep_val (value, Dep_list [])
       end
     else
       if Sys.file_exists specdir then
@@ -2220,30 +2221,44 @@ let deptree_of_pack ~default_branch specdir : string_tree =
 	Hashtbl.add table specdir false;
 	if Sys.file_exists depfile then
 	  let depends =
-	    List.fold_left (fun acc (pkg,_,_) ->
+	    List.fold_left (fun acc (pkg,vr_opt,_) ->
 	      try
-		let new_specdir = 
+		let new_specdir =
 		  specdir_of_pkg ~default_branch pkgdir pkg in
-		  if Hashtbl.mem table new_specdir then
-		    begin
-		      acc @ [new_specdir] (* add specdir for post-processing *)
-		    end
-		  else
-		    acc @ [new_specdir]
+		let make_ver v =
+		  try
+		    let pos = String.index v '-' in
+		    let len = String.length v in
+		    String.sub v 0 pos,
+		    Some (int_of_string (String.sub v (succ pos) (len - pos - 1))) (* TODO: check exception *)
+		  with Not_found -> v,None
+		in
+		let new_value =
+		  new_specdir, (match vr_opt with
+		    | Some (op,ver) ->
+			Some (make_ver ver)
+		    | None -> None)
+		in
+		if Hashtbl.mem table new_specdir then
+		  begin
+		    acc @ [new_value] (* add specdir for post-processing *)
+		  end
+		else
+		  acc @ [new_value]
 	      with _ -> acc)
-	      [] (make_depends ~ignore_last:true depfile)
+	      [] (make_depends ~ignore_last:false depfile)
 	  in
 	  resolve depth specdir;
-	  Dep_val (specdir, Dep_list
+	  Dep_val (value, Dep_list
 	    (List.fold_left
-	      (fun acc specdir -> (try acc @ [make (succ depth) specdir] with Exit -> acc)) [] depends))
+	      (fun acc value -> (try acc @ [make (succ depth) value] with Exit -> acc)) [] depends))
 	else
 	  begin
 	    resolve depth specdir;
-	    Dep_val (specdir, Dep_list [])
+	    Dep_val (value, Dep_list [])
 	  end
       else raise Exit
-  in make 0 specdir
+  in make 0 (specdir,None)
 
 let toptree_of_specdir specdir : top_tree =
   let table = Hashtbl.create 32 in
@@ -2397,9 +2412,11 @@ let upgrade specdir upgrade_mode default_branch =
     log_message "make depends tree...";
     deptree_of_pack ~default_branch specdir in
   
-  let depends = list_of_deptree deptree in  
+  let depends = list_of_deptree deptree in
   log_message "depend list...";
-  List.iter print_endline depends;
+  let print v =
+    printf "%s\n%!" (fst v); in
+  List.iter print depends;
   
   stop_delay 5;
 
@@ -2408,7 +2425,7 @@ let upgrade specdir upgrade_mode default_branch =
 
   let find_specdir specdir =
     let rec make acc = function
-      | Dep_val (specdir', Dep_list l) ->
+      | Dep_val ((specdir',_), Dep_list l) ->
 	  let new_acc = specdir'::acc in
 	  if specdir = specdir' then
 	    acc :: (List.flatten (List.map (make new_acc) l))
@@ -2418,8 +2435,16 @@ let upgrade specdir upgrade_mode default_branch =
     in List.flatten (make [] deptree)
   in
 
-  let eval_lazy_mode specdir =
-    let dep_paths = find_specdir specdir in
+  let eval_lazy_mode specdir vr_opt =
+    let dep_paths =
+      match vr_opt with
+	| Some (_,rev_opt) ->
+	    (match rev_opt with
+	      | Some _ ->
+		  find_specdir specdir
+	      | None -> [])
+	| None -> []
+    in
     if Hashtbl.mem mark_table specdir && not (Hashtbl.mem build_table specdir) then
       (false,dep_paths)
     else
@@ -2428,9 +2453,9 @@ let upgrade specdir upgrade_mode default_branch =
 
   let complete_impl check_fs_packages =
     List.iter
-      (fun specdir ->
+      (fun (specdir,vr_opt) ->
 	let (lazy_mode,dep_paths) =
-	  eval_lazy_mode specdir in
+	  eval_lazy_mode specdir vr_opt in
 	log_message (sprintf "lazy-mode is %b for %s, dep-paths:" lazy_mode specdir);
 	List.iter log_message dep_paths;
 	let updated =
@@ -2451,12 +2476,12 @@ let upgrade specdir upgrade_mode default_branch =
   match upgrade_mode with
     | Upgrade_full ->
 	List.iter
-	  (fun specdir ->
+	  (fun (specdir,_) ->
 	    ignore(update ~specdir ~check_pack:false ~lazy_mode:false ~interactive:true ()))
 	  depends
     | Upgrade_lazy ->
 	List.iter
-	  (fun specdir ->
+	  (fun (specdir,_) ->
 	    ignore(update ~specdir ~check_pack:false ~lazy_mode:true ~interactive:true ()))
 	  depends
     | Upgrade_complete ->
@@ -2573,7 +2598,7 @@ let make_external_depends packdir branch local_depends =
   List.filter
     (fun specdir ->
       let depfile = Filename.concat specdir "depends" in
-      Sys.file_exists depfile && (not (List.mem specdir local_depends)))
+      Sys.file_exists depfile && (not (List.mem_assoc specdir local_depends)))
     (List.map (fun s -> Filename.concat packdir (sprintf "%s/%s" s branch))
       (System.list_of_directory packdir))
 
@@ -2588,7 +2613,7 @@ let update_external_depends local_depends specdir =
 	    let d = Filename.dirname in
 	    Filename.concat (d (d specdir))
 	      (sprintf "%s/%s" pkgname (branch_of_specdir specdir)) in
-	  if List.mem specdir' local_depends then
+	  if List.mem_assoc specdir' local_depends then
 	    Some (op,major_increment ver)
 	  else
 	    Some (op,ver)
@@ -2611,10 +2636,10 @@ let fork ?(depth=0) top_specdir src dst =
   let dir = Filename.dirname in
   let pack_dir = dir (dir top_specdir) in
   let deptree = deptree_of_pack ~default_branch:(Some src) top_specdir in
-  let deplist = deplist_of_deptree deptree (* TODO: using more corrent depths *) in
+  let deplist = List.map (fun (k,v) -> fst k,v) (deplist_of_deptree deptree) (* TODO: using more corrent depths *) in
   let depends = list_of_deptree deptree in
   log_message "depend list...";
-  List.iter print_endline depends;
+  List.iter (fun s -> printf "%s\n" (fst s)) depends;
 
   let check_components =
     print_endline "check components...";
@@ -2701,7 +2726,7 @@ let fork ?(depth=0) top_specdir src dst =
       depends
   in
 
-  let check specdir =
+  let check (specdir,_) =
     check_components
       (components_of_composite
 	(Filename.concat specdir "composite")) in
@@ -2718,7 +2743,7 @@ let fork ?(depth=0) top_specdir src dst =
   let make_new_specdir specdir =
     Filename.concat (dir specdir) dst in
   
-  let fork_components specdir =
+  let fork_components (specdir,_) =
     let local_depth = List.assoc specdir deplist in
     let files = System.list_of_directory specdir in
     let forkdir = make_new_specdir specdir in
@@ -2776,7 +2801,9 @@ let fork ?(depth=0) top_specdir src dst =
   List.iter
     fork_components depends;
   List.iter (update_external_depends depends)
-    (make_external_depends pack_dir (branch_of_specdir top_specdir) depends);
+    (make_external_depends pack_dir 
+      (branch_of_specdir top_specdir)
+      depends);
   List.iter (fun x ->
     log_message (sprintf "Need branching %s" (fst x))) !branch_jobs;
   log_message "Delay before components branching...";
