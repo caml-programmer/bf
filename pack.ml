@@ -574,7 +574,7 @@ let make_depends ?(interactive=false) ?(ignore_last=false) file =
       (match (!pkg_name : pkg_name option) with
 	| Some name ->
 	    (match !pkg_op, !pkg_ver with
-	      | Some op, Some ver ->
+	      | Some op, Some ver ->		  
 		  add_depend (name,(Some (op,ver)),!pkg_desc)
 	      | _ ->
 		  add_depend (name,None,!pkg_desc))
@@ -2239,13 +2239,10 @@ let deptree_of_pack ~default_branch specdir : pack_tree =
 			Some (make_ver ver)
 		    | None -> None)
 		in
-		if Hashtbl.mem table new_specdir then
-		  begin
-		    acc @ [new_value] (* add specdir for post-processing *)
-		  end
-		else
-		  acc @ [new_value]
-	      with _ -> acc)
+		acc @ [new_value] (* add value/specdir for post-processing *)		  
+	      with exn -> 
+		log_message (sprintf "Warning: deptree_of_pack problem: %s\n" (Printexc.to_string exn));
+		acc)
 	      [] (make_depends ~ignore_last:false depfile)
 	  in
 	  resolve depth specdir;
@@ -2530,7 +2527,7 @@ let clone ?(vr=None) ~recursive ~overwrite specdir =
 
   let depends =
     list_of_deptree deptree in
-  List.iter (fun (s,_,_,_) -> printf "%s\n" s) depends;  
+  List.iter (fun (s,_,_,_) -> printf "%s\n" s) depends;
   
   let with_rec l =
     (if recursive then l else [last l]) in
