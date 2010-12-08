@@ -2208,6 +2208,8 @@ let deptree_of_pack ~default_branch specdir : pack_tree =
     log_message (sprintf "%s warning: %s already scanned" (String.make depth ' ') specdir) in
   let resolve depth specdir =
     log_message (sprintf "%s resolve %s" (String.make depth ' ') specdir) in
+  let ignore depth pkg =
+    log_message (sprintf "%s ignore %s" (String.make depth ' ') pkg) in
   let rec make depth value =
     let specdir = fst value in
     if Hashtbl.mem table specdir then
@@ -2223,26 +2225,33 @@ let deptree_of_pack ~default_branch specdir : pack_tree =
 	  let depends =
 	    List.fold_left (fun acc (pkg,vr_opt,_) ->
 	      try
-		let new_specdir =
-		  specdir_of_pkg ~default_branch pkgdir pkg in
-		let make_ver v =
-		  try
-		    let pos = String.index v '-' in
-		    let len =
-		      try
-			String.index_from v pos '.'
-		      with Not_found -> String.length v
-		    in
-		    String.sub v 0 pos,
-		    Some (int_of_string (String.sub v (succ pos) (len - pos - 1)))
-		  with Not_found -> v,None
-		in
-		let new_value =
-		  new_specdir, (match vr_opt with
-		    | Some (op,ver) -> Some (make_ver ver)
-		    | None          -> None)
-		in acc @ [new_value] (* add value/specdir for post-processing *)
-	      with exn -> 
+		if Pcre.pmatch ~pat:(sprintf "^%s" (Params.get_param "pkg-prefix")) pkg then
+		  let new_specdir =
+		    specdir_of_pkg ~default_branch pkgdir pkg in
+		  let make_ver v =
+		    try
+		      let pos = String.index v '-' in
+		      let len =
+			try
+			  String.index_from v pos '.'
+			with Not_found -> String.length v
+		      in
+		      String.sub v 0 pos,
+		      Some (int_of_string (String.sub v (succ pos) (len - pos - 1)))
+		    with Not_found -> v,None
+		  in
+		  let new_value =
+		    new_specdir, (match vr_opt with
+		      | Some (op,ver) -> Some (make_ver ver)
+		      | None          -> None)
+		  in
+		  acc @ [new_value] (* add value/specdir for post-processing *)
+		else
+		  begin
+		    ignore depth pkg;
+		    acc
+		  end
+	      with exn ->
 		log_message (sprintf "Warning: deptree_of_pack problem: %s\n" (Printexc.to_string exn));
 		acc)
 	      [] (make_depends ~ignore_last:false depfile)
