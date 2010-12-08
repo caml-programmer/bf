@@ -2228,18 +2228,20 @@ let deptree_of_pack ~default_branch specdir : pack_tree =
 		let make_ver v =
 		  try
 		    let pos = String.index v '-' in
-		    let len = String.length v in
+		    let len =
+		      try
+			String.index_from v pos '.'
+		      with Not_found -> String.length v
+		    in
 		    String.sub v 0 pos,
-		    Some (int_of_string (String.sub v (succ pos) (len - pos - 1))) (* TODO: check exception *)
+		    Some (int_of_string (String.sub v (succ pos) (len - pos - 1)))
 		  with Not_found -> v,None
 		in
 		let new_value =
 		  new_specdir, (match vr_opt with
-		    | Some (op,ver) ->
-			Some (make_ver ver)
-		    | None -> None)
-		in
-		acc @ [new_value] (* add value/specdir for post-processing *)		  
+		    | Some (op,ver) -> Some (make_ver ver)
+		    | None          -> None)
+		in acc @ [new_value] (* add value/specdir for post-processing *)
 	      with exn -> 
 		log_message (sprintf "Warning: deptree_of_pack problem: %s\n" (Printexc.to_string exn));
 		acc)
