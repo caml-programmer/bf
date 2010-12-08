@@ -46,6 +46,7 @@ let usage () =
   print_endline "   or: bf link <pkg-path> [symlink]";
   print_endline "   or: bf top <specdir> [overwrite] [norec]";
   print_endline "   or: bf graph <specdir> [<ver> <rev>]";
+  print_endline "   or: bf basegraph <specdir>";
   print_endline "   or: bf tag <composite> <tag>";
   print_endline "   or: bf log";
   exit 1
@@ -310,6 +311,11 @@ let main () =
 		  Pack.graph ~ver:Sys.argv.(3) ~rev:(make_int Sys.argv.(4)) Sys.argv.(2))
 	    else
 	      with_lock (fun () -> Pack.graph Sys.argv.(2))
+	| "basegraph" ->
+	    if len <> 3 then
+	      usage ()
+	    else
+	      with_lock (fun () -> Pack.basegraph Sys.argv.(2))
 	| "tag" ->
 	    if len = 4 then
 	      with_lock (fun () ->

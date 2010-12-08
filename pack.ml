@@ -2895,6 +2895,70 @@ let graph ?ver ?rev specdir =
   make_image ();
   view_image ()
 
+let basegraph specdir =
+  let dotfile = "graph.dot" in
+  let pngfile = "graph.png" in
+
+  let tree = deptree_of_pack ~default_branch:(Some (branch_of_specdir specdir)) specdir in
+  let depends =
+    list_of_deptree (map_deptree fst tree) in
+
+  let ch = open_out dotfile in
+  let out = output_string ch in
+  
+  out "digraph g {\n";
+  out "graph [ rankdir = \"LR\" ];\n";
+  out "node  [ fontname = \"Arial\", fontsize = \"10\" ];\n"; (* , //shape = record  *)
+  out "edge  [ labelfontname = \"Arial\", labelfontsize = \"10\" ];\n";  (* , //style = dashed *)
+  
+  let string_of_vr = function
+    | Some (ver,rev_opt) ->
+	sprintf "%s%s" ver (match rev_opt with Some rev -> sprintf "-%d" rev  | None -> "")
+    | None -> "any"
+  in
+  
+  List.iter
+    (fun n ->
+      out (sprintf "\"%s\" 
+                    [shape=box,style=\"rounded,filled\",fillcolor=\"#77CC77\"]\n" (pkgname_of_specdir n)))
+    depends;
+
+  let rec write_links parent = function
+    | Dep_val (e, tree) ->
+	let (en,evr_opt) = e in
+	(match parent with
+	  | Some p ->
+	      let (pn,pvr_opt) = p in
+	      out (sprintf "\"%s\" -> \"%s\" [label=\"%s -> %s\"]\n"
+		(pkgname_of_specdir pn)
+		(pkgname_of_specdir en)
+		(string_of_vr pvr_opt)
+		(string_of_vr evr_opt));
+	      write_links (Some e) tree
+	  | None ->
+	      write_links (Some e) tree)
+    | Dep_list l ->
+	List.iter (write_links parent) l
+  in
+
+  let make_image () =
+    if Sys.command (sprintf "dot -Tpng %s > %s" dotfile pngfile) <> 0 then
+      raise (Cannot_create_image pngfile)
+  in
+  
+  let view_image () =
+    if Sys.command (sprintf "qiv -f %s" pngfile) <> 0 then
+      if Sys.command (sprintf "gqview %s" pngfile) <> 0 then
+	raise (Cannot_view_image pngfile)
+  in
+
+  write_links None tree;
+  
+  out "}\n";
+  close_out ch;
+  make_image ();
+  view_image ()
+
 
 let vr_of_rev s =
   try
