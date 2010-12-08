@@ -1740,8 +1740,12 @@ let list_of_deptree tree =
 	  | None -> ());
 	List.iter (fill_graph (Some x)) l
     | _ -> assert false
-  in fill_graph None tree;  
+  in fill_graph None tree;
   unwind !g
+
+let rec map_deptree f = function
+  | Dep_val (x, tree) -> Dep_val (f x, map_deptree f tree)
+  | Dep_list l -> Dep_list (List.map (map_deptree f) l)
 
 (*
 let resort_depends l =
@@ -2420,11 +2424,9 @@ let upgrade specdir upgrade_mode default_branch =
     log_message "make depends tree...";
     deptree_of_pack ~default_branch specdir in
   
-  let depends = list_of_deptree deptree in
+  let depends = list_of_deptree (map_deptree fst deptree) in
   log_message "depend list...";
-  let print v =
-    printf "%s\n%!" (fst v); in
-  List.iter print depends;
+  List.iter print_endline depends;
   
   stop_delay 5;
 
@@ -2433,26 +2435,27 @@ let upgrade specdir upgrade_mode default_branch =
 
   let find_specdir specdir =
     let rec make acc = function
-      | Dep_val ((specdir',_), Dep_list l) ->
+      | Dep_val ((specdir',vr_opt), Dep_list l) ->
 	  let new_acc = specdir'::acc in
 	  if specdir = specdir' then
-	    acc :: (List.flatten (List.map (make new_acc) l))
+	    begin
+	      match vr_opt with
+		| Some (ver,rev_opt) ->
+		    (match rev_opt with
+		      | Some _ ->
+			  acc :: (List.flatten (List.map (make new_acc) l))
+		      | None -> [])
+		| None -> []
+	    end
 	  else
 	    List.flatten (List.map (make new_acc) l)
       | _ -> assert false
     in List.flatten (make [] deptree)
   in
 
-  let eval_lazy_mode specdir vr_opt =
-    let dep_paths =
-      match vr_opt with
-	| Some (_,rev_opt) ->
-	    (match rev_opt with
-	      | Some _ ->
-		  find_specdir specdir
-	      | None -> [])
-	| None -> []
-    in
+  let eval_lazy_mode specdir =
+    let dep_paths = 
+      find_specdir specdir in
     if Hashtbl.mem mark_table specdir && not (Hashtbl.mem build_table specdir) then
       (false,dep_paths)
     else
@@ -2461,9 +2464,9 @@ let upgrade specdir upgrade_mode default_branch =
 
   let complete_impl check_fs_packages =
     List.iter
-      (fun (specdir,vr_opt) ->
+      (fun specdir ->
 	let (lazy_mode,dep_paths) =
-	  eval_lazy_mode specdir vr_opt in
+	  eval_lazy_mode specdir in
 	log_message (sprintf "lazy-mode is %b for %s, dep-paths:" lazy_mode specdir);
 	List.iter log_message dep_paths;
 	let updated =
@@ -2484,12 +2487,12 @@ let upgrade specdir upgrade_mode default_branch =
   match upgrade_mode with
     | Upgrade_full ->
 	List.iter
-	  (fun (specdir,_) ->
+	  (fun specdir ->
 	    ignore(update ~specdir ~check_pack:false ~lazy_mode:false ~interactive:true ()))
 	  depends
     | Upgrade_lazy ->
 	List.iter
-	  (fun (specdir,_) ->
+	  (fun specdir ->
 	    ignore(update ~specdir ~check_pack:false ~lazy_mode:true ~interactive:true ()))
 	  depends
     | Upgrade_complete ->
