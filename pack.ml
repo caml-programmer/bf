@@ -2895,7 +2895,7 @@ let graph ?ver ?rev specdir =
   make_image ();
   view_image ()
 
-let basegraph specdir =
+let basegraph specdir mode =
   let dotfile = "graph.dot" in
   let pngfile = "graph.png" in
 
@@ -2923,17 +2923,35 @@ let basegraph specdir =
                     [shape=box,style=\"rounded,filled\",fillcolor=\"#77CC77\"]\n" (pkgname_of_specdir n)))
     depends;
 
+  let have_revision vr_opt =
+    match vr_opt with
+      | None -> false
+      | Some (ver,rev_opt) ->
+	  (match rev_opt with
+	    | Some _ -> true
+	    | None -> false)
+  in
+
   let rec write_links parent = function
     | Dep_val (e, tree) ->
 	let (en,evr_opt) = e in
 	(match parent with
 	  | Some p ->
 	      let (pn,pvr_opt) = p in
-	      out (sprintf "\"%s\" -> \"%s\" [label=\"%s -> %s\"]\n"
-		(pkgname_of_specdir pn)
-		(pkgname_of_specdir en)
-		(string_of_vr pvr_opt)
-		(string_of_vr evr_opt));
+	      if have_revision evr_opt then
+		if mode = "full" || mode = "hard" then
+		  out (sprintf "\"%s\" -> \"%s\" [label=\"%s\", color=\"black\"]\n"
+		    (pkgname_of_specdir pn)
+		    (pkgname_of_specdir en)
+		    (string_of_vr evr_opt))
+		else ()
+	      else
+		if mode = "full" || mode = "soft" then
+		  out (sprintf "\"%s\" -> \"%s\" [label=\"%s\", color=\"black\", style=\"dashed\"]\n"
+		    (pkgname_of_specdir pn)
+		    (pkgname_of_specdir en)
+		    (string_of_vr evr_opt))
+		else ();
 	      write_links (Some e) tree
 	  | None ->
 	      write_links (Some e) tree)

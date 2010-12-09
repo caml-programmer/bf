@@ -48,6 +48,3 @@ type upgrade_mode =
 
 let make_component ?(label=Current) ?(pkg=None) ?(rules=None) s =
   { name = s; label = Current; pkg = pkg; rules = rules }
-
-
-

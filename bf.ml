@@ -46,7 +46,7 @@ let usage () =
   print_endline "   or: bf link <pkg-path> [symlink]";
   print_endline "   or: bf top <specdir> [overwrite] [norec]";
   print_endline "   or: bf graph <specdir> [<ver> <rev>]";
-  print_endline "   or: bf basegraph <specdir>";
+  print_endline "   or: bf basegraph <specdir> [hard|soft]";
   print_endline "   or: bf tag <composite> <tag>";
   print_endline "   or: bf log";
   exit 1
@@ -312,10 +312,18 @@ let main () =
 	    else
 	      with_lock (fun () -> Pack.graph Sys.argv.(2))
 	| "basegraph" ->
+	    let check_mode = function
+	      | "soft" -> "soft"
+	      | "hard" -> "hard"
+	      |  _     -> usage ()
+	    in
 	    if len <> 3 then
-	      usage ()
+	      if len <> 4 then
+		usage ()
+	      else
+		with_lock (fun () -> Pack.basegraph Sys.argv.(2) (check_mode Sys.argv.(3)))
 	    else
-	      with_lock (fun () -> Pack.basegraph Sys.argv.(2))
+	      with_lock (fun () -> Pack.basegraph Sys.argv.(2) "full")
 	| "tag" ->
 	    if len = 4 then
 	      with_lock (fun () ->
