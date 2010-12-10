@@ -208,7 +208,7 @@ let strip_destdir s =
     else s
   else s
    
-let generate_changes top_dir a b =
+let generate_changes rules top_dir a b =
   let string_of_fs_entry = function
     | File s -> "f " ^ (strip_destdir s)
     | Dir s  -> "d " ^ (strip_destdir s)
@@ -234,7 +234,11 @@ let generate_changes top_dir a b =
 	    with Not_found ->
 	      out b_entry))
 	  b;
-	let ch = open_out ".bf-list" in
+	let ch = open_out
+	  (match rules with
+	    | Some alt -> (".bf-list." ^ alt)
+	    | None     ->  ".bf-list")
+	in
 	output_string ch 
 	  (sprintf "d %s\n" top_dir);
 	List.iter
@@ -280,7 +284,7 @@ let install_component component =
 		    Params.update_param "top-dir" real_dir;
 		  Rules.install_rules component.rules;
 		  Params.update_param "top-dir" top_dir;
-		  generate_changes top_dir
+		  generate_changes component.rules top_dir
 		    state (create_top_state real_dir);
 		  log_message (component.name ^ " installed");
 		  let ch = open_out ".bf-install" in
