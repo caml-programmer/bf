@@ -952,7 +952,12 @@ let build_package_impl ?(ready_spec=None) os platform args =
 		  (fun c ->
 		    let name = c.name in
 		    let bf_list =
-		      Filename.concat name ".bf-list" in
+		      match c.rules with
+			| Some alt ->
+			    Filename.concat name (sprintf ".bf-list.%s" alt)
+			| None ->
+			    Filename.concat name ".bf-list"
+		    in
 		    let rec add_with_check () =
 		      if Sys.file_exists bf_list then
 			add out bf_list
