@@ -360,7 +360,7 @@ let main () =
       
 let teleport f =
   (* todo: more advanced teleport *)
-  if Sys.file_exists ".bf-rules" then
+  if Sys.file_exists ".bf-rules" then (* todo: use alternative rules *)
     begin
       Sys.chdir "..";
       Params.update_param "start-dir"

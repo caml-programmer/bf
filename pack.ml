@@ -1585,10 +1585,10 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode
       (sprintf "force %s rebuilding by external components changes" c.name);
     with_dir c.name
       (fun () ->
-	if Sys.file_exists ".bf-build" then
-	  Unix.unlink ".bf-build";
-	if Sys.file_exists ".bf-install" then
-	  Unix.unlink ".bf-install")
+	if Sys.file_exists (with_rules ".bf-build" c) then
+	  Unix.unlink (with_rules ".bf-build" c);
+	if Sys.file_exists (with_rules ".bf-install" c) then
+	  Unix.unlink (with_rules ".bf-install" c))
   in
   
   let build ?(prev=false) tag =

@@ -150,7 +150,9 @@ let install_rules name =
   print_string "load rules...";
   Scheme.eval_file (rules_file name);
   print_endline "ok";
-  if Sys.file_exists ".bf-build" then
+  if Sys.file_exists
+    (match name with None -> ".bf-build" | Some s -> ".bf-build." ^ s)
+  then
     begin
       Scheme.eval_code (fun _ -> ()) "(install ())";
       Env.prepare ();

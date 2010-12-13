@@ -31,6 +31,12 @@ let clone_component component =
 let origin s = 
   "origin/" ^ s
 
+let with_rules s c =
+  match c.rules with
+    | Some alt ->
+	s ^ "." ^ alt
+    | None -> s
+
 let with_component_dir ?(low=false) ?(strict=true) component (thunk : unit -> unit) =
   let curdir = Sys.getcwd () in
 
@@ -129,14 +135,14 @@ let forward components =
   non_empty_iter forward_component components
 
 let build_component_native component =
-  if Sys.file_exists ".bf-build" then
+  if Sys.file_exists (with_rules ".bf-build" component) then
     log_message (component.name ^ " already built, nothing to do")
   else
     begin
-      log_message ("building " ^ component.name);
+      log_message (sprintf "building %s" (with_rules component.name component));
       Rules.build_rules component.rules;
       log_message (component.name ^ " built");
-      let ch = open_out ".bf-build" in
+      let ch = open_out (with_rules ".bf-build" component) in
       output_string ch (string_of_float (Unix.gettimeofday ()));
       output_string ch "\n";
       close_out ch
@@ -152,7 +158,9 @@ let build components =
   non_empty_iter build_component components
 
 let rebuild_component component =
-  let file = component.name ^ "/.bf-build" in
+  let file =
+    sprintf "%s/%s" component.name
+      (with_rules ".bf-build" component) in
   if Sys.file_exists file then
     Sys.remove file;
   ignore (with_component_dir ~strict:true component
@@ -239,7 +247,7 @@ let generate_changes rules top_dir a b =
 	    | Some alt -> (".bf-list." ^ alt)
 	    | None     ->  ".bf-list")
 	in
-	output_string ch 
+	output_string ch
 	  (sprintf "d %s\n" top_dir);
 	List.iter
 	  (fun e ->
@@ -260,11 +268,12 @@ let install_component component =
 	ignore
 	  (with_component_dir ~strict:false component
 	    (fun () ->
-	      if Sys.file_exists ".bf-install" && Sys.file_exists ".bf-build" then
-		log_message (component.name ^ " already installed, noting to do")
+	      if Sys.file_exists (with_rules ".bf-install" component)
+		&& Sys.file_exists (with_rules ".bf-build" component) then
+		  log_message ((with_rules component.name component) ^ " already installed, noting to do")
 	      else
 		begin
-		  if not (Sys.file_exists ".bf-build") then
+		  if not (Sys.file_exists (with_rules ".bf-build" component)) then
 		    build_component_native component;
 		  log_message ("installing " ^ component.name);
 		  let top_dir =
@@ -287,7 +296,7 @@ let install_component component =
 		  generate_changes component.rules top_dir
 		    state (create_top_state real_dir);
 		  log_message (component.name ^ " installed");
-		  let ch = open_out ".bf-install" in
+		  let ch = open_out (with_rules ".bf-install" component) in
 		  output_string ch (string_of_float (Unix.gettimeofday ()));
 		  output_string ch "\n";
 		  close_out ch;
@@ -307,7 +316,9 @@ let install components =
     [] (non_empty_list components)
 
 let reinstall_component component =
-  let file = component.name ^ "/.bf-install" in
+  let file =
+    sprintf "%s/%s" component.name
+      (with_rules ".bf-install" component) in
   if Sys.file_exists file then
     Sys.remove file;
   ignore(install_component component)
@@ -319,7 +330,8 @@ let update_component component =
   let exists s =
     Sys.file_exists (Filename.concat component.name s) in
   let status_changes =
-    not (exists ".bf-build") || not (exists ".bf-install") in
+    not (exists (with_rules ".bf-build" component)) ||
+    not (exists (with_rules ".bf-install" component)) in
   let remote_changes = ref false in
   let local_changes =
     with_component_dir ~strict:false component
@@ -530,10 +542,10 @@ let pack_changes specdir component =
 let status_component ?(max_component_length=0) ?(max_label_length=0) component =
   let build =
     Sys.file_exists
-      (component.name ^ "/.bf-build") in
+      (sprintf "%s/%s" component.name (with_rules ".bf-build" component)) in
   let install =
     Sys.file_exists
-      (component.name ^ "/.bf-install") in
+      (sprintf "%s/%s" component.name (with_rules ".bf-install" component)) in
   let label_type =
     string_of_label_type component.label in
   let label =
