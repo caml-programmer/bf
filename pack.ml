@@ -2363,7 +2363,9 @@ let deptree_of_specdir ~vr specdir : clone_tree =
 	let (ver',rev',_) =
 	  Hashtbl.find table specdir in	
 	if mode then
-	  begin
+	  begin	    
+	    checkout_pack 
+	      (mk_tag ((pkgname_of_specdir specdir), ver, rev));
 	    let spec =
 	      spec_from_v2
 		~version:ver
@@ -2377,13 +2379,9 @@ let deptree_of_specdir ~vr specdir : clone_tree =
       end
     else
       begin
-	let key =
-	  let pkgname =
-	    pkgname_of_specdir specdir in
-	  mk_tag (pkgname, ver, rev) in
-
-	checkout_pack key;
-
+	checkout_pack 
+	  (mk_tag ((pkgname_of_specdir specdir), ver, rev));
+	
 	if Sys.file_exists specdir then
 	  let spec = 
 	    spec_from_v2
