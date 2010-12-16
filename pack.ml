@@ -1996,7 +1996,7 @@ let parse_pkg_path ~userhost pkg_path =
     pkg_arch = arch;
     pkg_version = version;
     pkg_revision = revision;
-    pkg_branch = pack_branch;    
+    pkg_branch = pack_branch;
   }
 
 let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
@@ -2209,6 +2209,31 @@ let rec get_pack_depends ~default_branch table acc specdir =
     | l  ->
 	(specdir::(List.flatten (List.map (fun pkg -> (get_pack_depends ~default_branch table [] (specdir_of_pkg ~default_branch pkgdir pkg))) l)))
 
+let parse_vr_opt vr_opt =
+  let make_ver v =
+    try
+      let pos = String.index v '-' in
+      let len =
+	try
+	  String.index_from v pos '.'
+	with Not_found -> String.length v
+		      in
+      String.sub v 0 pos,
+      Some (int_of_string (String.sub v (succ pos) (len - pos - 1)))
+    with Not_found -> v,None
+  in
+  (match vr_opt with
+    | Some (op,ver) -> Some (make_ver ver)
+    | None          -> None)
+    
+let have_revision vr_opt =
+  match vr_opt with
+    | None -> false
+    | Some (ver,rev_opt) ->
+	(match rev_opt with
+	  | Some _ -> true
+	  | None -> false)
+
 let deptree_of_pack ~default_branch specdir : pack_tree =
   let table = Hashtbl.create 32 in
   let pkgdir =
@@ -2237,23 +2262,8 @@ let deptree_of_pack ~default_branch specdir : pack_tree =
 		if Pcre.pmatch ~pat:(sprintf "^%s" (Params.get_param "pkg-prefix")) pkg then
 		  let new_specdir =
 		    specdir_of_pkg ~default_branch pkgdir pkg in
-		  let make_ver v =
-		    try
-		      let pos = String.index v '-' in
-		      let len =
-			try
-			  String.index_from v pos '.'
-			with Not_found -> String.length v
-		      in
-		      String.sub v 0 pos,
-		      Some (int_of_string (String.sub v (succ pos) (len - pos - 1)))
-		    with Not_found -> v,None
-		  in
 		  let new_value =
-		    new_specdir, (match vr_opt with
-		      | Some (op,ver) -> Some (make_ver ver)
-		      | None          -> None)
-		  in
+		    new_specdir, (parse_vr_opt vr_opt) in
 		  acc @ [new_value] (* add value/specdir for post-processing *)
 		else
 		  begin
@@ -2335,6 +2345,8 @@ let deptree_of_specdir ~vr specdir : clone_tree =
     Filename.dirname (Filename.dirname specdir) in
   let warning depth specdir ver rev iver irev =
     log_message (sprintf "%s warning: %s %s %d already scanned, ignore %s %d" (String.make depth ' ') specdir ver rev iver irev) in
+  let replace depth specdir ver rev iver irev =
+    log_message (sprintf "%s warning: %s %s %d already scanned, replaced %s %d" (String.make depth ' ') specdir ver rev iver irev) in
   let resolve depth specdir ver rev =
     log_message (sprintf "%s resolve %s %s %d" (String.make depth ' ') specdir ver rev) in
   let checkout_pack key =
@@ -2345,13 +2357,23 @@ let deptree_of_specdir ~vr specdir : clone_tree =
     match vr with
 	Some x -> x | None -> read_pkg_release specdir in
   
-  let rec make depth (specdir,ver,rev) =
+  let rec make depth (specdir,ver,rev,mode) =
     if Hashtbl.mem table specdir then
       begin
-	let (ver',rev',spec) =
+	let (ver',rev',_) =
 	  Hashtbl.find table specdir in	
-	warning depth specdir ver' rev' ver rev;
-	Dep_val ((specdir,ver',rev',spec), Dep_list [])
+	if mode then
+	  begin
+	    let spec =
+	      spec_from_v2
+		~version:ver
+		~revision:(string_of_int rev) specdir in
+	    Hashtbl.replace table specdir (ver,rev,spec);
+	    replace depth specdir ver' rev' ver rev;
+	  end
+	else
+	  warning depth specdir ver' rev' ver rev;
+	Dep_val (specdir, Dep_list [])
       end
     else
       begin
@@ -2367,43 +2389,49 @@ let deptree_of_specdir ~vr specdir : clone_tree =
 	    spec_from_v2
 	      ~version:ver
 	      ~revision:(string_of_int rev) specdir in
+	  
 	  Hashtbl.add table specdir (ver,rev,spec);
 	  
 	  let depfile = 
 	    Filename.concat specdir "depends" in
 	  if Sys.file_exists depfile then
 	    let depends =
-	      List.fold_left (fun acc (pkg,_,_) ->
+	      List.fold_left (fun acc (pkg,vr_opt,_) ->
 		try
-		  let new_specdir = 
+		  let new_specdir =
 		    specdir_of_pkg ~default_branch:(Some (branch_of_specdir specdir)) pkgdir pkg in
 		  let (ver,rev) = 
 		    read_pkg_release new_specdir in
-		  if Hashtbl.mem table new_specdir then
-		    begin
-		      acc @ [new_specdir,ver,rev] (* add specdir for post-processing *)
-		    end
-		  else
-		    acc @ [new_specdir,ver,rev]
+		  acc @ [new_specdir,ver,rev,(have_revision (parse_vr_opt vr_opt))] (* add specdir for post-processing *)
 		with _ -> acc)
-		[] (make_depends ~ignore_last:true depfile)
+		[] (make_depends ~ignore_last:false depfile)
 	    in
 	    resolve depth specdir ver rev;
-	    Dep_val ((specdir,ver,rev,spec), Dep_list
+	    Dep_val (specdir, Dep_list
 	      (List.fold_left
-		(fun acc (specdir,ver,rev) ->
-		  (try acc @ [make (succ depth) (specdir,ver,rev)] with Exit -> acc)) [] depends))
+		(fun acc (specdir,ver,rev,mode) ->
+		  (try acc @ [make (succ depth) (specdir,ver,rev,mode)] with Exit -> acc)) [] depends))
 	  else
 	    begin
 	      resolve depth specdir ver rev;
-	      Dep_val ((specdir,ver,rev,spec), Dep_list [])
+	      Dep_val (specdir, Dep_list [])
 	    end
 	else raise Exit
       end
-  in 
+  in
   
-  let tree = make 0 (specdir,ver,rev) in
-  checkout_pack "master"; tree
+  let tree = 
+    make 0 (specdir,ver,rev,true) in
+
+  checkout_pack "master";
+  
+  (map_deptree (fun specdir -> 
+    let (ver,rev,spec) =
+      try
+	Hashtbl.find table specdir 
+      with Not_found -> assert false
+    in (specdir,ver,rev,spec)) 
+    tree)
 
 type dep_path = string list
 
@@ -2927,15 +2955,6 @@ let basegraph specdir mode =
       out (sprintf "\"%s\" 
                     [shape=box,style=\"rounded,filled\",fillcolor=\"#77CC77\"]\n" (pkgname_of_specdir n)))
     depends;
-
-  let have_revision vr_opt =
-    match vr_opt with
-      | None -> false
-      | Some (ver,rev_opt) ->
-	  (match rev_opt with
-	    | Some _ -> true
-	    | None -> false)
-  in
 
   let rec write_links parent = function
     | Dep_val (e, tree) ->

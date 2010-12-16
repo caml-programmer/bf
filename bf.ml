@@ -232,7 +232,7 @@ let main () =
 		      | _ -> usage ())
 		  else
 		    usage ()
-		in Pack.clone ~vr ~recursive ~overwrite Sys.argv.(2)
+		in with_lock (fun () -> Pack.clone ~vr ~recursive ~overwrite Sys.argv.(2))
 	      end
 	    else
 	      begin
