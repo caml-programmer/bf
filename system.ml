@@ -8,6 +8,12 @@ let path_list = ["/bin";"/sbin";"/usr/bin";"/usr/sbin"];;
 
 exception Error of string
 
+let mem_debug n =
+  let memsize =
+    int_of_float 
+      ((Gc.allocated_bytes () /. 1024.0) /. 1024.0) in
+  Printf.printf "mem-debug %d - %d Mb\n%!" n memsize
+
 let split_env_var s =
   let len = String.length s in
   let pos = String.index s '=' in
@@ -30,8 +36,8 @@ let string_of_channel ch =
 let list_of_channel ch =
   let rec read acc =
     try
-      read (acc @ [input_line ch])
-    with End_of_file -> acc
+      read ((input_line ch)::acc)
+    with End_of_file -> List.rev acc
   in read []
 
 exception Env_problem of string
@@ -188,11 +194,11 @@ let list_of_directory dir =
     while true do
       let s = Unix.readdir dh in
       if s <> "." && s <> ".." then
-	acc := !acc @ [s];
+	acc := s::!acc;
     done; []
   with End_of_file -> 
     Unix.closedir dh;
-    !acc
+    List.rev !acc
 
 let read_lines ?(env=Unix.environment()) ?(ignore_error=false) ?(filter=(fun _ -> true)) command =
   let (ch,out,err) = Unix.open_process_full command env in
@@ -200,14 +206,14 @@ let read_lines ?(env=Unix.environment()) ?(ignore_error=false) ?(filter=(fun _ -
     try
       let s = input_line ch in
       if filter s then
-	read (acc @ [s])
+	read (s::acc)
       else
 	read acc
     with End_of_file ->
       if not ignore_error then
 	let error = string_of_channel err in
 	match Unix.close_process_full (ch,out,err) with
-	  | Unix.WEXITED 0 -> acc
+	  | Unix.WEXITED 0 -> List.rev acc
 	  | _ ->
 	      let curenv =
 		let b = Buffer.create 32 in
@@ -221,7 +227,7 @@ let read_lines ?(env=Unix.environment()) ?(ignore_error=false) ?(filter=(fun _ -
 	      raise
 		(Error 
 		  (sprintf "cannot read lines from [%s] (%s) with env:\n\n%s" command error curenv))
-      else acc
+      else List.rev acc
   in read []
 
 let with_extension ext f files =

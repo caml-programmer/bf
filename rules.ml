@@ -125,12 +125,12 @@ let write_composite file components =
 let components_of_composite composite =
   let composite = load_composite composite in
   let rec iter acc = function
-    | Snull -> acc
+    | Snull -> List.rev acc
     | Spair v ->
 	(match v.cdr with
-	  | Snull -> acc @ [Scheme.component_of_sval v.car]
+	  | Snull -> (Scheme.component_of_sval v.car)::acc
 	  | Spair v2 ->
-	      iter (acc @ [Scheme.component_of_sval v.car]) (Spair v2)
+	      iter ((Scheme.component_of_sval v.car)::acc) (Spair v2)
 	  | _ -> log_error "invalid composition")
     | _ -> log_error "invalid composition"
   in iter [] composite
@@ -261,11 +261,11 @@ let read_directory dir =
     try
       let s = Unix.readdir dh in
       if s <> "." && s <> ".." then
-	read (acc @ [s])
+	read (s::acc)
       else
 	read acc
     with End_of_file ->
-      Unix.closedir dh; acc
+      Unix.closedir dh; List.rev acc
   in read []
 
 let with_dir dir f =
