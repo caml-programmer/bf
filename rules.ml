@@ -125,7 +125,7 @@ let write_composite file components =
 let components_of_composite composite =
   let composite = load_composite composite in
   let rec iter acc = function
-    | Snull -> List.rev acc
+    | Snull -> acc
     | Spair v ->
 	(match v.cdr with
 	  | Snull -> (Scheme.component_of_sval v.car)::acc
@@ -133,7 +133,7 @@ let components_of_composite composite =
 	      iter ((Scheme.component_of_sval v.car)::acc) (Spair v2)
 	  | _ -> log_error "invalid composition")
     | _ -> log_error "invalid composition"
-  in iter [] composite
+  in List.rev (iter [] composite)
 
 let build_rules name =
   load_plugins ();

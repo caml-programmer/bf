@@ -37,10 +37,10 @@ let string_list_of_sval_array v =
   List.map string_of_sval (Array.to_list v)
 
 let list_of_sval v =
-  let rec make acc = function      
-    | Snull -> acc
+  let rec make acc = function
+    | Snull -> List.rev acc
     | Spair p ->
-	make (acc@[p.car]) p.cdr
+	make (p.car::acc) p.cdr
     | sval -> error sval
   in make [] v
 
@@ -176,9 +176,9 @@ let make_pair f = function
   | sval -> error sval
 
 let rec make_list acc = function
-  | Snull -> acc
+  | Snull -> List.rev acc
   | Spair v ->
-      make_list (acc@[v.car]) v.cdr
+      make_list (v.car::acc) v.cdr
   | sval -> error sval
 
 let env_list_of_sval v =
