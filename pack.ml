@@ -2791,7 +2791,7 @@ let fork ?(depth=0) top_specdir src dst =
     let forkdir = make_new_specdir specdir in
     let components = 
       components_of_composite (Filename.concat specdir "composite") in
-    make_directory_r forkdir;
+    make_directory [forkdir];
     
     let ignore = ["depends";"composite";"release"] in
     List.iter
