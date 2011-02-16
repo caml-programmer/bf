@@ -284,13 +284,17 @@ let install_component component =
 		    if dest_dir = "" then
 		      top_dir
 		    else
-		      Filename.concat dest_dir 
+		      Filename.concat dest_dir
 			(System.strip_root top_dir)
 		  in
 		  let state =
 		    create_top_state real_dir in
 		  if dest_dir <> "" then
-		    Params.update_param "top-dir" real_dir;
+		    begin
+		      Params.update_param "install-dir" real_dir;
+		      Params.update_param "orig-top-dir" top_dir;
+		      Params.update_param "top-dir" real_dir;
+		    end;
 		  Rules.install_rules component.rules;
 		  Params.update_param "top-dir" top_dir;
 		  generate_changes component.rules top_dir
