@@ -7,6 +7,7 @@ open Types
 let env = Ocs_top.make_env ();;
 let thread = Ocs_top.make_thread ();;
 
+
 let output_scheme_value ch v =
   let port = Ocs_port.output_port ch in
   Ocs_print.print port false v;
@@ -65,6 +66,15 @@ let eval_sval s =
 	    | None -> error s
 	    | Some sval -> sval
 	end
+
+let shell () =
+  while true do
+    print_string "ocs> "; flush stdout;
+    (Ocs_eval.eval thread print
+      (Ocs_compile.compile env 
+	(Ocs_read.read_from_port 
+	  (Ocs_port.input_port stdin))))
+  done
 
 let defined name =
   match Ocs_vartable.var_find env.env_vartable name with

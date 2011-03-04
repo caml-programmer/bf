@@ -48,6 +48,7 @@ let usage () =
   print_endline "   or: bf graph <specdir> [<ver> <rev>]";
   print_endline "   or: bf basegraph <specdir> [hard|soft]";
   print_endline "   or: bf tag <composite> <tag>";
+  print_endline "   or: bf shell";
   print_endline "   or: bf log";
   exit 1
 
@@ -354,6 +355,8 @@ let main () =
 	      if len = 4 && Sys.argv.(3) = "symlink" then
 		Pack.link ~hard:false Sys.argv.(1)
 	      else usage ()
+	| "shell" ->
+	    Scheme.shell ()
 	| _ ->
 	    analyze ()
     else usage ()
