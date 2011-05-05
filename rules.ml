@@ -327,7 +327,7 @@ let make_directory_r ?(mode=0o755) s =
       end
     else
       make (s::rest) dir
-  in make [] s
+  in make [] (System.path_strip_directory s)
 
 let make_directory dirs =
   List.iter
