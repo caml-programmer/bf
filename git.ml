@@ -68,8 +68,7 @@ let git_log ?(pack=None) ?(diff=false) ?(since=None) tag_a tag_b =
       | None -> ""
       | Some s -> " " ^ s
   in
-  let fmt =
-    "%H %ae %ad %s%n%b%n" in
+  let fmt = "%h %ci %ae : %s" in
   let cmd =
     match since,diff with
       | Some s,true ->
