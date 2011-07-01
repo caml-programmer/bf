@@ -68,16 +68,18 @@ let git_log ?(pack=None) ?(diff=false) ?(since=None) tag_a tag_b =
       | None -> ""
       | Some s -> " " ^ s
   in
+  let fmt =
+    "%H %ae %ad %s%n%b%n" in
   let cmd =
     match since,diff with
       | Some s,true ->
-	  sprintf "git log --since='%s' -p %s%s" s tag_a file
+	  sprintf "git log --pretty=format:\"%s\" --since='%s' -p %s%s" fmt s tag_a file
       | None,true ->
-	  sprintf "git log -p '%s'..'%s'%s" tag_a tag_b file
+	  sprintf "git log --pretty=format:\"%s\" -p '%s'..'%s'%s" fmt tag_a tag_b file
       | Some s,false ->
-	  sprintf "git log --since='%s' %s%s" s tag_a file
+	  sprintf "git log --pretty=format:\"%s\" --since='%s' %s%s" fmt s tag_a file
       | None,false ->
-	  sprintf "git log '%s'..'%s'%s" tag_a tag_b file
+	  sprintf "git log --pretty=format:\"%s\" '%s'..'%s'%s" fmt tag_a tag_b file
   in
   let chunks = ref [] in
   let buf = Buffer.create 64 in
