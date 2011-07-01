@@ -633,13 +633,17 @@ let diff_component tag_a tag_b component =
 let make_diff tag_a tag_b components =
   non_empty_iter (diff_component tag_a tag_b) components
 
-let changelog_component ?(diff=false) ?(since=None) tag_a tag_b component =
+let changelog_component ?(branch=None) ?(diff=false) ?(since=None) tag_a tag_b component =
   let chunks = ref [] in
   ignore (with_component_dir ~low:true ~strict:false component
     (fun () ->
       let pack =
 	if component.name = "pack" then
-	  Some (Filename.dirname tag_a)
+	  match branch with
+	    | None ->
+		Some (Filename.dirname tag_a)
+	    | Some b ->
+		Some (Filename.concat (Filename.dirname tag_a) b)
 	else
 	  None
       in
@@ -651,16 +655,16 @@ let changelog_component ?(diff=false) ?(since=None) tag_a tag_b component =
 	  (string_of_label component.label))::logs));
   !chunks
 
-let make_changelog tag_a tag_b components =
+let make_changelog ?(branch=None) tag_a tag_b components =
   let chunks = ref [] in
   let add s = chunks:=s::!chunks in
   non_empty_iter
     (fun component -> 
-      List.iter add (changelog_component ~diff:false tag_a tag_b component)) components;
+      List.iter add (changelog_component ~branch ~diff:false tag_a tag_b component)) components;
   add "\n------------------ DIFF -------------------\n";
   non_empty_iter
     (fun component ->
-      List.iter add (changelog_component ~diff:true tag_a tag_b component))
+      List.iter add (changelog_component ~branch ~diff:true tag_a tag_b component))
     components;
   Notify.send_message
     ~subject:(Printf.sprintf "bf@changelog %s -> %s" tag_a tag_b)
@@ -778,7 +782,9 @@ let diff_composite composite tag_a tag_b =
 
 let changelog_composite composite tag_a tag_b =
   log_message ("=> changelog-composite " ^ composite ^ " " ^ tag_a ^ ":" ^ tag_b);
-  make_changelog tag_a tag_b
+  let branch =
+    Some (Filename.basename (Filename.dirname composite)) in  
+  make_changelog ~branch tag_a tag_b
     (only_local (Rules.components_of_composite composite))
 
 let changelog_components components tag_a tag_b =
