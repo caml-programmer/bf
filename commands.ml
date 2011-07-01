@@ -637,7 +637,13 @@ let changelog_component ?(diff=false) ?(since=None) tag_a tag_b component =
   let chunks = ref [] in
   ignore (with_component_dir ~low:true ~strict:false component
     (fun () ->
-      let logs = git_log ~diff ~since tag_a tag_b in
+      let pack =
+	if component.name = "pack" then
+	  Some (Filename.dirname tag_a)
+	else
+	  None
+      in
+      let logs = git_log ~pack ~diff ~since tag_a tag_b in
       if List.length logs > 0 && String.length (List.nth logs 0) > 2 then
 	chunks := (Printf.sprintf "\n\n\n### %s (%s) (%s)\n\n"
 	  (String.uppercase component.name)
