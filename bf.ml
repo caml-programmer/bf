@@ -34,7 +34,7 @@ let usage () =
   print_endline "Usage: bf (prepare|update|forward|[re]build|[re]install|status) <components>";
   print_endline "   or: bf (prepare|update|forward|[re]build|[re]install|status) <component> [branch <branch> | tag <tag>]";
   print_endline "   or: bf (prepare|update|forward|[re]build|[re]install|status) <composite> [<tag>]";
-  print_endline "   or: bf (diff|changelog) <composite> <tag-a> <tag-b>";
+  print_endline "   or: bf (diff|changelog) <composite> <tag-a> <tag-b> [compact]";
   print_endline "   or: bf (diff|changelog) <specdir> <rev-a> <rev-b>";
   print_endline "   or: bf review <composite> <since-date>";
   print_endline "   or: bf pack <specdir> <version> <release>";
@@ -342,9 +342,10 @@ let main () =
 		Pack.diff_packages Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	    else usage ()
 	| "changelog" ->
-	    if len = 5 then
+	    if len = 5 || len = 6 then
 	      if Filename.basename Sys.argv.(2) = "composite" then
-		Commands.changelog_composite ~interactive:true Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
+		Commands.changelog_composite ~interactive:true
+		  ~compact:(len=6) Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	      else
 		Pack.changelog_packages Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	    else usage ()

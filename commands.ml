@@ -655,17 +655,20 @@ let changelog_component ?(branch=None) ?(diff=false) ?(since=None) tag_a tag_b c
 	  (string_of_label component.label))::logs));
   !chunks
 
-let make_changelog ?(interactive=false) ?(branch=None) tag_a tag_b components =
+let make_changelog ?(interactive=false) ?(compact=false) ?(branch=None) tag_a tag_b components =
   let chunks = ref [] in
   let add s = chunks:=s::!chunks in
   non_empty_iter
     (fun component -> 
       List.iter add (changelog_component ~branch ~diff:false tag_a tag_b component)) components;
-  add "\n------------------ DIFF -------------------\n";
-  non_empty_iter
-    (fun component ->
-      List.iter add (changelog_component ~branch ~diff:true tag_a tag_b component))
-    components;
+  if not compact then
+    begin
+      add "\n------------------ DIFF -------------------\n";
+      non_empty_iter
+	(fun component ->
+	  List.iter add (changelog_component ~branch ~diff:true tag_a tag_b component))
+	components;
+    end;
   if interactive then
     begin
       printf "bf@changelog %s -> %s\n" tag_a tag_b;
@@ -786,11 +789,11 @@ let diff_composite composite tag_a tag_b =
   make_diff tag_a tag_b 
     (only_local (Rules.components_of_composite composite))
 
-let changelog_composite ?(interactive=false) composite tag_a tag_b =
+let changelog_composite ?(interactive=false) ?(compact=false) composite tag_a tag_b =
   log_message ("=> changelog-composite " ^ composite ^ " " ^ tag_a ^ ":" ^ tag_b);
   let branch =
     Some (Filename.basename (Filename.dirname composite)) in  
-  make_changelog ~interactive ~branch tag_a tag_b
+  make_changelog ~interactive ~compact ~branch tag_a tag_b
     (only_local (Rules.components_of_composite composite))
 
 let changelog_components components tag_a tag_b =
