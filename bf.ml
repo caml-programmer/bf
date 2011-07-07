@@ -344,7 +344,7 @@ let main () =
 	| "changelog" ->
 	    if len = 5 then
 	      if Filename.basename Sys.argv.(2) = "composite" then
-		Commands.changelog_composite Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
+		Commands.changelog_composite ~interactive:true Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	      else
 		Pack.changelog_packages Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	    else usage ()
