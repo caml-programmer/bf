@@ -21,8 +21,10 @@ type platform =
   | Rhel3
   | Rhel4
   | Rhel5
+  | Rhel6
   | Cent4
   | Cent5
+  | Cent6
   | Fedora10
   | Alt
   | Arch
@@ -40,8 +42,10 @@ let engine_of_platform = function
   | Rhel3     -> Rpm_build
   | Rhel4     -> Rpm_build
   | Rhel5     -> Rpm_build
+  | Rhel6     -> Rpm_build
   | Cent4     -> Rpm_build
   | Cent5     -> Rpm_build
+  | Cent6     -> Rpm_build
   | Fedora10  -> Rpm_build
   | Alt       -> Rpm_build
   | Arch      -> Rpm_build
@@ -54,8 +58,10 @@ let string_of_platform = function
   | Rhel3     -> "rhel3"
   | Rhel4     -> "rhel4"
   | Rhel5     -> "rhel5"
+  | Rhel6     -> "rhel6"
   | Cent4     -> "cent4"
   | Cent5     -> "cent5"
+  | Cent6     -> "cent6"
   | Fedora10  -> "f10"
   | Alt       -> "alt"
   | Arch      -> "arch"
@@ -68,8 +74,10 @@ let platform_of_string = function
   | "rhel3" -> Rhel3
   | "rhel4" -> Rhel4
   | "rhel5" -> Rhel5
+  | "rhel6" -> Rhel6
   | "cent4" -> Cent4
   | "cent5" -> Cent5
+  | "cent6" -> Cent6
   | "f10"   -> Fedora10
   | "alt"   -> Alt
   | "arch"  -> Arch
@@ -96,8 +104,10 @@ let linux_platform_mapping =
       "^Red Hat Enterprise.*?release 3",Rhel3;
       "^Red Hat Enterprise.*?release 4",Rhel4;
       "^Red Hat Enterprise.*?release 5",Rhel5;
+      "^Red Hat Enterprise.*?release 6",Rhel6;
       "^CentOS.*?release 4",Cent4;
       "^CentOS.*?release 5",Cent5;
+      "^CentOS.*?release 6",Cent6;
       "^Fedora.*?release 10",Fedora10;
       "^ALT Linux",Alt
     ];
