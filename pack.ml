@@ -1074,6 +1074,7 @@ let build_package_impl ?(ready_spec=None) os platform args =
 			(fun out ->
 			  let find_value = function
 			    | "topdir" -> Params.get_param "top-dir"
+			    | "prefix" -> Params.get_param "top-dir"
 			    | "name" -> spec.pkgname
 			    | "version" -> version
 			    | "release" -> release ^ "." ^ (string_of_platform platform)
@@ -1096,6 +1097,7 @@ let build_package_impl ?(ready_spec=None) os platform args =
 			  gen_param "group";
 			  gen_param "url";
 			  gen_param "buildroot";
+			  gen_param "prefix";
 			  if spec.provides <> [] then
 			    gen_param "provides";
 			  
