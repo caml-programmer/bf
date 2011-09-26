@@ -166,16 +166,23 @@ $ su -c "make install"
 
 Usage: bf (prepare|update|forward|[re]build|[re]install|status) <components>
    or: bf (prepare|update|forward|[re]build|[re]install|status) <component> [branch <branch> | tag <tag>]
-   or: bf (prepare|update|forward|[re]build|[re]install|status) <composite> [tag]
+   or: bf (prepare|update|forward|[re]build|[re]install|status) <composite> [<tag>]
    or: bf (diff|changelog) <composite> <tag-a> <tag-b>
+   or: bf (diff|changelog) <specdir> <rev-a> <rev-b>
    or: bf review <composite> <since-date>
    or: bf pack <specdir> <version> <release>
-   or: bf update <specdir> [version] [release]
-   or: bf upgrade <specdir> [lazy]
-   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite]
+   or: bf update <specdir> [lazy] [<version>] [<release>]
+   or: bf upgrade <specdir> [lazy|complete|full] [<branch>]
+   or: bf fork <specdir> <source-branch> <new-branch> [<single-rev-depth>]
+   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite|depends|packages]
+   or: bf clone <specdir> [overwrite] [norec] [<ver> <rev>]
+   or: bf link <pkg-path> [symlink]
+   or: bf top <specdir> [overwrite] [norec]
+   or: bf graph <specdir> [<ver> <rev>]
+   or: bf basegraph <specdir> [hard|soft]
    or: bf tag <composite> <tag>
-   or: bf log <logdir>
-
+   or: bf shell
+   or: bf log
 
 Где под <composite> подразумевается файл с определением функции composite,
 на языке Scheme, возвращающий список компонентов, над которым необходимо 
@@ -380,12 +387,16 @@ autopkg true
 файлы (например файлы документации или заголовочные 
 файлы).
 
-Параметр make-ops добавляет опции при вызове
+Параметр make-opts добавляет опции при вызове
 каждого make в .bf-rules. В многопроцессорных системах
 удобно использовать опцию -j утилиты make.
 
 Параметр log-level указывает выводить ли низкоуровневый
 процесс сборки на консоль.
+
+Параметр autopkg включает режим автоматической пересборки
+компонентов, в случае отсутствия при пакетировании
+необходимого файла .bf-list для какого-либо компонента.
 
 Параметр plugins-dir указывает директорию, где
 лежат плагины на языке Scheme, для того, чтобы
@@ -549,7 +560,7 @@ email skvt-support@jet.msk.su
 Для создания набора пакетов используется
 команда:
 
-# bf upgrade <specdir> [lazy]
+# bf upgrade <specdir> [lazy|complete|full] [<branch>]
 
 Например:
 
@@ -561,17 +572,42 @@ email skvt-support@jet.msk.su
 
 Флаг lazy - говорит о том, что в случае
 отсутствия изменений в компонентах, новую
-версию пакеты нет необходимости собирать.
+версию пакета нет необходимости собирать.
 Если его не указать, то пакеты будут
 собираться независимо от того, были ли
 какие-либо изменения в компонентах или
 нет.
+
+Флаг full - используется для полного
+обновления (пересборки с новым номером версии)
+всех пакетов в принудительном
+порядке, даже если изменений для них
+в репозиториях не зафиксировано.
+
+Флаг complete - включает режим, при
+котором обновляются только те пакеты,
+в которых зафикированы изменения, а также
+пакеты, рекурсивно зависимые от них.
+
+Если не указывать никаких флагов, то
+включается режим по-умолчанию, который
+равносилен режиму complete, с одним
+исключением - в режиме по-умолчанию
+проверяется также состояние файловой
+системы. То есть наличиее на ней
+необходимого для комплектности сборки 
+пакета, если он отсутствует, значит 
+будет производится его сборка (без
+обновления версии).
 
 В процессе отработки этого действия
 bf может переходить в интерактивный
 режим и спрашивать: какую pack-branch
 использовать для сборки того или иного
 пакета, если этих веток более чем одна.
+Для того чтобы этого не происходило,
+ветку для пакетов можно задать дополнительно
+при вызове команды.
 
 * Клонирование существующего набора пакетов *
 
@@ -614,6 +650,73 @@ bf может переходить в интерактивный
 
 # bf top <specdir> [overwrite] [norec]
 
+* Ветвление проектов *
+
+Для этого используется комманда:
+
+# bf fork <specdir> <source-branch> <new-branch> [<single-rev-depth>]
+
+Где под <source-branch> и <new-branch> подразумеваются не ветки компонентов,
+а ветки пакетов, которые формально располагаются в компоненте pack.git все
+в одной ветке master, но в разных директориях. Например так:
+
+jet-url-checker/2.3.2
+jet-url-checker/2.3.2/pre-update
+jet-url-checker/2.3.2/depends
+jet-url-checker/2.3.2/rejects
+jet-url-checker/2.3.2/release
+jet-url-checker/2.3.2/composite
+jet-url-checker/2.3.2/pre-install
+jet-url-checker/2.3.2/pre-uninstall
+jet-url-checker/2.3.2/post-install
+jet-url-checker/2.3.2/params
+jet-url-checker/2.3.2/version
+jet-url-checker/devel
+jet-url-checker/devel/pre-update
+jet-url-checker/devel/depends
+jet-url-checker/devel/rejects
+jet-url-checker/devel/release
+jet-url-checker/devel/composite
+jet-url-checker/devel/pre-install
+jet-url-checker/devel/pre-uninstall
+jet-url-checker/devel/post-install
+jet-url-checker/devel/params
+jet-url-checker/devel/version
+jet-detect/2.3.2
+jet-detect/2.3.2/depends
+jet-detect/2.3.2/rejects
+jet-detect/2.3.2/release
+jet-detect/2.3.2/composite
+jet-detect/2.3.2/post-install
+jet-detect/2.3.2/params
+jet-detect/2.3.2/version
+jet-detect/devel
+jet-detect/devel/depends
+jet-detect/devel/rejects
+jet-detect/devel/release
+jet-detect/devel/composite
+jet-detect/devel/post-install
+jet-detect/devel/params
+jet-detect/devel/version
+
+Перед использованием данной команды сперва стоит потренироваться в какой-нибудь
+тестовом окружении, чтобы чётко уяснить, что она делает.
+
+* Графическое представление дерева пакетов *
+
+# bf graph <specdir> [<ver> <rev>]
+# bf basegraph <specdir> [hard|soft]
+
+Для работы этих действий потребуются установленные
+утилиты dot(graphviz) и qiv.
+
+* BF Scheme shell *
+
+# bf shell
+
+Позволяет протестировать работу встроенной R5RS Scheme,
+иногда её работа отличается от поведения MzScheme (например
+при использовании syntax-rules).
 
 * SSH keys *
 
