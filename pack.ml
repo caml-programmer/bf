@@ -481,6 +481,7 @@ type spec = {
   pkgname : pkg_name;
   depends : depend list;
   provides : provide list;
+  obsoletes : provide list;
   rejects : reject list;
   components : component list;
   pre_install : string option;
@@ -773,6 +774,15 @@ let spec_from_v2 ~version ~revision specdir =
       end
     else [p]
   in
+  let obsoletes =
+    let n = f "obsoletes" in
+    if Sys.file_exists n then
+      let ch = open_in n in
+      let symbols =
+	System.list_of_channel ch in
+      close_in ch; symbols
+    else []
+  in
   let components =
     components_of_composite (f "composite") in
   let pre_install =
@@ -805,6 +815,7 @@ let spec_from_v2 ~version ~revision specdir =
     pkgname = pkgname;
     depends = depends;
     provides = provides;
+    obsoletes = obsoletes;
     rejects = rejects;
     components = components;
     pre_install = pre_install;
@@ -1081,6 +1092,8 @@ let build_package_impl ?(ready_spec=None) os platform args =
 			    | "buildroot" -> "buildroot"
 			    | "provides" ->
 				String.concat ", " (specify_provides spec.provides)
+			    | "obsoletes" ->
+				String.concat ", " spec.obsoletes
 			    | k -> Hashtbl.find spec.params k
 			  in
 			  let gen_param k =
@@ -1100,6 +1113,8 @@ let build_package_impl ?(ready_spec=None) os platform args =
 			  gen_param "prefix";
 			  if spec.provides <> [] then
 			    gen_param "provides";
+			  if spec.obsoletes <> [] then
+			    gen_param "obsoletes";
 			  
 			  out "%define _use_internal_dependency_generator 0\n";
 			  out "%define __find_requires %findreq\n";
@@ -1113,14 +1128,14 @@ let build_package_impl ?(ready_spec=None) os platform args =
 			    | None -> ()
 			    | Some pre ->
 				out "%pre\n";
-				out "if [ \"$1\" = \"1\" ] ; then\n";
+				out "if [ \"$1\" = \"1\" ] ; then # first install\n";
 				out "echo -n\n";
 				oo pre;
 				out "fi\n";
 				(match spec.pre_update with
 				  | None -> ()
 				  | Some preup ->
-				      out "if [ \"$1\" = \"2\" ] ; then\n";
+				      out "if [ \"$1\" = \"2\" ] ; then # update\n";
 				      out "echo -n\n";
 				      oo preup;
 				      out "fi\n"));
@@ -1133,7 +1148,7 @@ let build_package_impl ?(ready_spec=None) os platform args =
 			    | None -> ()
 			    | Some preun ->
 				out "%preun\n";
-				out "if [ \"$1\" = \"0\" ] ; then\n";
+				out "if [ \"$1\" = \"0\" ] ; then # all versions deleted\n";
 				out "echo -n\n";
 				oo preun;
 				out "fi\n"))
