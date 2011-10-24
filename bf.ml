@@ -360,7 +360,7 @@ let main () =
 	| "shell" ->
 	    Scheme.shell ()
 	| "make" ->
-	    Params.update_param "plugins-dir" "..";
+	    Params.update_param "plugins-dir" "../pack";
 	    if len = 3 then
 	      (match Sys.argv.(2) with
 		| "build" -> Rules.build_rules None
