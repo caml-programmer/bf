@@ -22,8 +22,11 @@ let read_params () =
     if Sys.file_exists ".bf-params" then
       Some ".bf-params"
     else
-      if Sys.file_exists "/etc/bf-params"
-      then Some "/etc/bf-params" else None
+      if Sys.file_exists "../.bf-params" then
+	Some "../.bf-params"
+      else
+	if Sys.file_exists "/etc/bf-params"
+	then Some "/etc/bf-params" else None
   in match filename with
     | None ->  Hashtbl.create 32
     | Some filename ->
