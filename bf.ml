@@ -48,6 +48,7 @@ let usage () =
   print_endline "   or: bf graph <specdir> [<ver> <rev>]";
   print_endline "   or: bf basegraph <specdir> [hard|soft]";
   print_endline "   or: bf tag <composite> <tag>";
+  print_endline "   or: bf make (build|install) [<name>]";
   print_endline "   or: bf shell";
   print_endline "   or: bf log";
   exit 1
@@ -358,6 +359,19 @@ let main () =
 	      else usage ()
 	| "shell" ->
 	    Scheme.shell ()
+	| "make" ->
+	    if len = 3 then
+	      (match Sys.argv.(2) with
+		| "build" -> Rules.build_rules None
+		| "install" -> Rules.install_rules None
+		| _ -> usage ())
+	    else if len = 4 then
+	      (match Sys.argv.(2) with
+		| "build" -> Rules.build_rules (Some Sys.argv.(3))
+		| "install" -> Rules.install_rules (Some Sys.argv.(3))
+		| _ -> usage ())
+	    else
+	      usage ()
 	| _ ->
 	    analyze ()
     else usage ()
