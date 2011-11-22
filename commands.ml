@@ -718,11 +718,11 @@ let with_tag tag components =
 
 let only_local components =
   List.filter
-    (fun c -> c.pkg = None && (not c.nopack)) components
+    (fun c -> c.pkg = None) components
 
 let only_external components =
   List.filter
-    (fun c -> c.pkg <> None && (not c.nopack)) components
+    (fun c -> c.pkg <> None) components
 
 let as_current l =
   List.map (fun c -> 
