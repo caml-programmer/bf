@@ -89,6 +89,8 @@ let snd = function
   | Spair v -> v.cdr
   | x -> error x
 
+exception Nopack_mode_conflict_with_package of string
+
 let component_of_sval s =
   match s with
     | Spair v ->
@@ -115,7 +117,10 @@ let component_of_sval s =
 		      | Ssymbol "rules" ->
 			  rules := Some (match fst x.cdr with Sstring s ->  s | x -> error x)
 		      | Ssymbol "nopack" ->
-			  nopack := true;
+			  (match !pkg with
+			    | None   -> nopack := true;
+			    | Some s ->
+				raise (Nopack_mode_conflict_with_package s))
 		      | x -> error x)
 		| Snull -> ()
 		| x -> error x);

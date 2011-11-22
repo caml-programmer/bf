@@ -89,10 +89,11 @@ let analyze_arguments () =
 		  label = (Branch Sys.argv.(4));
 		  pkg = None; 
 		  rules = make_rules ();
+		  nopack = false;
 		}
 	  | "tag" ->
 	      Is_component_with_label
-		{ name = Sys.argv.(2); label = (Tag Sys.argv.(4)); pkg = None; rules = make_rules () }
+		{ name = Sys.argv.(2); label = (Tag Sys.argv.(4)); pkg = None; rules = make_rules (); nopack = false }
 	  |  _ ->
 	       Is_components
 		[ 

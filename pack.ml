@@ -881,7 +881,7 @@ let check_composite_depends spec =
 	  | Some pkg -> pkg
 	  | None -> assert false)
       (List.filter
-	(fun c -> c.pkg <> None && c.nopack = false)
+	(fun c -> c.pkg <> None && (not c.nopack))
 	spec.components)
   in
   let spec_depends =
@@ -1004,8 +1004,8 @@ let build_package_impl ?(ready_spec=None) os platform args =
 			else
 			  log_error (sprintf "bf list for (%s) is not found. Check your .bf-params and other configurations." name))
 		    in add_with_check ())
-		  (List.filter 
-		    (fun c -> c.pkg = None)
+		  (List.filter
+		    (fun c -> c.pkg = None && (not c.nopack))
 		    spec.components)
 	      in
 
@@ -3062,7 +3062,7 @@ let diff_packages ?(changelog=false) specdir rev_a rev_b =
 	    if tag_a <> tag_b then
 	      List.iter (List.iter print_endline)
 		(List.map (changelog_component tag_a tag_b)
-		  (List.filter (fun c -> c.name <> "pack" && c.pkg = None) (Rules.components_of_composite composite)))
+		  (List.filter (fun c -> c.name <> "pack" && c.pkg = None && (not c.nopack)) (Rules.components_of_composite composite)))
 	  end
       with Not_found ->
 	printf "+ %s %s %d\n%!" pkgname_b ver_b rev_b))

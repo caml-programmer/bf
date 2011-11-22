@@ -712,16 +712,17 @@ let with_tag tag components =
 	      label = Tag tag_name; 
 	      pkg = component.pkg; 
 	      rules = component.rules;
+	      nopack = component.nopack;
 	    })
 	  components
 
 let only_local components =
   List.filter
-    (fun c -> c.pkg = None) components
+    (fun c -> c.pkg = None && (not c.nopack)) components
 
 let only_external components =
   List.filter
-    (fun c -> c.pkg <> None) components
+    (fun c -> c.pkg <> None && (not c.nopack)) components
 
 let as_current l =
   List.map (fun c -> 
@@ -730,6 +731,7 @@ let as_current l =
       label = Current; 
       pkg = c.pkg; 
       rules = c.rules;
+      nopack = c.nopack;
     }) l
 
 let tag_ready ~tag components =
