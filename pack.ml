@@ -903,7 +903,7 @@ let check_composite_depends spec =
 	(fun pkg ->
 	  log_message (sprintf "package (%s) is missing in depends file" pkg))
 	missings;
-      raise (Permanent_error "you must correct depends or composite files")
+      (* raise (Permanent_error "you must correct depends or composite files") *)
     end
 
 let rpm_key_format s =
