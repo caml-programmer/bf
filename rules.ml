@@ -109,6 +109,8 @@ let write_composite file components =
 	  out " (package \"";
 	  out s;
 	  out "\")");
+    if c.Types.nopack then
+	  out " (nopack)";
     (match c.Types.rules with
       | None -> ()
       | Some s ->

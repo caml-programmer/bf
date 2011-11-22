@@ -881,7 +881,7 @@ let check_composite_depends spec =
 	  | Some pkg -> pkg
 	  | None -> assert false)
       (List.filter
-	(fun c -> c.pkg <> None)
+	(fun c -> c.pkg <> None && c.nopack = false)
 	spec.components)
   in
   let spec_depends =
@@ -903,7 +903,7 @@ let check_composite_depends spec =
 	(fun pkg ->
 	  log_message (sprintf "package (%s) is missing in depends file" pkg))
 	missings;
-      (* raise (Permanent_error "you must correct depends or composite files") *)
+      raise (Permanent_error "you must correct depends or composite files")
     end
 
 let rpm_key_format s =

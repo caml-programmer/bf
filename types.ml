@@ -5,6 +5,7 @@ type component = {
   label : label;
   pkg : string option;
   rules : string option;
+  nopack: bool;
 }
 
 let string_of_label = function
@@ -46,5 +47,5 @@ type upgrade_mode =
   | Upgrade_complete
   | Upgrade_default
 
-let make_component ?(label=Current) ?(pkg=None) ?(rules=None) s =
-  { name = s; label = Current; pkg = pkg; rules = rules }
+let make_component ?(label=Current) ?(pkg=None) ?(rules=None) ?(nopack=false) s =
+  { name = s; label = Current; pkg = pkg; rules = rules; nopack = nopack }

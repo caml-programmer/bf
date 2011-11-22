@@ -100,6 +100,7 @@ let component_of_sval s =
 	let pkg = ref None in
 	let rules = ref None in
 	let label = ref Current in
+	let nopack = ref false in
 	let rec scan = function
 	  | Spair v ->
 	      (match v.car with
@@ -113,6 +114,8 @@ let component_of_sval s =
 			  pkg := Some (match fst x.cdr with Sstring s ->  s | x -> error x)
 		      | Ssymbol "rules" ->
 			  rules := Some (match fst x.cdr with Sstring s ->  s | x -> error x)
+		      | Ssymbol "nopack" ->
+			  nopack := true;
 		      | x -> error x)
 		| Snull -> ()
 		| x -> error x);
@@ -125,6 +128,7 @@ let component_of_sval s =
 	  label = !label;
 	  pkg = !pkg;
 	  rules = !rules;
+	  nopack = !nopack;
 	}
     | x -> error x
  
