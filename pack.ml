@@ -1631,7 +1631,9 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode
       end;
     
     List.iter add_reinstall
-      (install (with_tag (Some (mk_tag tag)) components));
+      (install (with_tag (Some (mk_tag tag))
+	(* выкидываем pack-компонент, чтобы не было ненужных checkout'ов в pack'e *)
+	(List.filter (fun c -> c.name <> "pack") components)));
     
     (try
       build_package ~ready_spec
