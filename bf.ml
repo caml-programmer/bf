@@ -49,6 +49,7 @@ let usage () =
   print_endline "   or: bf basegraph <specdir> [hard|soft]";
   print_endline "   or: bf tag <composite> <tag>";
   print_endline "   or: bf make (build|install) [<name>]";
+  print_endline "   or: bf versions <pkgdir>";
   print_endline "   or: bf shell";
   print_endline "   or: bf log";
   exit 1
@@ -374,6 +375,11 @@ let main () =
 		| _ -> usage ())
 	    else
 	      usage ()
+	| "versions" ->
+	    if len <> 3 then
+	      usage ()
+	    else
+	      with_lock (fun () -> Pack.last_versions Sys.argv.(2))
 	| _ ->
 	    analyze ()
     else usage ()

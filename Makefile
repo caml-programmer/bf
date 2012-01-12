@@ -4,7 +4,7 @@ OBJECTS   = $(SOURCES:.ml=.cmo)
 XOBJECTS  = $(OBJECTS:.cmo=.cmx)
 ARCHIVE   = archive.cma
 XARCHIVE  = $(ARCHIVE:.cma=.cmxa)
-REQUIRES  = pcre shell ocs smtp
+REQUIRES  = pcre shell ocs smtp str
 
 ifeq ($(OS),SunOS)
 CCOPTS=-lrt
