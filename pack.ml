@@ -3080,7 +3080,7 @@ let changelog_packages specdir rev_a rev_b =
   diff_packages ~changelog:true specdir rev_a rev_b
 
 
-(* last versions *)
+(* Versions *)
 
 exception Bad_pkgdir of string
 exception Bad_release of string
@@ -3151,5 +3151,193 @@ let last_versions pkgdir =
       List.iter 
 	(fun ((p,v),r) ->
 	  printf "- %s/%s-%d\n%!" p v r) (List.sort comapre !t))
-  
+
+
+(* Search *)
+
+exception Bad_component of string
+exception Bad_tag_file of string
+
+let read_tag_file file =
+  match System.list_of_channel (open_in file) with
+    | [x] -> x
+    | _   -> raise (Bad_tag_file file)
+
+let load_tags confdir =
+  let start =
+    Filename.concat confdir "refs/tags" in
+  let rec load f tag path =
+    if System.is_directory path then
+      List.iter
+	(fun s ->
+	  let new_tag =
+	    if tag = "" then s else tag ^ "/" ^ s in
+	  let new_path =
+	    path ^ "/" ^ s in
+	  load f new_tag new_path)
+	(System.list_of_directory path)
+    else
+      f tag path
+  in
+  let t = Hashtbl.create 32 in
+  let f tag file =
+    Hashtbl.add t tag (read_tag_file file)
+  in load f "" start; t
+
+let load_commit_tags branch commit_id =
+  let split s =
+    let pos = String.index s ' ' in
+    let len = String.length s in
+    String.sub s 0 pos,
+    String.sub s (succ pos) (len - pos - 2) in
+  let make_tag_list s =
+    let tag_re = Str.regexp "tag: \\([^,)]+\\)[,)]" in
+    let len = String.length s in
+    let rec make acc start =
+      if start >= len then
+	acc
+      else
+	(try
+	  ignore(Str.search_forward tag_re s start);
+	  make
+	    ((Str.matched_group 1 s)::acc) (Str.match_end ())
+	with Not_found -> acc)
+    in make [] 0
+  in
+  let cmd =
+    sprintf "git log --oneline --decorate --abbrev=40 %s" branch in
+  let buf = ref [] in
+  let tags = ref [] in
+  let add s =
+    buf := s::!buf in
+  let ch = Unix.open_process_in cmd in
+  try
+    while true do
+      let (id,rest) = split (input_line ch) in
+      let tags' =
+	make_tag_list rest in
+      if id = commit_id then
+	begin
+	  tags := tags';
+	  raise Exit
+	end
+      else
+	add (id,tags')
+    done; []
+  with 
+    | Exit -> close_in ch;
+	if !tags = [] then
+	  begin
+	    let rec find = function
+	      | [] -> []
+	      | (id,tags')::tl ->
+		  if tags' = [] then
+		    find tl
+		  else tags'
+	    in tags := find !buf
+	  end;
+	!tags	
+    | End_of_file ->
+	close_in ch; []
+
+let search commit_id =
+  let dir = Sys.getcwd () in
+  let component = Filename.basename dir in
+  let confdir = ".git" in
+  let tag_list = load_tags confdir in
+  let search_pack () =
+    let parent = Filename.dirname dir in
+    let f = Filename.concat parent in
+    if Sys.file_exists (f "pack.git") then
+      f "pack.git"
+    else if Sys.file_exists (f "pack") then
+      f "pack"
+    else raise Not_found
+  in
+  let search_top_packages branch =
+    (* Top-ы это те пакеты, которые не встречаются ни у
+       какого-либо другого пакета в зависимостях *)
+    let plist =
+      List.fold_left
+	(fun acc pkg ->
+	  let specdir = Filename.concat pkg branch in
+	  if Sys.file_exists specdir then
+	    let depends =
+	      parse_depends (Filename.concat specdir "depends") in
+	    (pkg,depends)::acc
+	  else acc) []
+	(List.filter System.is_directory (System.list_of_directory ".")) 
+    in
+    let mem pkg depends =
+      List.exists (fun (os,deplist) -> List.exists (fun (pkg',_,_) -> pkg = pkg') deplist) depends in
+    List.fold_left
+      (fun acc (pkg,_) ->
+	if List.exists (fun (_,depends) -> mem pkg depends) plist then
+	  acc
+	else pkg::acc) [] plist
+  in
+  let search_top_tags branch tag =
+    let packdir = search_pack () in
+    let tops = ref [] in
+    with_dir packdir 
+      (fun () ->
+	(* Состояние pack-а необходимо перевести на момент создания тега *)
+	Git.git_checkout ~low:true ~key:tag ();
+	try
+	  let pkg_list =
+	    search_top_packages branch in
+	  let tree_list =
+	    List.fold_left
+	      (fun acc pkg -> 
+		let specdir = Filename.concat pkg branch in
+		if Sys.file_exists specdir then
+		  (pkg,(toptree_of_specdir specdir))::acc
+		else acc) [] pkg_list in
+	  let top_pkg_list_with_component =
+	    List.fold_left 
+	      (fun acc (pkg,tree) ->
+		if 
+		  List.exists
+		    (fun (pkg',ver',rev') -> 
+		      let composite = sprintf "%s/%s/composite" pkg' branch in
+		      if Sys.file_exists composite then
+			List.exists (fun c -> c.name = component || c.name ^ ".git" = component)
+			  (Rules.components_of_composite composite)
+		      else false)
+		    (list_of_deptree tree)
+		then
+		  pkg::acc
+	      else acc) [] tree_list in
+	  
+	  (* TODO: поиск топовых тегов для заданого тега *)
+	  
+	  tops := top_pkg_list_with_component; (* временно - для отладки *)
+	  
+	  (* Восстанавливаем состояние pack-а *)
+	  Git.git_checkout ~low:true ~key:"master" ()
+	with exn ->
+	  Git.git_checkout ~low:true ~key:"master" ();
+	  raise exn);
+    !tops
+  in
+
+  (* TODO: check pack for master state *)
+
+  List.iter
+    (fun branch ->
+      printf "Search by branch: %s\n" branch;
+      let tags =
+	load_commit_tags branch commit_id in
+      List.iter 
+	(fun tag ->
+	  let tops = 
+	    (try
+	      search_top_tags branch tag 
+	    with Not_found -> [])
+	  in
+	  printf "- %s %s -> %s\n%!"
+	    (Hashtbl.find tag_list tag) tag (String.concat ", " tops)) tags)
+    (Git.git_branch ())
+    
+
 

@@ -50,6 +50,7 @@ let usage () =
   print_endline "   or: bf tag <composite> <tag>";
   print_endline "   or: bf make (build|install) [<name>]";
   print_endline "   or: bf versions <pkgdir>";
+  print_endline "   or: bf search <commit-id>";
   print_endline "   or: bf shell";
   print_endline "   or: bf log";
   exit 1
@@ -380,6 +381,11 @@ let main () =
 	      usage ()
 	    else
 	      with_lock (fun () -> Pack.last_versions Sys.argv.(2))
+	| "search" ->
+	    if len = 3 then
+	      with_lock (fun () ->
+		Pack.search Sys.argv.(2))
+	    else usage ()	      
 	| _ ->
 	    analyze ()
     else usage ()
