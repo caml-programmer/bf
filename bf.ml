@@ -408,5 +408,8 @@ let _ =
   let current = Sys.getcwd () in
   try    
     main ()
-  with exn ->
-    Sys.chdir current; raise exn
+  with 
+    | Logger.Error -> exit 2
+    | exn ->
+	Sys.chdir current; raise exn
+	  

@@ -279,11 +279,7 @@ let git_status () =
 let git_worktree_status ~strict component =
   let ignore =
     if Sys.file_exists ".bf-ignore" then
-      begin
-	let ch = open_in ".bf-ignore" in
-	let acc = list_of_channel ch in
-	close_in ch; acc
-      end
+      list_of_channel (open_in ".bf-ignore")
     else []
   in  
   let worktree_changes =

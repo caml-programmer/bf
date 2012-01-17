@@ -112,10 +112,11 @@ let log_error error =
   raise Error
 
 let log_command ?(low=false) ?env ?error_handler prog args =
+  let program = with_path prog in
+  let cmd_s = program ^ " " ^ (String.concat " " args) in
   with_logger
     (fun logger ->
       try
-	let program = with_path prog in
 	let environment = Shell_sys.create_env () in
 	Array.iter
 	  (fun s ->
@@ -131,7 +132,6 @@ let log_command ?(low=false) ?env ?error_handler prog args =
 	    ~environment
 	    program args
 	in
-	let cmd_s = program ^ " " ^ (String.concat " " args) in
 	let log_fd =
 	  if low then
 	    Unix.descr_of_out_channel logger.port
@@ -160,13 +160,13 @@ let log_command ?(low=false) ?env ?error_handler prog args =
 		      (match error_handler with
 			  Some f -> f ps
 			| None ->
-			    log_message ~logger (sprintf "failed: %d" rc);
+			    log_message ~logger (sprintf "failed: %d [%s]" rc cmd_s);
 			    raise Error)
 		  | Unix.WSIGNALED n -> 
 		      (match error_handler with
 			  Some f -> f ps
 			| None ->
-			    log_message ~logger (sprintf "killed: %d" n);
+			    log_message ~logger (sprintf "killed: %d [%s]" n cmd_s);
 			    raise Error)
 		  | Unix.WSTOPPED n ->
 		      (match error_handler with

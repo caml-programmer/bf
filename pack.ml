@@ -510,6 +510,7 @@ let string_of_pkgexn = function
   | exn -> Printexc.to_string exn
 
 let make_depends ?(interactive=false) ?(ignore_last=false) file =
+  let packdir = Filename.dirname (Filename.dirname (Filename.dirname file)) in
   let acc = ref ([] : depend list) in
   let add_depend v = acc := v::!acc in
   let add_package v =
@@ -536,20 +537,21 @@ let make_depends ?(interactive=false) ?(ignore_last=false) file =
 		with_platform 
 		  (fun os platform ->
 		    (try
-		      ignore(with_component_dir ~low:true ~strict:false (make_component "pack")
-			(fun () ->
-			  let branch = 
-			    branch_of_specdir (Filename.dirname file) in
-			  let specdir =
-			    sprintf "%s/%s"
-			      (match !pkg_name with
+		      ignore
+			(with_dir packdir
+			  (fun () ->
+			    let branch =
+			      branch_of_specdir (Filename.dirname file) in
+			    let specdir =
+			      sprintf "%s/%s"
+				(match !pkg_name with
 				| Some s -> s
 				| None -> log_error (sprintf "some package name - not found in %s" file))
-			      branch
-			  in
-			  pkg_ver := Some (sprintf "%s-%d.%s" ver
-			    (snd (read_pkg_release ~version:ver specdir))
-			    (string_of_platform platform))))
+				branch
+			    in
+			    pkg_ver := Some (sprintf "%s-%d.%s" ver
+			      (snd (read_pkg_release ~version:ver specdir))
+			      (string_of_platform platform))))			
 		    with exn ->
 		      log_message (sprintf "Warning: %s -> try using local pkg archive for search last pkg revision" (string_of_pkgexn exn));
 		      pkg_ver := Some (sprintf "%s-%d.%s" ver
@@ -750,12 +752,7 @@ let spec_from_v2 ~version ~revision specdir =
   let rejects =
     let n = f "rejects" in
     if Sys.file_exists n then
-      begin
-	let ch = open_in n in
-	let patterns = 
-	  System.list_of_channel ch in
-	close_in ch; patterns
-      end
+      System.list_of_channel (open_in n)
     else []
   in
   let provides =
@@ -766,21 +763,13 @@ let spec_from_v2 ~version ~revision specdir =
 	  sprintf "packbranch-%s = %s-%s-%s.%s" pack_branch pkgname
 	  version revision (string_of_platform platform)) in
     if Sys.file_exists n then
-      begin
-	let ch = open_in n in
-	let symbols =
-	  System.list_of_channel ch in
-	close_in ch; (p::symbols)
-      end
+      p::(System.list_of_channel (open_in n))
     else [p]
   in
   let obsoletes =
     let n = f "obsoletes" in
     if Sys.file_exists n then
-      let ch = open_in n in
-      let symbols =
-	System.list_of_channel ch in
-      close_in ch; symbols
+      System.list_of_channel (open_in n)
     else []
   in
   let components =
@@ -2377,16 +2366,22 @@ let toptree_of_specdir ?(log=true) specdir : top_tree =
       else raise Exit
   in make 0 specdir
 
-let deptree_of_specdir ~vr specdir : clone_tree =
+let deptree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
   let table = Hashtbl.create 32 in
   let pkgdir =
-    Filename.dirname (Filename.dirname specdir) in
+    match packdir with
+      | Some p -> p
+      | None ->
+	  Filename.dirname (Filename.dirname specdir) in
   let warning depth specdir ver rev iver irev =
-    log_message (sprintf "%s warning: %s %s %d already scanned, ignore %s %d" (String.make depth ' ') specdir ver rev iver irev) in
+    if log then
+      log_message (sprintf "%s warning: %s %s %d already scanned, ignore %s %d" (String.make depth ' ') specdir ver rev iver irev) in
   let replace depth specdir ver rev iver irev =
-    log_message (sprintf "%s warning: %s %s %d already scanned, replaced %s %d" (String.make depth ' ') specdir ver rev iver irev) in
+    if log then
+      log_message (sprintf "%s warning: %s %s %d already scanned, replaced %s %d" (String.make depth ' ') specdir ver rev iver irev) in
   let resolve depth specdir ver rev =
-    log_message (sprintf "%s resolve %s %s %d" (String.make depth ' ') specdir ver rev) in
+    if log then
+      log_message (sprintf "%s resolve %s %s %d" (String.make depth ' ') specdir ver rev) in
   let checkout_pack key =
     with_dir pkgdir
       (Git.git_checkout ~low:true ~key) in
@@ -3167,15 +3162,22 @@ let last_versions pkgdir =
 exception Bad_component of string
 exception Bad_tag_file of string
 
+let split del s =
+  let pos = String.index s del in
+  let len = String.length s in
+  String.sub s 0 pos,
+  String.sub s (succ pos) (len - pos - 1)
+
 let read_tag_file file =
   match System.list_of_channel (open_in file) with
     | [x] -> x
     | _   -> raise (Bad_tag_file file)
 
 let load_tags confdir =
+  printf "load tags from %s\n%!" confdir;
   let start =
     Filename.concat confdir "refs/tags" in
-  let rec load f tag path =
+  let rec fs_load f tag path =
     if System.is_directory path then
       List.iter
 	(fun s ->
@@ -3183,21 +3185,39 @@ let load_tags confdir =
 	    if tag = "" then s else tag ^ "/" ^ s in
 	  let new_path =
 	    path ^ "/" ^ s in
-	  load f new_tag new_path)
+	  fs_load f new_tag new_path)
 	(System.list_of_directory path)
     else
-      f tag path
+      f tag (read_tag_file path)
+  in
+  let packed_load f =
+    let re = Str.regexp_string "refs/tags/" in
+    let file =
+      Filename.concat confdir "packed-refs" in
+    if Sys.file_exists file then
+      List.iter
+	(fun s -> 
+	  let l = String.length s in
+	  if l > 0 && s.[0] <> '#' && s.[0] <> '^' then
+	    begin
+	      let (id,r) = split ' ' s in
+	      let rl = String.length r in
+	      if Str.string_match re r 0 then
+		begin
+		  let tag =
+		    String.sub r 10 (rl - 10) in
+		  f tag id
+		end
+	    end)
+	(System.list_of_channel (open_in file))
   in
   let t = Hashtbl.create 32 in
-  let f tag file =
-    Hashtbl.add t tag (read_tag_file file)
-  in load f "" start; t
+  let f tag id =
+    Hashtbl.add t tag id in
 
-let split del s =
-  let pos = String.index s del in
-  let len = String.length s in
-  String.sub s 0 pos,
-  String.sub s (succ pos) (len - pos - 1)
+  fs_load f "" start;
+  packed_load f;
+  t
 
 exception Bad_tag of string
 
@@ -3228,7 +3248,6 @@ let only_minimal_revisions tags =
     (fun a b -> compare (fst a) (fst b)) !l  
 
 let load_commit_tags branch commit_id =
-
   let make_tag_list s =
     let tag_re = Str.regexp "tag: \\([^,)]+\\)[,)]" in
     let len = String.length s in
@@ -3245,10 +3264,14 @@ let load_commit_tags branch commit_id =
   in
   let cmd =
     sprintf "git log --oneline --decorate --abbrev=40 %s" branch in
-  let buf = ref [] in
-  let tags = ref [] in
-  let add s =
-    buf := s::!buf in
+  let direct = ref [] in
+  let reverse = ref [] in
+  let add (id,tags) =
+    direct := (id,tags)::!direct;
+    List.iter 
+      (fun tag ->
+	reverse := (tag,id)::!reverse) tags
+  in
   let ch = Unix.open_process_in cmd in
   try
     while true do
@@ -3262,29 +3285,40 @@ let load_commit_tags branch commit_id =
 	end
       else
 	add (id,tags')
-    done; []
+    done; ([],[])
   with 
-    | Exit -> close_in ch;
-	tags := List.flatten (List.map snd !buf);
-	List.map
-	  (fun ((n,v),r) -> sprintf "%s/%s-%d" n v r) (only_minimal_revisions !tags)
+    | Exit -> close_in ch; (!direct,!reverse)
     | End_of_file ->
-	close_in ch; []
+	close_in ch; ([],[])
+
+exception Not_found_pack
+exception Bad_pack_state of string
+
+let search_pack () =
+  let parent = Filename.dirname (Sys.getcwd ()) in
+  let f = Filename.concat parent in
+  if Sys.file_exists (f "pack.git") then
+    f "pack.git"
+  else if Sys.file_exists (f "pack") then
+    f "pack"
+  else raise Not_found_pack
 
 let search commit_id =
   let dir = Sys.getcwd () in
   let component = Filename.basename dir in
   let confdir = ".git" in
+  let packdir = search_pack () in
+  
+  (* Check pack state *)
+  with_dir packdir (fun () ->
+    printf "check pack state...";
+    match Git.git_current_branch () with
+      | Some "master" -> printf "ok\n%!"
+      | _ -> raise (Bad_pack_state packdir));  
+
   let tag_list = load_tags confdir in
-  let search_pack () =
-    let parent = Filename.dirname dir in
-    let f = Filename.concat parent in
-    if Sys.file_exists (f "pack.git") then
-      f "pack.git"
-    else if Sys.file_exists (f "pack") then
-      f "pack"
-    else raise Not_found
-  in
+  let pack_tag_list =
+    load_tags (Filename.concat packdir ".git") in
   let search_top_packages branch =
     (* Top-ы это те пакеты, которые не встречаются ни у
        какого-либо другого пакета в зависимостях *)
@@ -3307,11 +3341,12 @@ let search commit_id =
 	  acc
 	else pkg::acc) [] plist
   in
-  let search_top_tags component_branch tag =
+  let search_top_tags search_eq_tags component_branch tag =
     let packdir = search_pack () in
-    let (component_package,(component_package_version,component_package_revision)) = split_tag tag in
+    let (component_package,_) = split_tag tag in
+    let equivalents = search_eq_tags tag in
     let tops = ref [] in
-    with_dir packdir 
+    with_dir packdir
       (fun () ->
 	(* Состояние pack-а необходимо перевести на момент создания тега *)
 	Git.git_checkout ~low:true ~key:tag ();
@@ -3345,7 +3380,7 @@ let search commit_id =
 			(list_of_deptree tree)
 		    then
 		      pkg::acc
-		    else acc) [] tree_list in	      
+		    else acc) [] tree_list in
 	      List.iter
 		(fun top_pkg ->
 		  let specdir = Filename.concat top_pkg pkg_branch in
@@ -3353,35 +3388,48 @@ let search commit_id =
 		    sprintf "%s/%s-%d" top_pkg v r in
 		  if Sys.file_exists specdir then
 		    begin
-		      let (v,r) = read_pkg_release ~next:true specdir in
+		      (*printf "checkout pack to state: %s for read %s/release\n%!" tag specdir;*)
+		      Git.git_checkout ~low:true ~key:tag ();
+		      let (v,r) = read_pkg_release ~next:false specdir in
+		      (*printf "read release %s-%d from specdir (%s)\n%!" v r specdir;*)
 		      let rec find (v',r') =
 			let key = mktag (v',r') in
-			Git.git_checkout ~low:true ~key ();
-			let tree =
-			  toptree_of_specdir ~log:false specdir	in
-			if
-			  List.exists 
-			    (fun (p',v',r') ->
-			      let p'' =
-				Filename.basename (Filename.dirname p') in
-			      let b' =
-				Filename.basename p'' in
-			      (* printf "p' = %s, b = %s, v' = %s, r' = %d\n" p'' b' v' r'; *)
-			      p'' = component_package &&
-				  v' = component_package_version && 
-				  r' = component_package_revision)
-			    (list_of_deptree tree)
-			then key
-			else
-			  if r' > r + 5 then
+			let check_rev () =
+			  if r' > r + 2 then
 			    raise Not_found
 			  else
 			    find (v',succ r')
+			in
+			if Hashtbl.mem pack_tag_list key then
+			  try
+			    let tree =
+			      deptree_of_specdir ~log:false ~vr:(Some (v',r')) ~packdir specdir in
+			    if
+			      List.exists 
+				(fun (p',v',r',_) ->
+				  let p'' =
+				    Filename.basename (Filename.dirname p') in
+				  List.exists 
+				    (fun e ->
+				      let (pe,(ve,re)) = split_tag e in
+				      p'' = pe && v' = ve &&  r' = re)
+				    equivalents)
+				(list_of_deptree tree)
+			    then key
+			    else
+			      check_rev ()
+			  with Logger.Error ->
+			    check_rev ()
+			else
+			  begin
+			    (* printf "tag not found: %s\n%!" key; *)
+			    check_rev ()
+			  end
 		      in 
 		      try
 			tops := (find (v,r))::!tops
 		      with Not_found ->
-			tops := (top_pkg ^ " not found by 5 up-levels"):: !tops
+			tops := (top_pkg ^ " not found by 3 up-levels"):: !tops
 		    end)
 		top_pkg_list_with_component)
 	    (System.list_of_directory component_package);
@@ -3394,22 +3442,32 @@ let search commit_id =
     !tops
   in
 
-  (* TODO: check pack for master state *)
-
   List.iter
     (fun component_branch ->
-      printf "Search by component branch: %s\n" component_branch;
-      let tags =
+      printf "Search by component branch: %s\n%!" component_branch;
+      let (direct,reverse) =
 	load_commit_tags component_branch commit_id in
-      List.iter 
+      let tags =
+	List.map
+	  (fun ((n,v),r) -> sprintf "%s/%s-%d" n v r)
+	  (only_minimal_revisions
+	    (List.flatten (List.map snd direct))) in
+      let search_equivalent_tags tag =
+	try
+	  let id =
+	    List.assoc tag reverse in
+	  List.assoc id direct
+	with Not_found -> [tag]
+      in
+      List.iter
 	(fun tag ->
 	  let tops = 
 	    (try
-	      search_top_tags component_branch tag
+	      search_top_tags search_equivalent_tags component_branch tag
 	    with Not_found -> [])
 	  in
-	  printf "- %s %s -> %s\n%!"
-	    (Hashtbl.find tag_list tag) tag (String.concat ", " tops)) tags)
+	  printf "> %s %s:\n%!" (Hashtbl.find tag_list tag) tag;
+	  List.iter (printf " >> %s\n%!") tops) tags)
     (Git.git_branch ())
     
 

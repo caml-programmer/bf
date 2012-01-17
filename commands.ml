@@ -456,10 +456,8 @@ let read_pkg_release ?(next=false) ?version specdir =
   (try
     if Sys.file_exists file then
       let ch = open_in file in
-      let vr =
-	max_vr (List.filter filter
-	  (List.map make (System.list_of_channel ch))) in
-      close_in ch; vr
+      max_vr (List.filter filter
+	(List.map make (System.list_of_channel ch)))
     else raise Exit
   with exn -> 
     raise (Pkg_release_not_found (specdir,exn)))

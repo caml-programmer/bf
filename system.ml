@@ -37,7 +37,8 @@ let list_of_channel ch =
   let rec read acc =
     try
       read ((input_line ch)::acc)
-    with End_of_file -> List.rev acc
+    with End_of_file -> close_in ch;
+      List.rev acc
   in read []
 
 exception Env_problem of string
