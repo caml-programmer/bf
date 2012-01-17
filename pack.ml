@@ -2366,6 +2366,8 @@ let toptree_of_specdir ?(log=true) specdir : top_tree =
       else raise Exit
   in make 0 specdir
 
+exception Tree_error of string
+
 let deptree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
   let table = Hashtbl.create 32 in
   let pkgdir =
@@ -2455,8 +2457,7 @@ let deptree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
     try
       make 0 (specdir,ver,rev,true)
     with Exit -> checkout_pack "master";
-      printf "Error: not found specdir (%s) for pack state: %s/%s-%d\n%!" specdir (pkgname_of_specdir specdir) ver rev;
-      exit 2
+      raise (Tree_error (sprintf "not found specdir (%s) for pack state: %s/%s-%d\n%!" specdir (pkgname_of_specdir specdir) ver rev));
   in
 
   checkout_pack "master";
@@ -3406,7 +3407,7 @@ let search commit_id =
 			    find (v',succ r')
 			in
 			if Hashtbl.mem pack_tag_list key then
-			  try
+			  (try
 			    let tree =
 			      deptree_of_specdir ~log:false ~vr:(Some (v',r')) ~packdir specdir in
 			    if
@@ -3423,8 +3424,12 @@ let search commit_id =
 			    then key
 			    else
 			      check_rev ()
-			  with Logger.Error ->
-			    check_rev ()
+			  with 
+			    | Logger.Error -> check_rev ()
+			    | Tree_error msg ->
+				print_string " ## ";
+				print_string msg;
+				check_rev ())
 			else
 			  begin
 			    (* printf "tag not found: %s\n%!" key; *)
