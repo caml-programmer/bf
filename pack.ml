@@ -2451,8 +2451,13 @@ let deptree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
       end
   in
   
-  let tree = 
-    make 0 (specdir,ver,rev,true) in
+  let tree =
+    try
+      make 0 (specdir,ver,rev,true)
+    with Exit -> checkout_pack "master";
+      printf "Error: not found specdir (%s) for pack state: %s/%s-%d\n%!" specdir (pkgname_of_specdir specdir) ver rev;
+      exit 2
+  in
 
   checkout_pack "master";
   
