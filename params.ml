@@ -100,3 +100,4 @@ set_param ~default:"" "http-proxy";;
 set_param ~default:"jet" "pkg-prefix";;
 set_param ~default:"bf.session.log" "session-log";;
 set_param ~default:"bf.lock" "lock-file";;
+set_param ~default:"true" "use-external";; (* components in external packages *)

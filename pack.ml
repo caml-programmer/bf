@@ -1504,7 +1504,7 @@ let check_pack_component () =
 let reinstalled_components = (* for update and upgrade actions *)
   Hashtbl.create 32;;
 
-let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
+let update ?ready_spec ~specdir ?(use_external=true) ?(check_pack=true) ?(check_fs=false) ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
   let specdir = System.path_strip_directory specdir in
 
   check_specdir specdir;
@@ -1567,14 +1567,20 @@ let update ?ready_spec ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode
       Some (pkgname,version,(pred revision))
     else None
   in
+  
+  let with_filter l =
+    if use_external then l
+    else only_local l
+  in
 
-  let components =
-    match ready_spec with
-      | None ->
-	  let composite =
-	    Filename.concat specdir "composite" in
-	  (Rules.components_of_composite composite)
-      | Some spec -> spec.components
+  let components =    
+    with_filter
+      (match ready_spec with
+	| None ->
+	    let composite =
+	      Filename.concat specdir "composite" in
+	    (Rules.components_of_composite composite)
+	| Some spec -> spec.components)
   in
   
   let have_composite_changes =
@@ -2532,6 +2538,9 @@ let upgrade specdir upgrade_mode default_branch =
       (true,dep_paths)
   in
 
+  let use_external =
+    Params.get_param "use-external" = "true" in
+  
   let complete_impl check_fs_packages =
     List.iter
       (fun specdir ->
@@ -2543,6 +2552,7 @@ let upgrade specdir upgrade_mode default_branch =
 	  update
 	    ~specdir
 	    ~lazy_mode
+	    ~use_external
 	    ~check_pack:false
 	    ~check_fs:check_fs_packages
 	    ~interactive:true ()
@@ -2625,10 +2635,13 @@ let clone ?(vr=None) ~recursive ~overwrite specdir =
     List.exists (Pcre.pmatch ~pat) (System.list_of_directory ".")
   in
   
+  let use_external =
+    Params.get_param "use-external" = "true" in
+
   List.iter
     (fun (specdir,ver,rev,spec) ->
       if not (pkg_exists specdir ver rev) || overwrite then
-	ignore(update ~ready_spec:spec ~check_pack:false ~specdir ~ver:(Some ver) ~rev:(Some (string_of_int rev)) ()))
+	ignore(update ~ready_spec:spec ~use_external ~check_pack:false ~specdir ~ver:(Some ver) ~rev:(Some (string_of_int rev)) ()))
     (with_rec depends)
 
 exception Bad_version_format_for_major_increment of string
