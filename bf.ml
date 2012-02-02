@@ -367,12 +367,12 @@ let main () =
 	    if len = 3 then
 	      (match Sys.argv.(2) with
 		| "build" -> Rules.build_rules None
-		| "install" -> Rules.install_rules None
+		| "install" -> Rules.install_rules ~check_build:false None
 		| _ -> usage ())
 	    else if len = 4 then
 	      (match Sys.argv.(2) with
 		| "build" -> Rules.build_rules (Some Sys.argv.(3))
-		| "install" -> Rules.install_rules (Some Sys.argv.(3))
+		| "install" -> Rules.install_rules ~check_build:false (Some Sys.argv.(3))
 		| _ -> usage ())
 	    else
 	      usage ()

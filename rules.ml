@@ -146,13 +146,13 @@ let build_rules name =
   Scheme.eval_code (fun _ -> ()) "(build ())";
   Env.prepare ()
 
-let install_rules name =
+let install_rules ?(check_build=true) name =
   load_plugins ();
   Env.prepare ();
   print_string "load rules...";
   Scheme.eval_file (rules_file name);
   print_endline "ok";
-  if Sys.file_exists
+  if (not check_build) || Sys.file_exists
     (match name with None -> ".bf-build" | Some s -> ".bf-build." ^ s)
   then
     begin
