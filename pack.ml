@@ -1996,7 +1996,7 @@ let name_of_pkg_path pkg_path =
   let version = extract_version (sprintf "-%d.%s.%s.%s" revision (string_of_platform platform) arch extension) pkg in
   extract_name (sprintf "-%s-%d.%s.%s.%s" version revision (string_of_platform platform) arch extension) pkg  
 
-let parse_pkg_path ~userhost pkg_path =
+let parse_pkg_path pkg_path =
   let pkg_dir = Filename.dirname pkg_path in
   let pkg = Filename.basename pkg_path in
   let platform = extract_platform pkg in
@@ -2008,6 +2008,10 @@ let parse_pkg_path ~userhost pkg_path =
     extract_version (sprintf "-%d.%s.%s.%s" revision (string_of_platform platform) arch extension) pkg in
   let pkg_name =
     extract_name (sprintf "-%s-%d.%s.%s.%s" version revision (string_of_platform platform) arch extension) pkg in
+  (pkg_dir,pkg_name,pkg,platform,extension,arch,version,revision)
+
+let make_pkg_record ~userhost pkg_path =
+  let (pkg_dir,pkg_name,pkg,platform,extension,arch,version,revision) = parse_pkg_path pkg_path in
   let pack_branch =
     extract_packbranch ~userhost pkg_path in
   { 
@@ -2028,7 +2032,7 @@ let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
   
   let rec scan pkg_path =
     log_message (sprintf "scanning %s" pkg_path);
-    let e = parse_pkg_path ~userhost pkg_path in
+    let e = make_pkg_record ~userhost pkg_path in
     let deps =
       extract_depend_list ~userhost pkg_path in
     
@@ -3492,6 +3496,56 @@ let search commit_id =
 	  printf "> %s %s:\n%!" (Hashtbl.find tag_list tag) tag;
 	  List.iter (printf " >> %s\n%!") tops) tags)
     (Git.git_branch ())
-    
+
+(* Clean old packages *)
+
+let pkg_compare a b =
+  let (dir_a,name_a,pkg_a,platform_a,ext_a,arch_a,ver_a,rev_a) = snd a in
+  let (dir_b,name_b,pkg_b,platform_b,ext_b,arch_b,ver_b,rev_b) = snd b in
+  match compare name_a name_b with
+    | 0 ->
+	(match compare ver_a ver_b with
+	  | 0 -> compare rev_a rev_b
+	  | x -> x)
+    | x -> x
+  
+let clean () =  
+  let t = Hashtbl.create 32 in  
+  List.iter
+    (fun (s,x) ->
+      let (_,name,_,_,_,_,ver,rev) = x in
+      Hashtbl.add t name (s,ver,rev))
+    (List.sort pkg_compare
+      (List.map
+	(fun s -> s,parse_pkg_path s)
+	(System.list_of_directory ".")));
+  let droplist = ref [] in
+  let drop s =
+    droplist := s::!droplist in 
+  Hashtbl.iter
+    (fun name (cur_s,cur_ver,cur_rev) ->
+      let all = Hashtbl.find_all t name in
+      printf "%s: %s\n" name 
+	(String.concat " " 
+	  (List.map
+	    (fun (s,ver,rev) ->
+	      let label = 
+		ver ^ "-" ^ string_of_int rev in
+	      if cur_s = s then
+		"[" ^ label ^ "]"
+	      else 
+		begin drop s; label end) all))) t;
+  try
+    while true do
+      printf "Clean unselected revisions? (y/n): %!";
+      match input_line stdin with
+	| "y" ->
+	    List.iter Unix.unlink !droplist;
+	    raise Exit
+	| "n" ->
+	    raise Exit
+	| _ -> ()
+    done
+  with Exit -> ()
 
 

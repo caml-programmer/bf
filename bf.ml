@@ -52,6 +52,7 @@ let usage () =
   print_endline "   or: bf versions <pkgdir>";
   print_endline "   or: bf search <commit-id>";
   print_endline "   or: bf shell";
+  print_endline "   or: bf clean";
   print_endline "   or: bf log";
   exit 1
 
@@ -362,6 +363,8 @@ let main () =
 	      else usage ()
 	| "shell" ->
 	    Scheme.shell ()
+	| "clean" ->
+	    Pack.clean ()
 	| "make" ->
 	    Params.update_param "plugins-dir" "../pack";
 	    if len = 3 then
