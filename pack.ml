@@ -3520,7 +3520,7 @@ let clean () =
 	(fun acc s ->
 	  try
 	    (s,parse_pkg_path s)::acc
-	  with Cannot_extract_extension _ -> acc)
+	  with _ -> acc)
 	[] (System.list_of_directory ".")));
   let droplist = ref [] in
   let drop s =
