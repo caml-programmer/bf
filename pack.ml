@@ -3516,9 +3516,12 @@ let clean () =
       let (_,name,_,_,_,_,ver,rev) = x in
       Hashtbl.add t name (s,ver,rev))
     (List.sort pkg_compare
-      (List.map
-	(fun s -> s,parse_pkg_path s)
-	(System.list_of_directory ".")));
+      (List.fold_left
+	(fun acc s ->
+	  try
+	    (s,parse_pkg_path s)::acc
+	  with Cannot_extract_extension _ -> acc)
+	[] (System.list_of_directory ".")));
   let droplist = ref [] in
   let drop s =
     droplist := s::!droplist in 
