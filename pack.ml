@@ -3514,7 +3514,10 @@ let clean () =
   List.iter
     (fun (s,x) ->
       let (_,name,_,_,_,_,ver,rev) = x in
-      Hashtbl.add t name (s,ver,rev))
+      if Hashtbl.mem t name then
+	Hashtbl.replace t name ((s,ver,rev)::(Hashtbl.find t name))
+      else      
+	Hashtbl.add t name [s,ver,rev])
     (List.sort pkg_compare
       (List.fold_left
 	(fun acc s ->
@@ -3526,18 +3529,18 @@ let clean () =
   let drop s =
     droplist := s::!droplist in 
   Hashtbl.iter
-    (fun name (cur_s,cur_ver,cur_rev) ->
-      let all = Hashtbl.find_all t name in
+    (fun name list ->
+      let first = ref true in
       printf "%s: %s\n" name 
 	(String.concat " " 
 	  (List.map
 	    (fun (s,ver,rev) ->
 	      let label = 
 		ver ^ "-" ^ string_of_int rev in
-	      if cur_s = s then
-		"[" ^ label ^ "]"
+	      if !first then
+		begin first := false; "[" ^ label ^ "]" end
 	      else 
-		begin drop s; label end) all))) t;
+		begin drop s; label end) list))) t;
   try
     while true do
       printf "Clean unselected revisions? (y/n): %!";
