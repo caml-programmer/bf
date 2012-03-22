@@ -408,11 +408,11 @@ let teleport f =
     f ()
 
 let _ =
-  let current = Sys.getcwd () in
-  try    
-    main ()
-  with 
+  try main () with
     | Logger.Error -> exit 2
-    | exn ->
-	Sys.chdir current; raise exn
+    | Unix.Unix_error (error,name,param) ->
+	let msg = Unix.error_message error in
+	printf "Fatal error: exception Unix.Unix_error(%s,%s,%s)\n" msg name param;
+	exit 2
+    | exn -> raise exn
 	  
