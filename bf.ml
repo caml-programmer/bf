@@ -407,12 +407,31 @@ let teleport f =
   else
     f ()
 
+let print_current_state () =
+  let param name =
+    Printf.printf "%s: %s\n" name (Params.get_param name) in
+  Printf.printf "*** CURRENT STATE of BUILDFARM ***\n%!";
+  param "git-url";
+  param "top-dir";
+  param "dev-dir";
+  param "dest-dir";
+  param "component";
+  param "label-type";
+  param "label";
+  param "start-dir";
+  param "pkg-storage";
+  param "log-level";
+  Printf.printf "**********************************\n%!"
+   
 let _ =
   try main () with
-    | Logger.Error -> exit 2
-    | Unix.Unix_error (error,name,param) ->
-	let msg = Unix.error_message error in
-	printf "Fatal error: exception Unix.Unix_error(%s,%s,%s)\n" msg name param;
-	exit 2
-    | exn -> raise exn
+    | exn ->
+	print_current_state ();
+	(match exn with
+	  | Logger.Error -> exit 2
+	  | Unix.Unix_error (error,name,param) ->
+	      let msg = Unix.error_message error in
+	      Printf.printf "Fatal error: exception Unix.Unix_error(%s,%s,%s)\n" msg name param;
+	      exit 2
+	  | exn -> raise exn)
 	  
