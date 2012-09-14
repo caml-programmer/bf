@@ -1063,6 +1063,14 @@ let scm_git_push_cycle url depth =
     (Scheme.string_of_sval url)
     (Scheme.make_int depth);
   Snull
+
+let scm_git_push_tag_cycle url tag depth =
+  Git.git_push_cycle
+    ~tags:true
+    ~refspec:(Some tag)
+    (Scheme.string_of_sval url)
+    (Scheme.make_int depth);
+  Snull
 ;;
 
 (* Register global functions *)
@@ -1119,3 +1127,4 @@ Ocs_env.set_pf2 Scheme.env scm_substrings "substrings";;
 Ocs_env.set_pfn Scheme.env scm_env_append "env-append";;
 
 Ocs_env.set_pf2 Scheme.env scm_git_push_cycle "git-push-cycle";;
+Ocs_env.set_pf3 Scheme.env scm_git_push_tag_cycle "git-push-tag-cycle";;
