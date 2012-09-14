@@ -601,23 +601,13 @@ let tag_component tag component =
     let url = 
       Filename.concat
 	(git_create_url component) component.name in
-    match git_current_branch () with
-	Some branch ->
-	  (match git_make_tag tag with
-	    | Tag_created ->
-		git_push_cycle ~tags:true ~refspec:(Some tag) url 10
-	    | Tag_already_exists -> 
-		git_push_cycle ~tags:true ~refspec:(Some tag) url 10
-	    | Tag_creation_problem -> raise Logger.Error)
-      | None ->
-	  log_message ("Warning: cannot find current branch for " ^ component.name);
-	  (match git_make_tag tag with
-	    | Tag_created ->
-		git_push_cycle ~tags:true ~refspec:(Some tag) url 10
-	    | Tag_already_exists -> 
-		git_push_cycle ~tags:true ~refspec:(Some tag) url 10
-	    | Tag_creation_problem -> raise Logger.Error)    
-  in ignore 
+    if git_current_branch () = None then
+      log_message ("Warning: cannot find current branch for " ^ component.name);
+    match git_make_tag tag with
+      | Tag_created | Tag_already_exists ->
+	  git_push_cycle ~tags:false ~refspec:(Some tag) url 10
+      | Tag_creation_problem -> raise Logger.Error
+  in ignore
        (with_component_dir ~strict:false component call)
 
 let make_tag tag components =
