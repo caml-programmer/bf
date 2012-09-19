@@ -480,8 +480,7 @@ let update_pack component =
     with_component_dir ~strict:true component
       (fun () ->
 	let start = git_current_branch () in
-	git_fetch "origin";
-	git_fetch ~tags:true "origin";
+	git_remote_update "origin";
 	git_track_new_branches ();
 	List.iter
 	  (fun branch ->
