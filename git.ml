@@ -45,8 +45,8 @@ let git_push ?(tags=false) ?refspec url =
 	log_command ~env "git" (["push"] @ opts @ [url])
 
 let git_remote_update spec =
-  log_command ~env "git" (["remote"] @ ["update"] @ [spec])
-   
+  log_command ~env "git" ["remote";"update";spec]
+       
 let git_make_tag tag =
   let state = ref Tag_created in
   let error_handler ps =
