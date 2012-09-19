@@ -93,8 +93,7 @@ let with_component_dir ?(low=false) ?(strict=true) component (thunk : unit -> un
 		  begin
 		    if not (List.mem (origin b) rb) then
 		      begin
-			git_fetch "origin";
-			git_fetch ~tags:true "origin";		     
+			git_remote_update "origin";
 		      end;
 		    git_track_new_branches ();
 		  end
@@ -341,8 +340,7 @@ let update_component component =
     with_component_dir ~strict:false component
       (fun () ->
 	let start = git_current_branch () in
-	git_fetch "origin";
-	git_fetch ~tags:true "origin";
+	git_remote_update "origin";
 	git_track_new_branches ();
 	let update branch =
 	  if git_changed branch (origin branch) then
