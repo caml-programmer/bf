@@ -44,9 +44,8 @@ let git_push ?(tags=false) ?refspec url =
 	let opts = if tags then ["--tags"] else [] in
 	log_command ~env "git" (["push"] @ opts @ [url])
 
-let git_remote_update () =
-  log_command ~env "git" ["remote";"prune";"origin"];
-  log_command ~env "git" ["remote";"update"]
+let git_remote_update spec =
+  log_command ~env "git" (["remote"] @ ["update"] @ [spec])
    
 let git_make_tag tag =
   let state = ref Tag_created in

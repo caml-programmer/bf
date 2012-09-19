@@ -388,8 +388,7 @@ let fetch_tags component =
   ignore
     (with_component_dir ~strict:false component
       (fun () ->
-	git_fetch "origin";
-	git_fetch ~tags:true "origin";
+	git_remote_update "origin";
 	git_track_new_branches ()))    
 
 (* Pack update support *)
