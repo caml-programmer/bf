@@ -215,7 +215,7 @@ let git_diff ?(ignore=[]) ?key () =
   let cmd =
     match key with
       | None   -> "git diff --name-status"
-      | Some k -> "git diff --name-status " ^ k
+      | Some k -> "git diff --name-status " ^ k ^ " --"
   in read_lines
        ~env
        ~filter:(fun s -> not
@@ -241,7 +241,7 @@ let git_check_key l tag =
 
 let git_changes key_a key_b =
   let cmd =
-    sprintf "git diff --name-status '%s' '%s'" key_a key_b in
+    sprintf "git diff --name-status '%s' '%s' --" key_a key_b in
   try
     read_lines ~env cmd
   with exn ->
