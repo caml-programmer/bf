@@ -30,10 +30,10 @@ let git_pull ?(force=false) ?refspec url =
   match refspec with
     | Some spec -> 
 	let opts = if force then ["--force"] else [] in
-	log_command ~env "git" (["pull"] @ opts @ [url;spec])
+	log_command ~env "git" (["pull";"--no-edit"] @ opts @ [url;spec])
     | None ->
 	let opts = if force then ["--force"] else [] in
-	log_command ~env "git" (["pull"] @ opts @ [url])
+	log_command ~env "git" (["pull";"--no-edit"] @ opts @ [url])
 
 let git_push ?(tags=false) ?refspec url =
   match refspec with
