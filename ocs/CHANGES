@@ -1,0 +1,27 @@
+1.0.1
+
+    - Fix sorting of byte code objects in Makefile.
+
+    - Add missing functions numerator and denominator.
+
+    - Keep rationals normalized.
+
+1.0 (changes from pre-releases)
+
+    - Rearrange build to generate bytecode and native libraries and a
+    native interpreter usable from the command line.
+
+    - Remove CVS Id's (the project is now being stored in a GNU Arch
+    repository) from all files.
+
+    - Fix Ocs_port.string_input_port to actually initialize the
+    port with the string length.
+
+    - Fix internal definitions of the form (define (fun args ...) ...).
+    Previously the first item of the body would be skipped.
+
+    - Fix the order of arguments to atan when called with two arguments.
+
+    - When invoking continuations with multiple arguments, the
+    arguments are now wrapped with Svalues as if (values ...) were used.
+

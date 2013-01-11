@@ -1,0 +1,105 @@
+ocs_char.cmo: ocs_env.cmi ocs_error.cmo ocs_types.cmi ocs_char.cmi 
+ocs_char.cmx: ocs_env.cmx ocs_error.cmx ocs_types.cmi ocs_char.cmi 
+ocs_compile.cmo: ocs_env.cmi ocs_error.cmo ocs_misc.cmi ocs_sym.cmi \
+    ocs_types.cmi ocs_vartable.cmi ocs_compile.cmi 
+ocs_compile.cmx: ocs_env.cmx ocs_error.cmx ocs_misc.cmx ocs_sym.cmx \
+    ocs_types.cmi ocs_vartable.cmx ocs_compile.cmi 
+ocs_complex.cmo: ocs_complex.cmi 
+ocs_complex.cmx: ocs_complex.cmi 
+ocs_contin.cmo: ocs_env.cmi ocs_error.cmo ocs_eval.cmi ocs_misc.cmi \
+    ocs_types.cmi ocs_contin.cmi 
+ocs_contin.cmx: ocs_env.cmx ocs_error.cmx ocs_eval.cmx ocs_misc.cmx \
+    ocs_types.cmi ocs_contin.cmi 
+ocs_env.cmo: ocs_error.cmo ocs_sym.cmi ocs_types.cmi ocs_vartable.cmi \
+    ocs_env.cmi 
+ocs_env.cmx: ocs_error.cmx ocs_sym.cmx ocs_types.cmi ocs_vartable.cmx \
+    ocs_env.cmi 
+ocs_eval.cmo: ocs_error.cmo ocs_misc.cmi ocs_sym.cmi ocs_types.cmi \
+    ocs_eval.cmi 
+ocs_eval.cmx: ocs_error.cmx ocs_misc.cmx ocs_sym.cmx ocs_types.cmi \
+    ocs_eval.cmi 
+ocs_io.cmo: ocs_env.cmi ocs_error.cmo ocs_eval.cmi ocs_port.cmi ocs_print.cmi \
+    ocs_read.cmi ocs_types.cmi ocs_io.cmi 
+ocs_io.cmx: ocs_env.cmx ocs_error.cmx ocs_eval.cmx ocs_port.cmx ocs_print.cmx \
+    ocs_read.cmx ocs_types.cmi ocs_io.cmi 
+ocs_lex.cmo: ocs_char.cmi ocs_error.cmo ocs_numstr.cmi ocs_port.cmi \
+    ocs_types.cmi ocs_lex.cmi 
+ocs_lex.cmx: ocs_char.cmx ocs_error.cmx ocs_numstr.cmx ocs_port.cmx \
+    ocs_types.cmi ocs_lex.cmi 
+ocs_list.cmo: ocs_env.cmi ocs_error.cmo ocs_misc.cmi ocs_types.cmi \
+    ocs_list.cmi 
+ocs_list.cmx: ocs_env.cmx ocs_error.cmx ocs_misc.cmx ocs_types.cmi \
+    ocs_list.cmi 
+ocs_macro.cmo: ocs_compile.cmi ocs_env.cmi ocs_error.cmo ocs_misc.cmi \
+    ocs_sym.cmi ocs_types.cmi ocs_macro.cmi 
+ocs_macro.cmx: ocs_compile.cmx ocs_env.cmx ocs_error.cmx ocs_misc.cmx \
+    ocs_sym.cmx ocs_types.cmi ocs_macro.cmi 
+ocs_main.cmo: ocs_error.cmo ocs_prim.cmi ocs_top.cmi ocs_types.cmi 
+ocs_main.cmx: ocs_error.cmx ocs_prim.cmx ocs_top.cmx ocs_types.cmi 
+ocs_misc.cmo: ocs_error.cmo ocs_types.cmi ocs_misc.cmi 
+ocs_misc.cmx: ocs_error.cmx ocs_types.cmi ocs_misc.cmi 
+ocs_num.cmo: ocs_complex.cmi ocs_env.cmi ocs_error.cmo ocs_numaux.cmi \
+    ocs_types.cmi ocs_num.cmi 
+ocs_num.cmx: ocs_complex.cmx ocs_env.cmx ocs_error.cmx ocs_numaux.cmx \
+    ocs_types.cmi ocs_num.cmi 
+ocs_numaux.cmo: ocs_error.cmo ocs_types.cmi ocs_numaux.cmi 
+ocs_numaux.cmx: ocs_error.cmx ocs_types.cmi ocs_numaux.cmi 
+ocs_numstr.cmo: ocs_env.cmi ocs_error.cmo ocs_num.cmi ocs_numaux.cmi \
+    ocs_types.cmi ocs_numstr.cmi 
+ocs_numstr.cmx: ocs_env.cmx ocs_error.cmx ocs_num.cmx ocs_numaux.cmx \
+    ocs_types.cmi ocs_numstr.cmi 
+ocs_port.cmo: ocs_error.cmo ocs_port.cmi 
+ocs_port.cmx: ocs_error.cmx ocs_port.cmi 
+ocs_prim.cmo: ocs_compile.cmi ocs_env.cmi ocs_error.cmo ocs_eval.cmi \
+    ocs_io.cmi ocs_lex.cmi ocs_macro.cmi ocs_misc.cmi ocs_port.cmi \
+    ocs_read.cmi ocs_sym.cmi ocs_types.cmi ocs_prim.cmi 
+ocs_prim.cmx: ocs_compile.cmx ocs_env.cmx ocs_error.cmx ocs_eval.cmx \
+    ocs_io.cmx ocs_lex.cmx ocs_macro.cmx ocs_misc.cmx ocs_port.cmx \
+    ocs_read.cmx ocs_sym.cmx ocs_types.cmi ocs_prim.cmi 
+ocs_print.cmo: ocs_char.cmi ocs_numstr.cmi ocs_port.cmi ocs_sym.cmi \
+    ocs_types.cmi ocs_print.cmi 
+ocs_print.cmx: ocs_char.cmx ocs_numstr.cmx ocs_port.cmx ocs_sym.cmx \
+    ocs_types.cmi ocs_print.cmi 
+ocs_read.cmo: ocs_error.cmo ocs_lex.cmi ocs_misc.cmi ocs_port.cmi ocs_sym.cmi \
+    ocs_types.cmi ocs_read.cmi 
+ocs_read.cmx: ocs_error.cmx ocs_lex.cmx ocs_misc.cmx ocs_port.cmx ocs_sym.cmx \
+    ocs_types.cmi ocs_read.cmi 
+ocs_string.cmo: ocs_env.cmi ocs_error.cmo ocs_types.cmi ocs_string.cmi 
+ocs_string.cmx: ocs_env.cmx ocs_error.cmx ocs_types.cmi ocs_string.cmi 
+ocs_sym.cmo: ocs_error.cmo ocs_types.cmi ocs_sym.cmi 
+ocs_sym.cmx: ocs_error.cmx ocs_types.cmi ocs_sym.cmi 
+ocs_top.cmo: ocs_char.cmi ocs_compile.cmi ocs_contin.cmi ocs_env.cmi \
+    ocs_error.cmo ocs_eval.cmi ocs_io.cmi ocs_lex.cmi ocs_list.cmi \
+    ocs_macro.cmi ocs_num.cmi ocs_numstr.cmi ocs_port.cmi ocs_prim.cmi \
+    ocs_print.cmi ocs_read.cmi ocs_string.cmi ocs_types.cmi ocs_vector.cmi \
+    ocs_top.cmi 
+ocs_top.cmx: ocs_char.cmx ocs_compile.cmx ocs_contin.cmx ocs_env.cmx \
+    ocs_error.cmx ocs_eval.cmx ocs_io.cmx ocs_lex.cmx ocs_list.cmx \
+    ocs_macro.cmx ocs_num.cmx ocs_numstr.cmx ocs_port.cmx ocs_prim.cmx \
+    ocs_print.cmx ocs_read.cmx ocs_string.cmx ocs_types.cmi ocs_vector.cmx \
+    ocs_top.cmi 
+ocs_vartable.cmo: ocs_vartable.cmi 
+ocs_vartable.cmx: ocs_vartable.cmi 
+ocs_vector.cmo: ocs_env.cmi ocs_error.cmo ocs_types.cmi ocs_vector.cmi 
+ocs_vector.cmx: ocs_env.cmx ocs_error.cmx ocs_types.cmi ocs_vector.cmi 
+ocs_char.cmi: ocs_types.cmi 
+ocs_compile.cmi: ocs_types.cmi 
+ocs_contin.cmi: ocs_types.cmi 
+ocs_env.cmi: ocs_sym.cmi ocs_types.cmi 
+ocs_eval.cmi: ocs_types.cmi 
+ocs_io.cmi: ocs_types.cmi 
+ocs_lex.cmi: ocs_error.cmo ocs_port.cmi ocs_types.cmi 
+ocs_list.cmi: ocs_types.cmi 
+ocs_macro.cmi: ocs_types.cmi 
+ocs_misc.cmi: ocs_types.cmi 
+ocs_num.cmi: ocs_types.cmi 
+ocs_numaux.cmi: ocs_types.cmi 
+ocs_numstr.cmi: ocs_types.cmi 
+ocs_prim.cmi: ocs_types.cmi 
+ocs_print.cmi: ocs_port.cmi ocs_types.cmi 
+ocs_read.cmi: ocs_lex.cmi ocs_port.cmi ocs_types.cmi 
+ocs_string.cmi: ocs_types.cmi 
+ocs_sym.cmi: ocs_types.cmi 
+ocs_top.cmi: ocs_types.cmi 
+ocs_types.cmi: ocs_port.cmi ocs_vartable.cmi 
+ocs_vector.cmi: ocs_types.cmi 

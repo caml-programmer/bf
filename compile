@@ -1,0 +1,3 @@
+#!/bin/sh -e
+
+ocamlbuild -j 4 -no-links -use-ocamlfind bf.native 

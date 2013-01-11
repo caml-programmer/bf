@@ -17,7 +17,7 @@ uninstall:
 
 .PHONY: clean
 clean:
-	rm -f _build
+	rm -rf _build
 
 .PHONY: distclean
 distclean: clean
