@@ -2610,6 +2610,7 @@ let top specdir =
 	  new_components;
 	acc @ new_components)
       [] depends in
+  stop_delay 3;
   let buf = Buffer.create 32 in
   let add = Buffer.add_string buf in
   List.iter
@@ -2618,7 +2619,7 @@ let top specdir =
 	update_component c in
       let reinstalled =
 	install_component c in
-      add (sprintf "%s updated(%b) resinstalled(%b)\n" c.name updated reinstalled))
+      add (sprintf "%s updated(%b) reinstalled(%b)\n" c.name updated reinstalled))
     components;
   print_endline (Buffer.contents buf)
    
