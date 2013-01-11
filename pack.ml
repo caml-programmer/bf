@@ -2606,7 +2606,10 @@ let top specdir =
 	    (Rules.components_of_composite composite) in
 	List.iter 
 	  (fun c ->
-	    log_message (sprintf "\t- %s (%s %s)" c.name (string_of_label_type c.label) (string_of_label c.label)))
+	    let rules =
+	      match c.rules with None -> "" | Some s -> (" (rules " ^ s ^ ")") in
+	    log_message 
+	      (sprintf "\t- %s (%s %s)%s" c.name (string_of_label_type c.label) (string_of_label c.label) rules))
 	  new_components;
 	acc @ new_components)
       [] depends in
