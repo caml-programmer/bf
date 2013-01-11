@@ -1,41 +1,13 @@
 include Makefile.config
-SOURCES   = system.ml types.ml scheme.ml params.ml env.ml logger.ml git.ml notify.ml rules.ml commands.ml pack.ml
-OBJECTS   = $(SOURCES:.ml=.cmo)
-XOBJECTS  = $(OBJECTS:.cmo=.cmx)
-ARCHIVE   = archive.cma
-XARCHIVE  = $(ARCHIVE:.cma=.cmxa)
-REQUIRES  = pcre shell ocs smtp str
 
-ifeq ($(OS),SunOS)
-CCOPTS=-lrt
-endif
-
-all: $(ARCHIVE)
-	$(OCAMLC) -ccopt "$(CCOPTS)" -o bf -custom toplevellib.cma $(ARCHIVE) bf.ml -linkpkg
-
-opt: $(XARCHIVE)
-	$(OCAMLOPT) -ccopt "$(CCOPTS)" -o bf $(XARCHIVE) bf.ml -linkpkg
-
-$(ARCHIVE): $(OBJECTS)
-	$(OCAMLC) -a -o $(ARCHIVE) $(OBJECTS)
-
-$(XARCHIVE): $(XOBJECTS)
-	$(OCAMLOPT) -a -o $(XARCHIVE) $(XOBJECTS)
-
-OPTIONS   = -syntax camlp4o -package camlp4
-OCAMLC    = $(OCAMLFIND) ocamlc   -w YS $(OPTIONS) -package "$(REQUIRES)"
-OCAMLOPT  = $(OCAMLFIND) ocamlopt -w YS $(OPTIONS) -package "$(REQUIRES)"
-OCAMLDEP  = $(OCAMLFIND) ocamldep $(OPTIONS)
-OCAMLLEX  = ocamllex
-OCAMLFIND = ocamlfind
-
-depend: $(SOURCES)
-	$(OCAMLDEP) $(SOURCES) $(APPNAME).ml >depend
+all:
+	./compile
 
 .PHONY: install
+
 install:
 	install -m 755 -d $(PREFIX) $(PREFIX)/bin
-	install -m 755 bf $(PREFIX)/bin
+	install -m 755 _build/src/bf.native $(PREFIX)/bin
 	install -m 755 tools/ssh-copy-id $(PREFIX)/bin
 	install -m 755 tools/make-autologin $(PREFIX)/bin
 
@@ -45,36 +17,9 @@ uninstall:
 
 .PHONY: clean
 clean:
-	rm -f *~ *.cmi *.cmo *.cma *.cmx *.o *.a *.cmxa
+	rm -f _build
 
 .PHONY: distclean
 distclean: clean
-	rm -f *~ depend Makefile.config
-	rm -f bf
-
-.SUFFIXES: .cmo .cmi .cmx .ml .mli .mll
-
-.ml.cmx:
-	$(OCAMLOPT) -c $<
-
-.ml.cmo:
-	$(OCAMLC) -c $<
-
-.mli.cmi:
-	$(OCAMLC) -c $<
-
-.mll.ml:
-	$(OCAMLLEX) $<
-
-*.mli:
-	true
-
-include depend
-
-
-
-
-
-
-
-
+	rm -f *~ Makefile.config
+	rm -rf _build
