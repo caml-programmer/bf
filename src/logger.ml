@@ -113,25 +113,14 @@ let log_error error =
 
 let log_command ?(low=false) ?env ?error_handler prog args =
   let program = with_path prog in
-  let cmd_s = program ^ " " ^ (String.concat " " args) in
+  let command = program ^ " " ^ (String.concat " " args) in
   with_logger
     (fun logger ->
       try
-	let environment = Shell_sys.create_env () in
-	Array.iter
-	  (fun s ->
-	    (try
-	      let (key,value) =
-		System.split_env_var s
-	      in Shell_sys.set_env_var environment key value
-	    with Not_found -> ()))
-	  (match env with Some e -> e | None -> Env.component ());
-	let cmd =
-	  Shell.cmd
-	    ~cmdname:program
-	    ~environment
-	    program args
-	in
+	let environment = 
+	  match env with 
+	      Some e -> e 
+	    | None -> Env.component () in
 	let log_fd =
 	  if low then
 	    Unix.descr_of_out_channel logger.port
@@ -139,39 +128,38 @@ let log_command ?(low=false) ?env ?error_handler prog args =
 	    match Params.get_param "log-level" with
 	      | "low"  -> Unix.descr_of_out_channel logger.port
 	      | "high" -> Unix.descr_of_out_channel stdout
-	      | _      -> Unix.descr_of_out_channel stdout
-	in
-	log_message ~low ~logger (sprintf "run: %s" cmd_s);
-	Shell.call
-	  ~stdout:(Shell.to_fd log_fd)
-	  ~stderr:(Shell.to_fd log_fd) [cmd];
-	log_message ~low ~logger (sprintf "success: %s" cmd_s)
+	      | _      -> Unix.descr_of_out_channel stdout in
+	log_message ~low ~logger (sprintf "run: %s" command);
+	(match Unix.fork () with
+	  | 0 ->  (* child *)
+	      if log_fd <> Unix.stdout then
+		Unix.dup2 log_fd Unix.stdout;
+	      Unix.execve prog (Array.of_list args) environment
+	  | pid ->
+	      let (_,ps) = Unix.waitpid [] pid in
+	      (match ps with
+		| Unix.WEXITED rc ->
+		    (match error_handler with
+			Some f -> f ps
+		      | None ->
+			  log_message ~logger (sprintf "failed: %d [%s]" rc command);
+			  raise Error)
+		| Unix.WSIGNALED n -> 
+		    (match error_handler with
+			Some f -> f ps
+		      | None ->
+			  log_message ~logger (sprintf "killed: %d [%s]" n command);
+			  raise Error)
+		| Unix.WSTOPPED n ->
+		    (match error_handler with
+			Some f -> f ps
+		      | None ->
+			  log_message ~logger (sprintf "stopped: %d" n);
+			  raise Error)));
+	log_message ~low ~logger (sprintf "success: %s" command)
       with 
 	| Unix.Unix_error(error,name,arg) ->
 	    log_error
 	      (sprintf "failed: Unix.Unix_error(%s,%s,%s)" 
 		(Unix.error_message error)
-		name arg)
-	| Shell.Subprocess_error errors ->
-	    List.iter
-	      (fun (cmd,ps) ->
-		(match ps with
-		  | Unix.WEXITED rc ->
-		      (match error_handler with
-			  Some f -> f ps
-			| None ->
-			    log_message ~logger (sprintf "failed: %d [%s]" rc cmd_s);
-			    raise Error)
-		  | Unix.WSIGNALED n -> 
-		      (match error_handler with
-			  Some f -> f ps
-			| None ->
-			    log_message ~logger (sprintf "killed: %d [%s]" n cmd_s);
-			    raise Error)
-		  | Unix.WSTOPPED n ->
-		      (match error_handler with
-			  Some f -> f ps
-			| None ->
-			    log_message ~logger (sprintf "stopped: %d" n);
-			    raise Error)))
-	      errors)
+		name arg))

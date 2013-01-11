@@ -1,2 +1,4 @@
 <ocs> : include
 <src> : include
+<smtp> : include
+<regexp> : include

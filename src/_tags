@@ -1,2 +1,2 @@
-<*.ml> : package(pcre,shell,smtp)
-<bf.native> : package(pcre,shell,smtp,num,netstring,str)
+<*.ml> : package(pcre,unix)
+<bf.native> : package(pcre,unix,num,str)
