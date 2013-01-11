@@ -2584,35 +2584,44 @@ let upgrade specdir upgrade_mode default_branch =
     | Upgrade_default ->
 	complete_impl true
 
-let top ~recursive ~overwrite specdir =
-  let specdir = System.path_strip_directory specdir in
+let top specdir =
+  let specdir =
+    System.path_strip_directory specdir in
   check_specdir specdir;
   check_pack_component ();
   let deptree =
-    if recursive then
-      log_message "make depends tree...";
     toptree_of_specdir specdir in
   let depends =
     list_of_deptree deptree in
-  
-  let with_rec l =
-    (if recursive then l else [last l]) in
-
   log_message "depend list...";
-  List.iter (fun (pkg,ver,rev) -> printf "%s %s %d\n%!" pkg ver rev) (with_rec depends);
-  stop_delay 5;
-  
-  let pkg_exists specdir ver rev =
-    let pat = sprintf "%s\\-%s\\-%d\\." (pkgname_of_specdir specdir) ver rev in
-    List.exists (Pcre.pmatch ~pat) (System.list_of_directory ".")
-  in
-  
+  let components =
+    List.fold_left 
+      (fun acc (specdir,_,_) ->
+	log_message (sprintf "# %s" specdir);
+	let composite =
+      	  Filename.concat specdir "composite" in
+	let new_components =
+	  List.filter 
+	    (fun c -> not (List.mem c acc))
+	    (Rules.components_of_composite composite) in
+	List.iter 
+	  (fun c ->
+	    log_message (sprintf "\t- %s (%s %s)" c.name (string_of_label_type c.label) (string_of_label c.label)))
+	  new_components;
+	acc @ new_components)
+      [] depends in
+  let buf = Buffer.create 32 in
+  let add = Buffer.add_string buf in
   List.iter
-    (fun (specdir,ver,rev) ->
-      if not (pkg_exists specdir ver rev) || overwrite then
-	ignore(update ~check_pack:false ~specdir ~ver:(Some ver) ~rev:(Some (string_of_int rev)) ()))
-    (with_rec depends)
-
+    (fun c ->
+      let updated = 
+	update_component c in
+      let reinstalled =
+	install_component c in
+      add (sprintf "%s updated(%b) resinstalled(%b)\n" c.name updated reinstalled))
+    components;
+  print_endline (Buffer.contents buf)
+   
 let clone ?(vr=None) ~recursive ~overwrite specdir =
   let specdir = System.path_strip_directory specdir in
 

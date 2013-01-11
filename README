@@ -177,7 +177,7 @@ Usage: bf (prepare|update|forward|[re]build|[re]install|status) <components>
    or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite|depends|packages]
    or: bf clone <specdir> [overwrite] [norec] [<ver> <rev>]
    or: bf link <pkg-path> [symlink]
-   or: bf top <specdir> [overwrite] [norec]
+   or: bf top <specdir>
    or: bf graph <specdir> [<ver> <rev>]
    or: bf basegraph <specdir> [hard|soft]
    or: bf tag <composite> <tag>
@@ -646,9 +646,9 @@ bf может переходить в интерактивный
 собираться будет последняя зарегистрированная 
 версия пакета верхнего уровня.
 
-* Сборка набора пакетов из самых последних версий *
+* Сборка самых свежих компонентов *
 
-# bf top <specdir> [overwrite] [norec]
+# bf top <specdir>
 
 * Ветвление проектов *
 

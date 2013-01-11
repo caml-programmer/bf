@@ -252,25 +252,7 @@ let main () =
 	      end
 	| "top" ->
 	    if Sys.file_exists Sys.argv.(2) then
-	      begin
-		let check_rec s = if s = "norec" then false else usage () in
-		let check_over s = if s = "overwrite" then true else usage () in
-		let (recursive,overwrite) =
-		  if len = 3 then
-		    (true,false)
-		  else if len = 4 then
-		    (match Sys.argv.(3) with
-		      | "overwrite" -> (true,true)
-		      | "norec" -> (false,false)
-		      | _ -> usage ())
-		  else if len = 5 then
-		    (match Sys.argv.(3) with
-		      | "overwrite" -> (check_rec Sys.argv.(4),true)
-		      | "norec" -> (false,check_over Sys.argv.(4))
-		      | _ -> usage ())
-		  else usage ()
-		in Pack.top ~recursive ~overwrite Sys.argv.(2)
-	      end
+	      Pack.top Sys.argv.(2)
 	    else usage ()
 	| "upgrade" ->
 	    let (upgrade_mode,default_branch) =
