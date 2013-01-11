@@ -44,7 +44,7 @@ let usage () =
   print_endline "   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite|depends|packages]";
   print_endline "   or: bf clone <specdir> [overwrite] [norec] [<ver> <rev>]";
   print_endline "   or: bf link <pkg-path> [symlink]";
-  print_endline "   or: bf top <specdir> [overwrite] [norec]";
+  print_endline "   or: bf top <specdir>";
   print_endline "   or: bf graph <specdir> [<ver> <rev>]";
   print_endline "   or: bf basegraph <specdir> [hard|soft]";
   print_endline "   or: bf tag <composite> <tag>";
