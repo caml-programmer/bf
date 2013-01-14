@@ -27,8 +27,6 @@
 - утилиту bf, производяую сборку компонтов,
   также хранящуюся в репозитории
 
-
-
 * Установка системы контроля версий *
 
 Система контроля версий git должна быть версии 1.5.x.y
@@ -44,122 +42,47 @@
 # make prefix=/opt/git
 # make prefix=/opt/git install
 
-
-
 * Подготовка сборочной среды, для сборки утилиты bf *
 
 Для сборки утилиты bf необходм компилятор языка
-Objective Caml и набор следующих пакетов к нему:
-pcre shell ocs ocamlnet.
-
-Наиболее простым способом установки компилятора
-и пакетов является использование GODI.
-
-Что такое GODI? Это система управления пакетами
-для компилятора Objective Caml, основанная на
-pkgsrc из NetBSD.
-
-Скачать godi-тарбол можно тут - http://godi.ocaml-programming.de
-
-Установка производится в две стадии:
-
-1) bootstrap.sh --prefix=/opt/godi
-
-Тут мы задем префикс для установки, традиционно используется
-/opt/godi, если необходимо, чтобы GODI был доступен всем
-пользователям системы, при необходимости ничто не мешает
-поставить его в своей домашний каталог.
-
-После завершения первой стадии небходимо установить
-переменные окружения PATH и MANPATH примерно следующим
-образом:
-
-echo 'export PATH=/opt/godi/bin:/opt/godi/sbin:$PATH' > /etc/profile.d/godi.sh
-echo 'export MANPATH=/opt/godi/man:$MANPATH' >> /etc/profile.d/godi.sh
-chmod +x /etc/profile.d/godi.sh
-
-2) bootstrap_stage2.sh
-
-На второй стадии потребуется подключение к Инетернет,
-хотя бы через прокси сервер, поэтому необходимо в таком
-случае заранее выставить переменные среды http_proxy и
-ftp_proxy для утилиты wget, которая используются
-по-умолчанию.
-
-Базовые настройки в GODI производятся в 
-файле: /opt/godi/etc/godi.conf
-
-После успешной установки в распоряжение
-должна появится утилита godi_console, с помощью,
-которой можно произовдить установку, переустановку
-и обновление пакетов.
-
-Если на момент сборки godi_console в системе не были
-установлены заголовочные файлы и библиотека ncurses,
-то пользоваться godi_console будет неудобно, поэтому
-после доустановки ncurses может потребоваться пересобрать
-godi_console. Сделать это можно следующим образом:
-
-# godi_console perform -build godi-tools
-
+Objective Caml >= 3.12 и программа make.
 
 * Установка утилиты bf *
 
-Для сборки потребуются следующие 
-модули: pcre shell ocs smtp
-
-Установить их можно следующим способом:
-
-# godi_console perform -build godi-pcre
-# godi_console perform -build godi-ocamlnet
-# godi_console perform -build godi-ocs
-
-Далее скачиваем исходики bf:
-
-git clone ssh://git@wiki.service.jet.msk.su/users/git/projects/bf.git bf.git
-
-или
+Скачиваем исходники bf:
 
 git clone http://caml.ru/repos/bf.git bf.git
 
-На caml.ru, bf реже обновляется, поэтому лучше брать
-с wiki.
-
-В отличии от godi_console, git использует
-curl для скачивания файлов, поэтому необходимые
-пременные окружения также должны быть выставлены.
+Утилита git использует curl для скачивания файлов, 
+поэтому необходимые пременные окружения также должны 
+быть выставлены.
 
 Переходим в катлог с исходными текстам и запускам сборку:
 
-cd bf.git
-./confgire /usr
-make opt
+ $ cd bf.git
+ $ ./configure [<prefix>]
+ $ make
+ $ su -c "make install"
+
+Если не указать <prefix> установка будет производиться в каталог /usr.
+Появятся следующие файлы:
+
+/usr/bin/bf
+/usr/bin/make-autologin
+/usr/bin/ssh-copy-id
 
 Смотрим что получилось:
 
-$ ldd ./bf 
-        linux-gate.so.1 =>  (0xffffe000)
-        librt.so.1 => /lib/librt.so.1 (0xb7f07000)
-        libpcre.so.0 => /lib/libpcre.so.0 (0xb7ee0000)
-        libm.so.6 => /lib/libm.so.6 (0xb7ebb000)
-        libdl.so.2 => /lib/libdl.so.2 (0xb7eb7000)
-        libc.so.6 => /lib/libc.so.6 (0xb7d86000)
-        libpthread.so.0 => /lib/libpthread.so.0 (0xb7d6e000)
-        /lib/ld-linux.so.2 (0xb7f23000)
+$ ldd /usr/bin/bf
+        linux-gate.so.1 =>  (0xb782c000)
+        libm.so.6 => /lib/i386-linux-gnu/i686/cmov/libm.so.6 (0xb77eb000)
+        libdl.so.2 => /lib/i386-linux-gnu/i686/cmov/libdl.so.2 (0xb77e7000)
+        libc.so.6 => /lib/i386-linux-gnu/i686/cmov/libc.so.6 (0xb7689000)
+        /lib/ld-linux.so.2 (0xb782d000)
 
-Получилось хорошо, главное следить, чтобы libpcre.so какая-нибудь 
-левая не подцепилась, иначе придется делать симлинки (в случае идентичных
-версий с разными названиями), либо пересобирать модуль pcre c нужной 
-libpcre.so.
-
-Производим установку утилиты bf в каталог /usr/bin:
-
-$ su -c "make install"
-
-
+Получилось хорошо, никаких лишних зависимостей.
 
 * Использование утилиты bf *
-
 
 Запуск утилиты bf без параметров выводит возможные варианты
 использования:
@@ -167,7 +90,7 @@ $ su -c "make install"
 Usage: bf (prepare|update|forward|[re]build|[re]install|status) <components>
    or: bf (prepare|update|forward|[re]build|[re]install|status) <component> [branch <branch> | tag <tag>]
    or: bf (prepare|update|forward|[re]build|[re]install|status) <composite> [<tag>]
-   or: bf (diff|changelog) <composite> <tag-a> <tag-b>
+   or: bf (diff|changelog) <composite> <tag-a> <tag-b> [compact]
    or: bf (diff|changelog) <specdir> <rev-a> <rev-b>
    or: bf review <composite> <since-date>
    or: bf pack <specdir> <version> <release>
@@ -181,8 +104,13 @@ Usage: bf (prepare|update|forward|[re]build|[re]install|status) <components>
    or: bf graph <specdir> [<ver> <rev>]
    or: bf basegraph <specdir> [hard|soft]
    or: bf tag <composite> <tag>
+   or: bf make (build|install) [<name>]
+   or: bf versions <pkgdir>
+   or: bf search <commit-id>
    or: bf shell
+   or: bf clean
    or: bf log
+   or: bf tests
 
 Где под <composite> подразумевается файл с определением функции composite,
 на языке Scheme, возвращающий список компонентов, над которым необходимо 
@@ -725,83 +653,11 @@ jet-detect/devel/version
 (send-file-over-ssh <local-source> <remote-destination>)
 
 Необходмо подложить ssh ключи, например с помощью
-такой утилиты:
+утилиты make-autologin, входящей в поставку bf.
 
-$ cat /usr/local/bin/make-autologin
-#!/bin/sh
+Запуск команды производим на машине, на которой должна
+запускаться send-file-over-ssh:
 
-if [ "$1" = "" ]; then
-    echo "Usage: make-autologin user@host"
-    exit 1
-fi
+ $ make-autologin user@host
 
-if [ ! -f "$HOME/.ssh/id_rsa.pub" ]; then
-    ssh-keygen -t rsa
-fi
-
-ssh-copy-id -i $HOME/.ssh/id_rsa.pub $1
-
-Если же в вашей системе нет утилиты ssh-copy-id, то
-можно её также положить в /usr/local/bin:
-
-$ cat /usr/bin/ssh-copy-id 
-#!/bin/sh
-
-# Shell script to install your identity.pub on a remote machine
-# Takes the remote machine name as an argument.
-# Obviously, the remote machine must accept password authentication,
-# or one of the other keys in your ssh-agent, for this to work.
-
-ID_FILE="${HOME}/.ssh/identity.pub"
-
-if [ "-i" = "$1" ]; then
-  shift
-  # check if we have 2 parameters left, if so the first is the new ID file
-  if [ -n "$2" ]; then
-    if expr "$1" : ".*\.pub" ; then
-      ID_FILE="$1"
-    else
-      ID_FILE="$1.pub"
-    fi
-    shift         # and this should leave $1 as the target name
-  fi
-else
-  if [ x$SSH_AUTH_SOCK != x ] ; then
-    GET_ID="$GET_ID ssh-add -L"
-  fi
-fi
-
-if [ -z "`eval $GET_ID`" ] && [ -r "${ID_FILE}" ] ; then
-  GET_ID="cat ${ID_FILE}"
-fi
-
-if [ -z "`eval $GET_ID`" ]; then
-  echo "$0: ERROR: No identities found" >&2
-  exit 1
-fi
-
-if [ "$#" -lt 1 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-  echo "Usage: $0 [-i [identity_file]] [user@]machine" >&2
-  exit 1
-fi
-
-{ eval "$GET_ID" ; } | ssh $1 "umask 077; test -d .ssh || mkdir .ssh ; cat >> .ssh/authorized_keys" || exit 1
-
-cat <<EOF
-Now try logging into the machine, with "ssh '$1'", and check in:
-
-  .ssh/authorized_keys
-
-to make sure we haven't added extra keys that you weren't expecting.
-
-EOF
-
-
-Ну а далее просто запускаем следующую команду на машине, 
-на которой должна запускаться send-file-over-ssh:
-
-$ make-autologin user@host
-
-Вводим пароль и всё работает.
-
-
+Вводим правильный пароль и всё работает.
