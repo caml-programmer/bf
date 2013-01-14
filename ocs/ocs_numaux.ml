@@ -178,8 +178,7 @@ let float_to_exact f =
   else
     let fb = Int64.bits_of_float f in
     let m = fb_get_m fb
-    and e = fb_get_e fb
-    and is_neg = fb_get_s fb in
+    and e = fb_get_e fb in (* and is_neg = fb_get_s fb in *)
     let bm = big_int_of_int64 m in
       if f_is_int m e then
 	begin
