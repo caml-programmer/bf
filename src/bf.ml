@@ -167,8 +167,8 @@ let main () =
 	      let specdir = Sys.argv.(2) in
 	      let version = Sys.argv.(3) in
 	      let release = Sys.argv.(4) in
-	      Pack.build_package
-		[specdir;version;release]
+	      Pack.build_package_file
+		(specdir,version,release)
 	    else usage ()
 	| "update" ->
 	    if len > 2 then
@@ -244,10 +244,10 @@ let main () =
 	    else
 	      begin
 		if len = 4 then
-		  with_lock (fun () -> Pack.pkg_clone Sys.argv.(2) Sys.argv.(3) "default")
+		  with_lock (fun () -> Pack.clone_by_pkgfile Sys.argv.(2) Sys.argv.(3) "default")
 		else
 		  if len = 5 then
-		    with_lock (fun () -> Pack.pkg_clone Sys.argv.(2) Sys.argv.(3) Sys.argv.(4))
+		    with_lock (fun () -> Pack.clone_by_pkgfile Sys.argv.(2) Sys.argv.(3) Sys.argv.(4))
 		  else
 		    usage ()
 	      end

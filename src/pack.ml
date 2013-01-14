@@ -908,565 +908,562 @@ let resolve_params find s =
       (try find k with Not_found -> s))
     s
 
-let build_package_impl ?(ready_spec=None) os platform args =
-  match args with
-    | [specdir;version;release] ->
-	let abs_specdir =
-	  if String.length specdir > 0 && specdir.[0] = '/' then
-	    specdir
-	  else
-	    Filename.concat (Sys.getcwd()) specdir
+let build_package_impl ?(ready_spec=None) os platform (specdir,version,release) =
+  let abs_specdir =
+    if String.length specdir > 0 && specdir.[0] = '/' then
+      specdir
+    else
+      Filename.concat (Sys.getcwd()) specdir
+  in
+  let with_specdir = Filename.concat abs_specdir in
+  let with_out s f =
+    let n = with_specdir s in
+    let ch = open_out n in
+    f (output_string ch);
+    close_out ch; n
+  in
+  (match get_version (with_specdir "version") with
+    | "1.0" ->
+	(match spec_from_v1 abs_specdir with
+	    [spec;files;findreq] ->
+	      let pkgname = 
+		Filename.basename specdir in
+	      let hookfile =
+		Filename.concat abs_specdir "hooks.scm" in
+	      let hooks =
+		if Sys.file_exists hookfile then
+		  Some hookfile
+		else None
+	      in build_over_rpmbuild
+		   (pkgname,platform,version,release,spec,files,findreq,hooks)
+	  | _-> assert false)
+    | "2.0" ->
+	let spec = 
+	  match ready_spec with
+	    | Some s -> s
+	    | None ->
+		spec_from_v2 ~version ~revision:release abs_specdir in
+	let bf_table = Hashtbl.create 32 in
+	let reg k =
+	  if Hashtbl.mem bf_table k then "" 
+	  else 
+	    begin
+	      Hashtbl.add bf_table k false;
+	      k
+	    end
 	in
-	let with_specdir = Filename.concat abs_specdir in
-	let with_out s f =
-	  let n = with_specdir s in
-	  let ch = open_out n in
-	  f (output_string ch);
-	  close_out ch; n
-	in
-	(match get_version (with_specdir "version") with
-	  | "1.0" ->
-	      (match spec_from_v1 abs_specdir with
-		  [spec;files;findreq] ->
-		    let pkgname = 
-		      Filename.basename specdir in
-		    let hookfile =
-		      Filename.concat abs_specdir "hooks.scm" in
-		    let hooks =
-		      if Sys.file_exists hookfile then
-			Some hookfile
-		      else None
-		    in build_over_rpmbuild
-			 (pkgname,platform,version,release,spec,files,findreq,hooks)
-		| _-> assert false)
-	  | "2.0" ->
-	      let spec = 
-		match ready_spec with
-		  | Some s -> s
+	let accumulate_lists add out =
+	  List.iter
+	    (fun c ->
+	      let name = c.name in
+	      let bf_list =
+		match c.rules with
+		  | Some alt ->
+		      Filename.concat name (sprintf ".bf-list.%s" alt)
 		  | None ->
-		      spec_from_v2 ~version ~revision:release abs_specdir in
-	      let bf_table = Hashtbl.create 32 in
-	      let reg k =
-		if Hashtbl.mem bf_table k then "" 
-		else 
-		  begin
-		    Hashtbl.add bf_table k false;
-		    k
-		  end
+		      Filename.concat name ".bf-list"
 	      in
-	      let accumulate_lists add out =
-		List.iter
-		  (fun c ->
-		    let name = c.name in
-		    let bf_list =
-		      match c.rules with
-			| Some alt ->
-			    Filename.concat name (sprintf ".bf-list.%s" alt)
-			| None ->
-			    Filename.concat name ".bf-list"
-		    in
-		    let rec add_with_check () =
-		      if Sys.file_exists bf_list then
-			add out bf_list
-		      else
-			(if Params.get_param "autopkg" <> "false" then
-			  begin
-			    log_message
-			      (sprintf "bf list for (%s) is not found -> need installing" name);
-			    let tag =
-			      let k =
-				mk_tag ((pkgname_of_specdir abs_specdir), version, (int_of_string release)) in
-			      let tag_exists = ref false in
-			      ignore(with_component_dir ~strict:false c
-				(fun () -> 
-				  tag_exists := List.mem k (Git.git_tag_list ())));
-			      if !tag_exists then
-				Some k
-			      else None
-			    in
-			    reinstall (with_tag tag [c]);
-			    add_with_check ()
-			  end
-			else
-			  log_error (sprintf "bf list for (%s) is not found. Check your .bf-params and other configurations." name))
-		    in add_with_check ())
-		  (List.filter
-		    (fun c -> c.pkg = None && (not c.nopack))
-		    spec.components)
-	      in
-
-	      print_depends spec.depends;
-	      check_composite_depends spec;
-	      
-	      let add_bf_list custom out file =
-		let ch = open_in file in
-		let rec read () =
-		  try
-		    out (custom (input_line ch));
-		    read ()
-		  with End_of_file -> close_in ch
-		in read ()
-	      in
-	      
-	      (match engine_of_platform platform with
-		| Rpm_build ->
-		    let custom_pkg_files =
-		      call_before_build
-			~pkgname:spec.pkgname ~version ~revision:release ~platform spec.hooks in
-		    
-		    let files =
-		      with_out "rpmbuild.files"
-			(fun out ->
-			  let make_rpm_line s =
-			    let l = String.length s in
-			    if l > 2 then			      
-			      (match s.[0] with
-				| 'd' -> reg (sprintf "%%dir %s\n" (String.sub s 2 (l - 2)))
-				| 'f' -> reg (sprintf "%s\n" (String.sub s 2 (l - 2)))
-				| _ -> "")
-			    else ""
-			  in
-			  accumulate_lists (add_bf_list make_rpm_line) out;
-			  List.iter (fun s -> out (make_rpm_line s))
-			    custom_pkg_files)
-		    in
-		    let findreq =
-		      with_out "rpmbuild.findreq"
-			(fun out -> 
-			  out "#!/bin/sh\n";
-			  List.iter 
-			    (fun (pkg_name,ov_opt,_) ->
-			      (match ov_opt with
-				| Some (op,ver) ->
-				    out (sprintf "echo \"%s %s %s\"\n"
-				      pkg_name (string_of_pkg_op op) ver)
-				| None ->
-				    out (sprintf "echo %s\n" pkg_name)))
-			    spec.depends;
-			  let freq =
-			    "/usr/lib/rpm/find-requires" in
-			  if Sys.file_exists freq then
-			    begin
-			      out "/usr/lib/rpm/find-requires";
-			      out "\\\n| grep -v ^$";
-			      List.iter
-				(fun reject ->
-				  out (sprintf "\\\n| sed -e 's#%s##'" reject))
-				spec.rejects
-			    end
-			  else
-			    log_message (sprintf "warning: %s is not found" freq))
-		    in
-		    let specify_provides l =
-		      if System.arch () = "x86_64" then
-			List.map
-			  (fun p ->
-			    if Pcre.pmatch ~rex:(Pcre.regexp "^lib") p then
-			      p ^ "()(64bit)"
-			    else p) l
-		      else l
-		    in		    
-		    let specfile =
-		      with_out "rpmbuild.spec"
-			(fun out ->
-			  let find_value = function
-			    | "topdir" -> Params.get_param "top-dir"
-			    | "prefix" -> Params.get_param "top-dir"
-			    | "name" -> spec.pkgname
-			    | "version" -> version
-			    | "release" -> release ^ "." ^ (string_of_platform platform)
-			    | "buildroot" -> "buildroot"
-			    | "provides" ->
-				String.concat ", " (specify_provides spec.provides)
-			    | "obsoletes" ->
-				String.concat ", " spec.obsoletes
-			    | k -> Hashtbl.find spec.params k
-			  in
-			  let gen_param k =
-			    (try
-			      out (sprintf "%s: %s\n" (rpm_key_format k) (find_value k))
-			    with Not_found -> ())
-			  in
-			  gen_param "summary";
-			  gen_param "name";
-			  gen_param "version";
-			  gen_param "release";
-			  gen_param "license";
-			  gen_param "vendor";
-			  gen_param "group";
-			  gen_param "url";
-			  gen_param "buildroot";
-			  gen_param "prefix";
-			  if spec.provides <> [] then
-			    gen_param "provides";
-			  if spec.obsoletes <> [] then
-			    gen_param "obsoletes";
-			  
-			  out "%define _use_internal_dependency_generator 0\n";
-			  out "%define __find_requires %findreq\n";
-			  out "%description\n";
-			  out "%files\n";
-			  out (sprintf "%%include %s\n" files);
-
-			  let oo s = out (resolve_params find_value s); out "\n" in
-			  
-			  (match spec.pre_install with
-			    | None -> ()
-			    | Some pre ->
-				out "%pre\n";
-				out "if [ \"$1\" = \"1\" ] ; then # first install\n";
-				out "echo -n\n";
-				oo pre;
-				out "fi\n";
-				(match spec.pre_update with
-				  | None -> ()
-				  | Some preup ->
-				      out "if [ \"$1\" = \"2\" ] ; then # update\n";
-				      out "echo -n\n";
-				      oo preup;
-				      out "fi\n"));
-			  (match spec.post_install with
-			    | None -> ()
-			    | Some post ->
-				out "%post\n";
-				oo post);
-			  (match spec.pre_uninstall with
-			    | None -> ()
-			    | Some preun ->
-				out "%preun\n";
-				out "if [ \"$1\" = \"0\" ] ; then # all versions deleted\n";
-				out "echo -n\n";
-				oo preun;
-				out "fi\n"))
-		    in
-		    
-		    build_over_rpmbuild 
-		      (spec.pkgname,platform,version,release,specfile,files,findreq,spec.hooks)
-		      
-		| Pkg_trans ->
-		    let custom_pkg_files =
-		      call_before_build
-			~pkgname:spec.pkgname ~version ~revision:release ~platform spec.hooks in
-		    
-		    let pkgtrans_key_format = String.uppercase in
-		    let find_value = function
-		      | "topdir" -> Params.get_param "top-dir"
-		      | "pkg" -> pkgtrans_name_format spec.pkgname
-		      | "arch" -> System.arch ()
-		      | "version" -> sprintf "%s-%s" version release
-		      | "category" -> Hashtbl.find spec.params "group"
-		      | "name" -> Hashtbl.find spec.params "summary"
-		      | k -> Hashtbl.find spec.params k
-		    in
-		    let _ =
-		      with_out "pkginfo"
-			(fun out -> 
-			  let gen_param k =
-			    (try
-			      out (sprintf "%s=%s\n" (pkgtrans_key_format k) (find_value k))
-			    with Not_found -> ())
-			  in
-			  gen_param "pkg";
-			  gen_param "arch";
-			  gen_param "name";
-			  gen_param "version";
-			  gen_param "vendor";
-			  gen_param "category";
-			  gen_param "email")
-		    in
-		    let _ =
-		      with_out "prototype"
-			(fun out ->
-			  let make_pkgtrans_line s =
-			    let l = String.length s in
-			    if l > 2 then
-			      (match s.[0] with
-				| 'd' ->
-				    let dir = String.sub s 2 (l - 2) in
-				    let mode = sprintf "%o" (Unix.stat dir).Unix.st_perm in
-				    reg (sprintf "d none %s %s root root\n" dir mode)
-				| 'f' -> 
-				    let file = String.sub s 2 (l - 2) in
-				    let mode = sprintf "%o" (Unix.stat file).Unix.st_perm in
-				    reg (sprintf "f none %s %s root root\n" file mode)
-				| _ -> "")
-			    else ""
-			  in
-			  let write_content name content =
-			    let file =
-			      Filename.concat abs_specdir name in
-			    out (sprintf "i %s=%s\n" name file);
-			    System.write_string
-			      ~file ~string:(resolve_params find_value content)
-			  in
-			  let make_depends depends =
-			    let b = Buffer.create 32 in
-			    let out = Buffer.add_string b in
-			    List.iter 
-			      (fun (pkg_name,_,pkg_desc_opt) ->
-				let pkg_desc =
-				  match pkg_desc_opt with
-				    | None -> pkg_name
-				    | Some s -> s
-				in out (sprintf "P %s %s\n" (pkgtrans_name_format pkg_name) pkg_desc))
-			      depends;
-			    Buffer.contents b
-			  in
-			  
-			  out (sprintf "i pkginfo=%s/pkginfo\n" abs_specdir);
-			  
-			  (match spec.pre_install with
-			    | None -> ()
-			    | Some content ->
-				(match spec.pre_update with
-				  | None ->
-				      write_content "preinstall" content
-				  | Some upd ->
-				      write_content "preinstall"
-					(content ^ "\n" ^  upd)));
-			  (match spec.post_install with
-			    | None -> ()
-			    | Some content ->
-				write_content "postinstall" content);
-			  (match spec.pre_uninstall with
-			    | None -> ()
-			    | Some content ->
-				write_content "preremove" content);
-			  (match spec.depends with
-			    | [] ->  ()
-			    | list ->
-				write_content "depend" (make_depends list));
-			  
-			  accumulate_lists (add_bf_list make_pkgtrans_line) out;
-			  List.iter (fun s -> out (make_pkgtrans_line s))
-			    custom_pkg_files)
-		    in
-			
-		    let pkg_spool = "/var/spool/pkg/" in
-		    let pkg_name = find_value "pkg" in
-		    let pkg_file = sprintf "%s-%s.%s.%s" 
-		      pkg_name (find_value "version")
-		      (string_of_platform platform)
-		      (find_value "arch")
-		    in
-		    let pkg_file_abs = Filename.concat pkg_spool pkg_file in
-		    let pkg_file_gz = pkg_file ^ ".gz" in
-		    
-		    Rules.remove_directory (Filename.concat pkg_spool pkg_name);
-
-		    with_dir abs_specdir
-		      (fun () ->
-			let root =
-			  match dest_dir () with
-			    | Some d -> d
-			    | None -> "/" in
-			log_command "pkgmk"
-			  ["-o";"-r";root];
-			log_command "pkgtrans" 
-			  ["-o";"-s";pkg_spool; pkg_file; pkg_name]);
-		    
-		    log_command "mv" ["-f";pkg_file_abs;"./"];
-		    (try Sys.remove pkg_file_gz with _ -> ());
-		    log_command "gzip" [pkg_file];
-		    call_after_build 
-		      ~location:(Sys.getcwd ())
-		      ~fullname:pkg_file_gz spec.hooks
-		| Deb_pkg ->
-		    let custom_pkg_files =
-		      call_before_build
-			~pkgname:spec.pkgname ~version ~revision:release ~platform spec.hooks in
-		    
-		    let make_debian_depends deps =
-		      let b = Buffer.create 32 in
-		      let add s =
-			if Buffer.length b = 0 then
-			  Buffer.add_string b s
-			else
-			  begin
-			    Buffer.add_string b ", ";
-			    Buffer.add_string b s
-			  end
+	      let rec add_with_check () =
+		if Sys.file_exists bf_list then
+		  add out bf_list
+		else
+		  (if Params.get_param "autopkg" <> "false" then
+		    begin
+		      log_message
+			(sprintf "bf list for (%s) is not found -> need installing" name);
+		      let tag =
+			let k =
+			  mk_tag ((pkgname_of_specdir abs_specdir), version, (int_of_string release)) in
+			let tag_exists = ref false in
+			ignore(with_component_dir ~strict:false c
+			  (fun () -> 
+			    tag_exists := List.mem k (Git.git_tag_list ())));
+			if !tag_exists then
+			  Some k
+			else None
 		      in
-		      List.iter
-			(fun (pkgname, ov_opt, _) ->
-			  match ov_opt with
-			    | Some (op,ver) ->
-				add (sprintf "%s (%s %s)" pkgname (string_of_pkg_op op) ver)
-			    | None ->
-				add pkgname)
-			deps;
-		      Buffer.contents b
+		      reinstall (with_tag tag [c]);
+		      add_with_check ()
+		    end
+		  else
+		    log_error (sprintf "bf list for (%s) is not found. Check your .bf-params and other configurations." name))
+	      in add_with_check ())
+	    (List.filter
+	      (fun c -> c.pkg = None && (not c.nopack))
+	      spec.components)
+	in
+
+	print_depends spec.depends;
+	check_composite_depends spec;
+	
+	let add_bf_list custom out file =
+	  let ch = open_in file in
+	  let rec read () =
+	    try
+	      out (custom (input_line ch));
+	      read ()
+	    with End_of_file -> close_in ch
+	  in read ()
+	in
+	
+	(match engine_of_platform platform with
+	  | Rpm_build ->
+	      let custom_pkg_files =
+		call_before_build
+		  ~pkgname:spec.pkgname ~version ~revision:release ~platform spec.hooks in
+	      
+	      let files =
+		with_out "rpmbuild.files"
+		  (fun out ->
+		    let make_rpm_line s =
+		      let l = String.length s in
+		      if l > 2 then			      
+			(match s.[0] with
+			  | 'd' -> reg (sprintf "%%dir %s\n" (String.sub s 2 (l - 2)))
+			  | 'f' -> reg (sprintf "%s\n" (String.sub s 2 (l - 2)))
+			  | _ -> "")
+		      else ""
 		    in
+		    accumulate_lists (add_bf_list make_rpm_line) out;
+		    List.iter (fun s -> out (make_rpm_line s))
+		      custom_pkg_files)
+	      in
+	      let findreq =
+		with_out "rpmbuild.findreq"
+		  (fun out -> 
+		    out "#!/bin/sh\n";
+		    List.iter 
+		      (fun (pkg_name,ov_opt,_) ->
+			(match ov_opt with
+			  | Some (op,ver) ->
+			      out (sprintf "echo \"%s %s %s\"\n"
+				pkg_name (string_of_pkg_op op) ver)
+			  | None ->
+			      out (sprintf "echo %s\n" pkg_name)))
+		      spec.depends;
+		    let freq =
+		      "/usr/lib/rpm/find-requires" in
+		    if Sys.file_exists freq then
+		      begin
+			out "/usr/lib/rpm/find-requires";
+			out "\\\n| grep -v ^$";
+			List.iter
+			  (fun reject ->
+			    out (sprintf "\\\n| sed -e 's#%s##'" reject))
+			  spec.rejects
+		      end
+		    else
+		      log_message (sprintf "warning: %s is not found" freq))
+	      in
+	      let specify_provides l =
+		if System.arch () = "x86_64" then
+		  List.map
+		    (fun p ->
+		      if Pcre.pmatch ~rex:(Pcre.regexp "^lib") p then
+			p ^ "()(64bit)"
+		      else p) l
+		else l
+	      in		    
+	      let specfile =
+		with_out "rpmbuild.spec"
+		  (fun out ->
 		    let find_value = function
 		      | "topdir" -> Params.get_param "top-dir"
-		      | "source" -> spec.pkgname
-		      | "package" -> spec.pkgname
-		      | "priority" -> "optional"
-		      | "maintainer" -> Hashtbl.find spec.params "email"
-		      | "architecture" -> fix_debian_arch (System.arch ())
-		      | "version" -> sprintf "%s-%s" version release
-		      | "section" -> Hashtbl.find spec.params "group"
-		      | "description" -> Hashtbl.find spec.params "summary"
-		      | "depends" -> make_debian_depends spec.depends
+		      | "prefix" -> Params.get_param "top-dir"
+		      | "name" -> spec.pkgname
+		      | "version" -> version
+		      | "release" -> release ^ "." ^ (string_of_platform platform)
+		      | "buildroot" -> "buildroot"
+		      | "provides" ->
+			  String.concat ", " (specify_provides spec.provides)
+		      | "obsoletes" ->
+			  String.concat ", " spec.obsoletes
 		      | k -> Hashtbl.find spec.params k
 		    in
-		    			
-		    let make_date () =
-		      let tm = Unix.localtime (Unix.time ()) in
-		      sprintf "%04d-%02d-%02d" 
-			(tm.Unix.tm_year + 1900)
-			(tm.Unix.tm_mon + 1)
-			(tm.Unix.tm_mday)
+		    let gen_param k =
+		      (try
+			out (sprintf "%s: %s\n" (rpm_key_format k) (find_value k))
+		      with Not_found -> ())
 		    in
+		    gen_param "summary";
+		    gen_param "name";
+		    gen_param "version";
+		    gen_param "release";
+		    gen_param "license";
+		    gen_param "vendor";
+		    gen_param "group";
+		    gen_param "url";
+		    gen_param "buildroot";
+		    gen_param "prefix";
+		    if spec.provides <> [] then
+		      gen_param "provides";
+		    if spec.obsoletes <> [] then
+		      gen_param "obsoletes";
 		    
-		    let make_deb_line s =
+		    out "%define _use_internal_dependency_generator 0\n";
+		    out "%define __find_requires %findreq\n";
+		    out "%description\n";
+		    out "%files\n";
+		    out (sprintf "%%include %s\n" files);
+
+		    let oo s = out (resolve_params find_value s); out "\n" in
+		    
+		    (match spec.pre_install with
+		      | None -> ()
+		      | Some pre ->
+			  out "%pre\n";
+			  out "if [ \"$1\" = \"1\" ] ; then # first install\n";
+			  out "echo -n\n";
+			  oo pre;
+			  out "fi\n";
+			  (match spec.pre_update with
+			    | None -> ()
+			    | Some preup ->
+				out "if [ \"$1\" = \"2\" ] ; then # update\n";
+				out "echo -n\n";
+				oo preup;
+				out "fi\n"));
+		    (match spec.post_install with
+		      | None -> ()
+		      | Some post ->
+			  out "%post\n";
+			  oo post);
+		    (match spec.pre_uninstall with
+		      | None -> ()
+		      | Some preun ->
+			  out "%preun\n";
+			  out "if [ \"$1\" = \"0\" ] ; then # all versions deleted\n";
+			  out "echo -n\n";
+			  oo preun;
+			  out "fi\n"))
+	      in
+	      
+	      build_over_rpmbuild 
+		(spec.pkgname,platform,version,release,specfile,files,findreq,spec.hooks)
+		
+	  | Pkg_trans ->
+	      let custom_pkg_files =
+		call_before_build
+		  ~pkgname:spec.pkgname ~version ~revision:release ~platform spec.hooks in
+	      
+	      let pkgtrans_key_format = String.uppercase in
+	      let find_value = function
+		| "topdir" -> Params.get_param "top-dir"
+		| "pkg" -> pkgtrans_name_format spec.pkgname
+		| "arch" -> System.arch ()
+		| "version" -> sprintf "%s-%s" version release
+		| "category" -> Hashtbl.find spec.params "group"
+		| "name" -> Hashtbl.find spec.params "summary"
+		| k -> Hashtbl.find spec.params k
+	      in
+	      let _ =
+		with_out "pkginfo"
+		  (fun out -> 
+		    let gen_param k =
+		      (try
+			out (sprintf "%s=%s\n" (pkgtrans_key_format k) (find_value k))
+		      with Not_found -> ())
+		    in
+		    gen_param "pkg";
+		    gen_param "arch";
+		    gen_param "name";
+		    gen_param "version";
+		    gen_param "vendor";
+		    gen_param "category";
+		    gen_param "email")
+	      in
+	      let _ =
+		with_out "prototype"
+		  (fun out ->
+		    let make_pkgtrans_line s =
 		      let l = String.length s in
 		      if l > 2 then
 			(match s.[0] with
 			  | 'd' ->
-			      let dir =
-				Filename.concat 
-				  (Filename.concat abs_specdir "debian")
-				  (System.strip_root (String.sub s 2 (l - 2))) in
-			      make_directory [dir];
-			  | 'f' ->
-			      let src = String.sub s 2 (l - 2) in
-			      let dst = Filename.concat 
-				(Filename.concat abs_specdir "debian") 
-				(System.strip_root src) in
-                              let dir = Filename.dirname dst in
-			      make_directory [dir];
-			      System.link_or_copy
-				(match dest_dir () with
-				  | Some d -> Filename.concat d src
-				  | None -> src) dst
-			  | _ -> ())
+			      let dir = String.sub s 2 (l - 2) in
+			      let mode = sprintf "%o" (Unix.stat dir).Unix.st_perm in
+			      reg (sprintf "d none %s %s root root\n" dir mode)
+			  | 'f' -> 
+			      let file = String.sub s 2 (l - 2) in
+			      let mode = sprintf "%o" (Unix.stat file).Unix.st_perm in
+			      reg (sprintf "f none %s %s root root\n" file mode)
+			  | _ -> "")
+		      else ""
 		    in
-		    let debian_home =
-		      Filename.concat abs_specdir "debian" in
-		    remove_directory debian_home;
-		    make_directory [debian_home];
-		    accumulate_lists (add_bf_list make_deb_line) (fun _ -> ());
-		    List.iter make_deb_line custom_pkg_files;
-		    		    
-		    let write_script name content =
+		    let write_content name content =
 		      let file =
-			Filename.concat
-			  (Filename.concat abs_specdir "debian/DEBIAN") name in
+			Filename.concat abs_specdir name in
+		      out (sprintf "i %s=%s\n" name file);
 		      System.write_string
-			~file ~string:(resolve_params find_value (sprintf "#!/bin/sh\n%s\n" content));
-		      Unix.chmod file 0o755
+			~file ~string:(resolve_params find_value content)
 		    in
-
-		    with_dir abs_specdir
-		      (fun () ->
-			let doc_location =
-			  sprintf "debian/usr/share/doc/%s" spec.pkgname in
-			let man_location =
-			  sprintf "debian/usr/share/man/man1" in
-			
-			make_directory [
-			  "debian/DEBIAN";
-			  man_location;
-			  doc_location;
-			];
-			
-			(match spec.pre_install with
-			  | None -> ()
-			  | Some content ->
-			      (match spec.pre_update with
-				| None ->
-				    write_script "preinst" content
-				| Some upd ->
-				    write_script "preinst" (content ^ "\n" ^  upd)));
-			(match spec.post_install with
-			  | None -> ()
-			  | Some content ->
-			      write_script "postinst" content);
-			(match spec.pre_uninstall with
-			  | None -> ()
-			  | Some content ->
-			      write_script "prerm" content);
-
-			let _ =
-			  with_out (Filename.concat doc_location "copyright")
-			    (fun out ->
-			      out (find_value "email"))
-			in			
-			let manpage =
-			  with_out
-			    (Filename.concat man_location (spec.pkgname ^ ".1"))
-			    (fun out ->
-			      out (sprintf ".TH %s 1 \"%s\"\n" spec.pkgname (make_date ()));
-			      out ".SH NAME\n";
-			      out (sprintf "%s - debian package\n" spec.pkgname);
-			      out ".SH DESCRIPTION\n";
-			      out (find_value "description");
-			      out "\n";
-			      out ".SH AUTHOR\n";
-			      out (find_value "email");
-			      out "\n")
-			in
-			let _ =
-			  with_out "debian/DEBIAN/control"
-			    (fun out ->
-			      let gen_param k =
-				(try
-				  out (sprintf "%s: %s\n" (rpm_key_format k) (find_value k))
-				with Not_found -> ())
-			      in
-			      gen_param "source";
-			      gen_param "section";
-			      gen_param "priority";
-			      gen_param "maintainer";
-			      gen_param "version";
-			      gen_param "package";
-			      gen_param "architecture";
-			      gen_param "depends";
-			      gen_param "description";
-			      out
-				(" " ^ (find_value "description") ^ "\n"))
-			in
-			let changelog =
-			  with_out (Filename.concat doc_location "changelog")
-			    (fun out ->
-			      out (sprintf "%s (%s-%s) unstable; urgency=low\n" spec.pkgname version release);
-			      out "\n";
-			      out " * Current Release.\n";
-			      out "\n";
-			      out
-				(sprintf "-- %s %s\n" 
-				  (find_value "email")
-				  (List.hd (System.read_lines "date -R"))))
-			in
-			let changelog_deb =
-			  with_out (Filename.concat doc_location "changelog.Debian")
-			    (fun out ->
-			      out (sprintf "%s (%s-%s) unstable; urgency=low\n" spec.pkgname version release);
-			      out "\n";
-			      out " * Current Release.\n";
-			      out "\n";
-			      out
-				(sprintf "-- %s %s\n"
-				  (find_value "email")
-				  (List.hd (System.read_lines "date -R"))))
-			in
-			
-			log_command "gzip" ["--best";manpage];
-		    	log_command "gzip" ["--best";changelog];
-			log_command "gzip" ["--best";changelog_deb];
-			log_command "fakeroot" ["dpkg-deb";"--build";"debian"]);
+		    let make_depends depends =
+		      let b = Buffer.create 32 in
+		      let out = Buffer.add_string b in
+		      List.iter 
+			(fun (pkg_name,_,pkg_desc_opt) ->
+			  let pkg_desc =
+			    match pkg_desc_opt with
+			      | None -> pkg_name
+			      | Some s -> s
+			  in out (sprintf "P %s %s\n" (pkgtrans_name_format pkg_name) pkg_desc))
+			depends;
+		      Buffer.contents b
+		    in
 		    
-		    let pkgfile =
-		      sprintf "%s-%s-%s.%s.deb" 
-			spec.pkgname version release (fix_debian_arch (System.arch ())) in
-		    log_command
-		      "mv" [(Filename.concat abs_specdir "debian.deb");pkgfile])
-	  | version ->
-	      raise (Unsupported_specdir_version version))
-    | _ -> log_error "build_rh_package: wrong arguments"
+		    out (sprintf "i pkginfo=%s/pkginfo\n" abs_specdir);
+		    
+		    (match spec.pre_install with
+		      | None -> ()
+		      | Some content ->
+			  (match spec.pre_update with
+			    | None ->
+				write_content "preinstall" content
+			    | Some upd ->
+				write_content "preinstall"
+				  (content ^ "\n" ^  upd)));
+		    (match spec.post_install with
+		      | None -> ()
+		      | Some content ->
+			  write_content "postinstall" content);
+		    (match spec.pre_uninstall with
+		      | None -> ()
+		      | Some content ->
+			  write_content "preremove" content);
+		    (match spec.depends with
+		      | [] ->  ()
+		      | list ->
+			  write_content "depend" (make_depends list));
+		    
+		    accumulate_lists (add_bf_list make_pkgtrans_line) out;
+		    List.iter (fun s -> out (make_pkgtrans_line s))
+		      custom_pkg_files)
+	      in
+	      
+	      let pkg_spool = "/var/spool/pkg/" in
+	      let pkg_name = find_value "pkg" in
+	      let pkg_file = sprintf "%s-%s.%s.%s" 
+		pkg_name (find_value "version")
+		(string_of_platform platform)
+		(find_value "arch")
+	      in
+	      let pkg_file_abs = Filename.concat pkg_spool pkg_file in
+	      let pkg_file_gz = pkg_file ^ ".gz" in
+	      
+	      Rules.remove_directory (Filename.concat pkg_spool pkg_name);
 
-let build_package ?(ready_spec=None) args =
+	      with_dir abs_specdir
+		(fun () ->
+		  let root =
+		    match dest_dir () with
+		      | Some d -> d
+		      | None -> "/" in
+		  log_command "pkgmk"
+		    ["-o";"-r";root];
+		  log_command "pkgtrans" 
+		    ["-o";"-s";pkg_spool; pkg_file; pkg_name]);
+	      
+	      log_command "mv" ["-f";pkg_file_abs;"./"];
+	      (try Sys.remove pkg_file_gz with _ -> ());
+	      log_command "gzip" [pkg_file];
+	      call_after_build 
+		~location:(Sys.getcwd ())
+		~fullname:pkg_file_gz spec.hooks
+	  | Deb_pkg ->
+	      let custom_pkg_files =
+		call_before_build
+		  ~pkgname:spec.pkgname ~version ~revision:release ~platform spec.hooks in
+	      
+	      let make_debian_depends deps =
+		let b = Buffer.create 32 in
+		let add s =
+		  if Buffer.length b = 0 then
+		    Buffer.add_string b s
+		  else
+		    begin
+		      Buffer.add_string b ", ";
+		      Buffer.add_string b s
+		    end
+		in
+		List.iter
+		  (fun (pkgname, ov_opt, _) ->
+		    match ov_opt with
+		      | Some (op,ver) ->
+			  add (sprintf "%s (%s %s)" pkgname (string_of_pkg_op op) ver)
+		      | None ->
+			  add pkgname)
+		  deps;
+		Buffer.contents b
+	      in
+	      let find_value = function
+		| "topdir" -> Params.get_param "top-dir"
+		| "source" -> spec.pkgname
+		| "package" -> spec.pkgname
+		| "priority" -> "optional"
+		| "maintainer" -> Hashtbl.find spec.params "email"
+		| "architecture" -> fix_debian_arch (System.arch ())
+		| "version" -> sprintf "%s-%s" version release
+		| "section" -> Hashtbl.find spec.params "group"
+		| "description" -> Hashtbl.find spec.params "summary"
+		| "depends" -> make_debian_depends spec.depends
+		| k -> Hashtbl.find spec.params k
+	      in
+	      
+	      let make_date () =
+		let tm = Unix.localtime (Unix.time ()) in
+		sprintf "%04d-%02d-%02d" 
+		  (tm.Unix.tm_year + 1900)
+		  (tm.Unix.tm_mon + 1)
+		  (tm.Unix.tm_mday)
+	      in
+	      
+	      let make_deb_line s =
+		let l = String.length s in
+		if l > 2 then
+		  (match s.[0] with
+		    | 'd' ->
+			let dir =
+			  Filename.concat 
+			    (Filename.concat abs_specdir "debian")
+			    (System.strip_root (String.sub s 2 (l - 2))) in
+			make_directory [dir];
+		    | 'f' ->
+			let src = String.sub s 2 (l - 2) in
+			let dst = Filename.concat 
+			  (Filename.concat abs_specdir "debian") 
+			  (System.strip_root src) in
+                        let dir = Filename.dirname dst in
+			make_directory [dir];
+			System.link_or_copy
+			  (match dest_dir () with
+			    | Some d -> Filename.concat d src
+			    | None -> src) dst
+		    | _ -> ())
+	      in
+	      let debian_home =
+		Filename.concat abs_specdir "debian" in
+	      remove_directory debian_home;
+	      make_directory [debian_home];
+	      accumulate_lists (add_bf_list make_deb_line) (fun _ -> ());
+	      List.iter make_deb_line custom_pkg_files;
+	      
+	      let write_script name content =
+		let file =
+		  Filename.concat
+		    (Filename.concat abs_specdir "debian/DEBIAN") name in
+		System.write_string
+		  ~file ~string:(resolve_params find_value (sprintf "#!/bin/sh\n%s\n" content));
+		Unix.chmod file 0o755
+	      in
+
+	      with_dir abs_specdir
+		(fun () ->
+		  let doc_location =
+		    sprintf "debian/usr/share/doc/%s" spec.pkgname in
+		  let man_location =
+		    sprintf "debian/usr/share/man/man1" in
+		  
+		  make_directory [
+		    "debian/DEBIAN";
+		    man_location;
+		    doc_location;
+		  ];
+		  
+		  (match spec.pre_install with
+		    | None -> ()
+		    | Some content ->
+			(match spec.pre_update with
+			  | None ->
+			      write_script "preinst" content
+			  | Some upd ->
+			      write_script "preinst" (content ^ "\n" ^  upd)));
+		  (match spec.post_install with
+		    | None -> ()
+		    | Some content ->
+			write_script "postinst" content);
+		  (match spec.pre_uninstall with
+		    | None -> ()
+		    | Some content ->
+			write_script "prerm" content);
+
+		  let _ =
+		    with_out (Filename.concat doc_location "copyright")
+		      (fun out ->
+			out (find_value "email"))
+		  in			
+		  let manpage =
+		    with_out
+		      (Filename.concat man_location (spec.pkgname ^ ".1"))
+		      (fun out ->
+			out (sprintf ".TH %s 1 \"%s\"\n" spec.pkgname (make_date ()));
+			out ".SH NAME\n";
+			out (sprintf "%s - debian package\n" spec.pkgname);
+			out ".SH DESCRIPTION\n";
+			out (find_value "description");
+			out "\n";
+			out ".SH AUTHOR\n";
+			out (find_value "email");
+			out "\n")
+		  in
+		  let _ =
+		    with_out "debian/DEBIAN/control"
+		      (fun out ->
+			let gen_param k =
+			  (try
+			    out (sprintf "%s: %s\n" (rpm_key_format k) (find_value k))
+			  with Not_found -> ())
+			in
+			gen_param "source";
+			gen_param "section";
+			gen_param "priority";
+			gen_param "maintainer";
+			gen_param "version";
+			gen_param "package";
+			gen_param "architecture";
+			gen_param "depends";
+			gen_param "description";
+			out
+			  (" " ^ (find_value "description") ^ "\n"))
+		  in
+		  let changelog =
+		    with_out (Filename.concat doc_location "changelog")
+		      (fun out ->
+			out (sprintf "%s (%s-%s) unstable; urgency=low\n" spec.pkgname version release);
+			out "\n";
+			out " * Current Release.\n";
+			out "\n";
+			out
+			  (sprintf "-- %s %s\n" 
+			    (find_value "email")
+			    (List.hd (System.read_lines "date -R"))))
+		  in
+		  let changelog_deb =
+		    with_out (Filename.concat doc_location "changelog.Debian")
+		      (fun out ->
+			out (sprintf "%s (%s-%s) unstable; urgency=low\n" spec.pkgname version release);
+			out "\n";
+			out " * Current Release.\n";
+			out "\n";
+			out
+			  (sprintf "-- %s %s\n"
+			    (find_value "email")
+			    (List.hd (System.read_lines "date -R"))))
+		  in
+		  
+		  log_command "gzip" ["--best";manpage];
+		  log_command "gzip" ["--best";changelog];
+		  log_command "gzip" ["--best";changelog_deb];
+		  log_command "fakeroot" ["dpkg-deb";"--build";"debian"]);
+	      
+	      let pkgfile =
+		sprintf "%s-%s-%s.%s.deb" 
+		  spec.pkgname version release (fix_debian_arch (System.arch ())) in
+	      log_command
+		"mv" [(Filename.concat abs_specdir "debian.deb");pkgfile])
+    | version ->
+	raise (Unsupported_specdir_version version))
+
+let build_package_file ?(ready_spec=None) args =
   with_platform
     (fun os platfrom ->
       build_package_impl ~ready_spec os platfrom args)
@@ -1526,30 +1523,23 @@ let package_build (specdir,ver,rev,spec) =
       (* выкидываем pack-компонент, чтобы не было ненужных checkout'ов в pack'e *)
       (List.filter (fun c -> c.name <> "pack") components)));
   (try
-    build_package ~ready_spec:(Some spec) [specdir;ver;string_of_int rev];
+    build_package_file ~ready_spec:(Some spec) (specdir,ver,string_of_int rev);
   with
     | Permanent_error s -> log_error s;
     | exn -> log_error (Printexc.to_string exn));
   true
 
-let package_update ?ready_spec ~specdir ?(use_external=true) ?(check_pack=true) ?(check_fs=false) ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
+let package_update ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
   let specdir = System.path_strip_directory specdir in
-
   check_specdir specdir;
   if check_pack then
     check_pack_component ();
 
   let pkgname = pkgname_of_specdir specdir in
   let branch = branch_of_specdir specdir in
-  let clone_mode =
-    match ready_spec with None -> false | _ -> true in
 
   let have_pack_changes =
-    if clone_mode then
-      false
-    else
-      pack_changes specdir (make_component ~label:(Branch "master") "pack")
-  in
+    pack_changes specdir (make_component ~label:(Branch "master") "pack") in
 
   let conv_revision r =
     try int_of_string r with _ -> raise (Revision_must_be_digital r) in
@@ -1586,8 +1576,7 @@ let package_update ?ready_spec ~specdir ?(use_external=true) ?(check_pack=true) 
 	let rex = Pcre.regexp pat in
 	not (List.exists (Pcre.pmatch ~rex) (System.list_of_directory "."))
       end
-    else false
-  in
+    else false in
 
   let tag =
     (pkgname,version,revision) in
@@ -1595,39 +1584,23 @@ let package_update ?ready_spec ~specdir ?(use_external=true) ?(check_pack=true) 
   let prev_tag =
     if revision > 0 then
       Some (pkgname,version,(pred revision))
-    else None
-  in
+    else None in
   
-  let with_filter l =
-    if use_external then l
-    else only_local l
-  in
-
   let components =    
-    with_filter
-      (match ready_spec with
-	| None ->
-	    let composite =
-	      Filename.concat specdir "composite" in
-	    (Rules.components_of_composite composite)
-	| Some spec -> spec.components)
-  in
+    let l =
+      Rules.components_of_composite 
+	(Filename.concat specdir "composite") in
+    if Params.get_param "use-external" = "true" 
+    then l else only_local l in
   
   let have_composite_changes =
-    match ready_spec with
-      | None ->
-	  update components
-      | _ -> 
-	  List.iter fetch_tags components;
-	  false
-  in
+    update components in
   
   let have_external_components_changes =
     List.exists
       (fun component -> 
 	Hashtbl.mem reinstalled_components component.name)
-      (only_external components)
-  in
+      (only_external components) in
 
   let add_reinstall c =
     Hashtbl.replace reinstalled_components c.name false in
@@ -1661,8 +1634,7 @@ let package_update ?ready_spec ~specdir ?(use_external=true) ?(check_pack=true) 
 	(List.filter (fun c -> c.name <> "pack") components)));
     
     (try
-      build_package ~ready_spec
-	[specdir;version;string_of_int revision];
+      build_package_file (specdir,version,string_of_int revision);
       if not !custom_revision && not prev then
 	ignore(reg_pkg_release specdir version revision)
     with
@@ -1805,43 +1777,6 @@ let list_of_deptree tree =
 let rec map_deptree f = function
   | Dep_val (x, tree) -> Dep_val (f x, map_deptree f tree)
   | Dep_list l -> Dep_list (List.map (map_deptree f) l)
-
-(*
-let resort_depends l =
-  let compare (pa,da,_) (pb,db,_) =
-    let r = compare db da in
-    if r = 0 then
-      compare pb pa
-    else r
-  in
-  let a =
-    Array.mapi
-      (fun pos (e,depth) ->
-	(pos,depth,e))
-      (Array.of_list l)
-  in Array.sort compare a;
-  List.map
-    (fun (_,_,e) -> e)
-    (Array.to_list a)
-
-let max_uniquely l =
-  let m = Hashtbl.create 32 in
-  List.iter (fun (k,v) ->
-    try
-      let c = Hashtbl.find m k in
-      if v > c then
-	Hashtbl.replace m k v
-    with Not_found -> Hashtbl.add m k v) l;
-  let t = Hashtbl.create 32 in
-  List.filter
-    (fun (k,v) ->
-      if Hashtbl.mem t k then
-	false
-      else
-	if Hashtbl.find m k = v then
-	  (Hashtbl.add t k v; true)
-	else false) l
-*)
 
 (* Clone suport *)
 
@@ -2169,7 +2104,7 @@ let rec download_packages userhost l =
 	sprintf "%s:%s" userhost e.pkg_path in
       Rules.send_file_over_ssh src ".") l
 
-let pkg_clone userhost pkg_path mode =
+let clone_by_pkgfile userhost pkg_path mode =
   let overwrite = mode <> "default" in
   let depends =
     deptree_of_package ~userhost pkg_path in
@@ -2571,9 +2506,6 @@ let upgrade specdir upgrade_mode default_branch =
     else
       (true,dep_paths)
   in
-
-  let use_external =
-    Params.get_param "use-external" = "true" in
   
   let complete_impl check_fs_packages =
     List.iter
@@ -2586,7 +2518,6 @@ let upgrade specdir upgrade_mode default_branch =
 	  package_update
 	    ~specdir
 	    ~lazy_mode
-	    ~use_external
 	    ~check_pack:false
 	    ~check_fs:check_fs_packages
 	    ~interactive:true ()
