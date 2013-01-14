@@ -1,2 +1,2 @@
-<*.ml> : package(pcre,unix)
-<bf.native> : package(pcre,unix,num,str)
+<*.ml> : package(unix)
+<bf.native> : package(unix,num,str)

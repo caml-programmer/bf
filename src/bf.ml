@@ -54,6 +54,7 @@ let usage () =
   print_endline "   or: bf shell";
   print_endline "   or: bf clean";
   print_endline "   or: bf log";
+  print_endline "   or: bf tests";
   exit 1
 
 let make_int s =
@@ -370,7 +371,9 @@ let main () =
 	    if len = 3 then
 	      with_lock (fun () ->
 		Pack.search Sys.argv.(2))
-	    else usage ()	      
+	    else usage ()
+	| "tests" ->
+	    Tests.run ()
 	| _ ->
 	    analyze ()
     else usage ()

@@ -123,7 +123,7 @@ let rec select_platforms acc = function
 	  let s = System.read_file ~file in
 	  let l = 
 	    List.filter
-	      (fun (pat,_) -> Pcre.pmatch ~pat s) mapping in
+	      (fun (pat,_) -> Pcre.pmatch ~rex:(Pcre.regexp pat) s) mapping in
 	  (match l with
 	    | (_,platform)::_ -> 
 		select_platforms (acc @ [platform]) tl
@@ -252,12 +252,9 @@ let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
   let parse_line s =
     let make_path s =
       let n =
-	Pcre.replace ~pat:"%dir " ~templ:""
-	  (Pcre.replace ~pat:"%topdir" ~templ:top_dir
-	    (Pcre.replace
-	      ~pat:"%config\\(noreplace\\) %topdir"
-	      ~templ:top_dir s))
-      in 
+	  Strings.substring_replace ("%dir ","")
+	  (Strings.substring_replace ("%topdir",top_dir)
+	    (Strings.substring_replace ("%config\\(noreplace\\) %topdir",top_dir) s)) in
       let m = 
 	let l = String.length n in
 	if l > 0 && n.[0] = '/' then
@@ -904,7 +901,7 @@ let rpm_key_format s =
     
 let resolve_params find s =
   Pcre.substitute
-    ~pat:"%\\(.*?\\)"
+    ~rex:(Pcre.regexp "%\\(.*?\\)")
     ~subst:(fun s ->
       let l = String.length s in
       let k = String.sub s 2 (l - 3) in
@@ -1064,7 +1061,7 @@ let build_package_impl ?(ready_spec=None) os platform args =
 		      if System.arch () = "x86_64" then
 			List.map
 			  (fun p ->
-			    if Pcre.pmatch ~pat:"^lib" p then
+			    if Pcre.pmatch ~rex:(Pcre.regexp "^lib") p then
 			      p ^ "()(64bit)"
 			    else p) l
 		      else l
@@ -1553,8 +1550,10 @@ let update ?ready_spec ~specdir ?(use_external=true) ?(check_pack=true) ?(check_
   let have_fs_changes =
     if check_fs then
       begin
-	let pat = sprintf "%s-%s-%d" pkgname version (pred revision) in
-	not (List.exists (Pcre.pmatch ~pat) (System.list_of_directory "."))
+	let pat = 
+	  sprintf "%s-%s-%d" pkgname version (pred revision) in
+	let rex = Pcre.regexp pat in
+	not (List.exists (Pcre.pmatch ~rex) (System.list_of_directory "."))
       end
     else false
   in
@@ -1933,10 +1932,10 @@ let extract_packbranch ~userhost pkg_path =
   match
     (match userhost with
       | Some auth ->
-	  (System.read_lines ~filter:(Pcre.pmatch ~pat:"packbranch-")
+	  (System.read_lines ~filter:(Pcre.pmatch ~rex:(Pcre.regexp "packbranch-"))
 	    (sprintf "ssh %s rpm -qp --provides %s" auth pkg_path))
       | None ->
-	  (System.read_lines ~filter:(Pcre.pmatch ~pat:"packbranch-")
+	  (System.read_lines ~filter:(Pcre.pmatch ~rex:(Pcre.regexp "packbranch-"))
 	    (sprintf "rpm -qp --provides %s" pkg_path)))
   with [] -> raise (Pack_branch_is_not_found pkg_path)
     | hd::_ ->
@@ -1980,7 +1979,7 @@ let extract_depend_list ~userhost pkg_path =
 	      (pkg_name,None,None)::acc
 	    with Not_found -> acc))) []
       (System.read_lines
-	~filter:(Pcre.pmatch ~pat:(sprintf "^%s" (Params.get_param "pkg-prefix")))
+	~filter:(Pcre.pmatch ~rex:(Pcre.regexp (sprintf "^%s" (Params.get_param "pkg-prefix"))))
 	(match userhost with
 	  | Some auth ->
 	      (sprintf "ssh %s rpm -qRp %s" auth pkg_path)
@@ -2224,7 +2223,7 @@ let rec get_pack_depends ~default_branch table acc specdir =
   match
     (List.fold_left
       (fun acc (pkg,_,_) ->
-	if Hashtbl.mem table pkg || not (Pcre.pmatch ~pat:(sprintf "^%s" (Params.get_param "pkg-prefix")) pkg) then
+	if Hashtbl.mem table pkg || not (Pcre.pmatch ~rex:(Pcre.regexp (sprintf "^%s" (Params.get_param "pkg-prefix"))) pkg) then
 	  acc
 	else
 	  begin
@@ -2287,7 +2286,7 @@ let deptree_of_pack ~default_branch specdir : pack_tree =
 	  let depends =
 	    List.fold_left (fun acc (pkg,vr_opt,_) ->
 	      try
-		if Pcre.pmatch ~pat:(sprintf "^%s" (Params.get_param "pkg-prefix")) pkg then
+		if Pcre.pmatch ~rex:(Pcre.regexp (sprintf "^%s" (Params.get_param "pkg-prefix"))) pkg then
 		  let new_specdir =
 		    specdir_of_pkg ~default_branch pkgdir pkg in
 		  let new_value =
@@ -2648,8 +2647,9 @@ let clone ?(vr=None) ~recursive ~overwrite specdir =
   stop_delay 5;
   
   let pkg_exists specdir ver rev =
-    let pat = sprintf "%s\\-%s\\-%d\\." (pkgname_of_specdir specdir) ver rev in
-    List.exists (Pcre.pmatch ~pat) (System.list_of_directory ".")
+    let rex =
+      Pcre.regexp (sprintf "%s\\-%s\\-%d\\." (pkgname_of_specdir specdir) ver rev) in
+    List.exists (Pcre.pmatch ~rex) (System.list_of_directory ".")
   in
   
   let use_external =
@@ -2830,7 +2830,7 @@ let fork ?(depth=0) top_specdir src dst =
     List.map
       (fun (os,deplist) ->
 	os,(List.map (fun (pkgname,ov_opt,pkg_desc_opt) ->
-	  if Pcre.pmatch ~pat:(sprintf "^%s" (Params.get_param "pkg-prefix")) pkgname then
+	  if Pcre.pmatch ~rex:(Pcre.regexp (sprintf "^%s" (Params.get_param "pkg-prefix"))) pkgname then
 	    (pkgname,(change pkgname ov_opt),pkg_desc_opt)
 	  else
 	    (pkgname,ov_opt,pkg_desc_opt)) deplist))

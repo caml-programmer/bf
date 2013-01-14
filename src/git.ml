@@ -365,7 +365,7 @@ let check_component_url url name =
 
 let git_create_url component =
   let s = Params.get_param "git-url" in
-  match Pcre.split ~pat:"\\s+" s with
+  match Pcre.split (Re.compile (Re.rep1 Re.space)) s with
     | [] -> raise Invalid_url
     | [one] -> one
     | list ->

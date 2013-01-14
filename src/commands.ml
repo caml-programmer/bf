@@ -1009,19 +1009,15 @@ let scm_write_scheme_value src dst =
   Snull
     
 let scm_substring templ s =
-  if Pcre.pmatch ~pat:(Scheme.string_of_sval templ) (Scheme.string_of_sval s)
+  if Pcre.pmatch ~rex:(Pcre.regexp (Scheme.string_of_sval templ)) (Scheme.string_of_sval s)
   then Strue
   else Sfalse
 
 let scm_substrings templ s =
-  scm_make_list
-    (function
-      | None   -> Sstring ""
-      | Some s -> Sstring s)
-    (Array.to_list
-      (Pcre.extract_opt
-	~pat:(Scheme.string_of_sval templ)
-	(Scheme.string_of_sval s)))
+  let rex = 
+    Re_perl.compile_pat (Scheme.string_of_sval templ) in
+  scm_make_list (fun x -> Sstring x)
+    (Array.to_list (Re.get_all (Re.exec rex (Scheme.string_of_sval s))))
 
 let scm_env_append v =
   match Scheme.string_list_of_sval_array v with

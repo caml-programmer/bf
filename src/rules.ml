@@ -164,9 +164,19 @@ let install_rules ?(check_build=true) name =
 
 (*** Component rules *)
 
+let split re s =
+  let rec make acc pos =
+    try
+      let (a,b) =
+	Re.get_ofs (Re.exec ~pos re s) 0 in
+      Printf.printf "a:%d\nb:%d\npos:%d\n%!" a b pos;
+      make ((String.sub s pos a)::acc) b
+    with Not_found -> acc
+  in make [] 0
+  
 let split_by_space s =
-  Pcre.split ~pat:"\\s+" s
-
+  split (Re.compile (Re.rep1 Re.space)) s
+  
 let add_make_opts v =
   (split_by_space
     (try
@@ -284,16 +294,17 @@ let read_command cmd =
   System.read_lines ~env:(Env.component ()) cmd
 
 let replace_param key value content =
-  let key = String.uppercase key in
-  let rex =
-    Pcre.regexp 
-      ~flags:[`MULTILINE] ("^" ^ key ^ "\\s*=.*?$")
-  in Pcre.replace 
-       ~rex 
-       ~templ:(key ^ "=" ^ 
-       (match value with 
-	 | Some v -> v 
-	 | None -> "")) content
+  let replace line =
+    if Re.execp (Re_perl.compile_pat ("^" ^ key ^ "\\s*=.*?$")) line then
+      (key ^ "=" ^
+      (match value with
+	| Some v -> v
+	| None -> ""))
+    else
+      line
+  in String.concat "\n"
+       (List.map replace
+	 (Strings.split '\n' content))
 
 let rec replace_params content = function
   | [] -> content

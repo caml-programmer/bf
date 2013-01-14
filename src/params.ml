@@ -6,14 +6,16 @@ exception Unknown_parameter of string
 
 let read_from_file filename =
   let params = Hashtbl.create 32 in
-  let rex = Pcre.regexp "^([^\\s]+)\\s+(.*)$" in
+  let rex = Re_perl.compile_pat "^([^\\s]+)\\s+(.*)$" in
   let ch = open_in filename in
   List.iter
     (fun s ->
-      if Pcre.pmatch ~rex s then
-	let a =
-	  Pcre.extract ~rex s
-	in Hashtbl.replace params a.(1) a.(2))
+      try
+	let res = Re.exec rex s in
+	Hashtbl.replace params
+	  (Re.get res 0) 
+	  (Re.get res 1)
+      with Not_found -> ())
     (list_of_channel ch);
   params  
 
