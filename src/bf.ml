@@ -196,7 +196,7 @@ let main () =
 	      in
 	      if Sys.file_exists version then
 		with_lock (fun () ->
-		  ignore (Pack.update ~specdir ~lazy_mode ~ver ~rev ()))
+		  ignore (Pack.package_update ~specdir ~lazy_mode ~ver ~rev ()))
 	      else
 		analyze ()
 	    else

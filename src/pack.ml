@@ -1501,7 +1501,38 @@ let check_pack_component () =
 let reinstalled_components = (* for update and upgrade actions *)
   Hashtbl.create 32;;
 
-let update ?ready_spec ~specdir ?(use_external=true) ?(check_pack=true) ?(check_fs=false) ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
+exception Cannot_build_package of string
+
+let package_build (specdir,ver,rev,spec) =
+  let specdir =
+    System.path_strip_directory specdir in
+  let pkgname = pkgname_of_specdir specdir in
+  let tag = (pkgname,ver,rev) in
+  
+  check_specdir specdir;
+    
+  let components =
+    if Params.get_param "use-external" = "true" then
+      spec.components
+    else
+      only_local spec.components in
+  
+  List.iter fetch_tags components;
+
+  if not (tag_ready ~tag:(mk_tag tag) components) then
+    raise (Cannot_build_package (mk_tag tag));
+  ignore
+    (install (with_tag (Some (mk_tag tag))
+      (* выкидываем pack-компонент, чтобы не было ненужных checkout'ов в pack'e *)
+      (List.filter (fun c -> c.name <> "pack") components)));
+  (try
+    build_package ~ready_spec:(Some spec) [specdir;ver;string_of_int rev];
+  with
+    | Permanent_error s -> log_error s;
+    | exn -> log_error (Printexc.to_string exn));
+  true
+
+let package_update ?ready_spec ~specdir ?(use_external=true) ?(check_pack=true) ?(check_fs=false) ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
   let specdir = System.path_strip_directory specdir in
 
   check_specdir specdir;
@@ -2129,7 +2160,7 @@ let clone_packages l =
   List.iter (fun e ->
     let specdir =
       sprintf "./pack/%s/%s" e.pkg_name e.pkg_branch in
-    ignore (update ~specdir ~ver:(Some e.pkg_version) ~rev:(Some (string_of_int e.pkg_revision)) ())) l
+    ignore (package_update ~specdir ~ver:(Some e.pkg_version) ~rev:(Some (string_of_int e.pkg_revision)) ())) l
 
 let rec download_packages userhost l =
   List.iter 
@@ -2552,7 +2583,7 @@ let upgrade specdir upgrade_mode default_branch =
 	log_message (sprintf "lazy-mode is %b for %s, dep-paths:" lazy_mode specdir);
 	List.iter log_message dep_paths;
 	let updated =
-	  update
+	  package_update
 	    ~specdir
 	    ~lazy_mode
 	    ~use_external
@@ -2571,12 +2602,12 @@ let upgrade specdir upgrade_mode default_branch =
     | Upgrade_full ->
 	List.iter
 	  (fun specdir ->
-	    ignore(update ~specdir ~check_pack:false ~lazy_mode:false ~interactive:true ()))
+	    ignore(package_update ~specdir ~check_pack:false ~lazy_mode:false ~interactive:true ()))
 	  depends
     | Upgrade_lazy ->
 	List.iter
 	  (fun specdir ->
-	    ignore(update ~specdir ~check_pack:false ~lazy_mode:true ~interactive:true ()))
+	    ignore(package_update ~specdir ~check_pack:false ~lazy_mode:true ~interactive:true ()))
 	  depends
     | Upgrade_complete ->
 	complete_impl false;
@@ -2652,13 +2683,10 @@ let clone ?(vr=None) ~recursive ~overwrite specdir =
     List.exists (Pcre.pmatch ~rex) (System.list_of_directory ".")
   in
   
-  let use_external =
-    Params.get_param "use-external" = "true" in
-
   List.iter
-    (fun (specdir,ver,rev,spec) ->
+    (fun ((specdir,ver,rev,spec) as build_arg) ->
       if not (pkg_exists specdir ver rev) || overwrite then
-	ignore(update ~ready_spec:spec ~use_external ~check_pack:false ~specdir ~ver:(Some ver) ~rev:(Some (string_of_int rev)) ()))
+	ignore(package_build build_arg))
     (with_rec depends)
 
 exception Bad_version_format_for_major_increment of string

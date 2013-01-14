@@ -134,7 +134,7 @@ let log_command ?(low=false) ?env ?error_handler prog args =
 	  | 0 ->  (* child *)
 	      if log_fd <> Unix.stdout then
 		Unix.dup2 log_fd Unix.stdout;
-	      Unix.execve prog (Array.of_list args) environment
+	      Unix.execve prog (Array.of_list (prog::args)) environment
 	  | pid ->
 	      let (_,ps) = Unix.waitpid [] pid in
 	      (match ps with
