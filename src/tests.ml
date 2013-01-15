@@ -12,8 +12,17 @@ let regexp2 () =
 let regexp3 () =
   (Re.get (Re.exec (Re_perl.compile_pat "\\d+") "X = 45") 0 = "45")
 
+let logcommand1 () =
+  try
+    ignore(Logger.log_command "ls" ["*"]);
+    true
+  with exn ->
+    printf "logcommand1: %s\n" (Printexc.to_string exn);
+    false
+     
 let run () =
   test "Regexp 1" regexp1;
   test "Regexp 2" regexp2;
-  test "Regexp 3" regexp3
+  test "Regexp 3" regexp3;
+  test "LogCommand1" logcommand1
 

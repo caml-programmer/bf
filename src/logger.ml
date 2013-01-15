@@ -137,26 +137,28 @@ let log_command ?(low=false) ?env ?error_handler prog args =
 	      Unix.execve prog (Array.of_list (prog::args)) environment
 	  | pid ->
 	      let (_,ps) = Unix.waitpid [] pid in
-	      (match ps with
-		| Unix.WEXITED rc ->
-		    (match error_handler with
+	      if ps = Unix.WEXITED 0 then
+		log_message ~low ~logger (sprintf "success: %s" command)
+	      else
+		(match ps with
+		  | Unix.WEXITED rc ->
+		      (match error_handler with
+			  Some f -> f ps
+			| None ->
+			    log_message ~logger (sprintf "failed: %d [%s]" rc command);
+			    raise Error)
+		  | Unix.WSIGNALED n -> 
+		      (match error_handler with
+			  Some f -> f ps
+			| None ->
+			    log_message ~logger (sprintf "killed: %d [%s]" n command);
+			    raise Error)
+		  | Unix.WSTOPPED n ->
+		      (match error_handler with
 			Some f -> f ps
-		      | None ->
-			  log_message ~logger (sprintf "failed: %d [%s]" rc command);
-			  raise Error)
-		| Unix.WSIGNALED n -> 
-		    (match error_handler with
-			Some f -> f ps
-		      | None ->
-			  log_message ~logger (sprintf "killed: %d [%s]" n command);
-			  raise Error)
-		| Unix.WSTOPPED n ->
-		    (match error_handler with
-			Some f -> f ps
-		      | None ->
-			  log_message ~logger (sprintf "stopped: %d" n);
-			  raise Error)));
-	log_message ~low ~logger (sprintf "success: %s" command)
+			| None ->
+			    log_message ~logger (sprintf "stopped: %d" n);
+			    raise Error)));
       with 
 	| Unix.Unix_error(error,name,arg) ->
 	    log_error
