@@ -14,7 +14,7 @@ let regexp3 () =
 
 let logcommand1 () =
   try
-    ignore(Logger.log_command "ls" ["*"]);
+    ignore(Logger.log_command "ls" ["-la";"/"]);
     true
   with exn ->
     printf "logcommand1: %s\n" (Printexc.to_string exn);
