@@ -33,6 +33,7 @@ type platform =
   | Solaris10
   | Debian
   | Gentoo
+  | Unknown_linux
 
 type platform_mapping =
     (string * ((string * platform) list)) list
@@ -55,7 +56,8 @@ let engine_of_platform = function
   | Solaris9  -> Pkg_trans
   | Solaris10 -> Pkg_trans
   | Debian    -> Deb_pkg
-  | Gentoo    -> raise Pkg_engine_not_found
+  | Gentoo | Unknown_linux
+      -> raise Pkg_engine_not_found
 
 let string_of_platform = function
   | Rhel3     -> "rhel3"
@@ -73,6 +75,7 @@ let string_of_platform = function
   | Solaris10 -> "sol10"
   | Debian    -> "deb"
   | Gentoo    -> "gentoo"
+  | Unknown_linux -> "linux"
 
 let platform_of_string = function
   | "rhel3" -> Rhel3
@@ -90,6 +93,7 @@ let platform_of_string = function
   | "sol10" -> Solaris10
   | "deb"   -> Debian
   | "gentoo" -> Gentoo
+  | "linux" -> Unknown_linux
   |  s -> log_error (sprintf "Unsupported platform (%s)" s)
 
 let os_of_string = function
@@ -151,7 +155,7 @@ let with_platform (f : os -> platform -> 'a) =
     | Linux ->
 	let platform =
 	  (match select_platforms [] linux_platform_mapping with
-	    | [] -> log_error "unknown or unsupported platform"
+	    | [] -> Unknown_linux
 	    | p::_ -> p)
 	in f os platform
     | SunOS ->
