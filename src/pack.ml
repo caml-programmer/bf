@@ -32,11 +32,13 @@ type platform =
   | Solaris9
   | Solaris10
   | Debian
+  | Gentoo
 
 type platform_mapping =
     (string * ((string * platform) list)) list
 
 exception Permanent_error of string
+exception Pkg_engine_not_found
 
 let engine_of_platform = function
   | Rhel3     -> Rpm_build
@@ -53,6 +55,7 @@ let engine_of_platform = function
   | Solaris9  -> Pkg_trans
   | Solaris10 -> Pkg_trans
   | Debian    -> Deb_pkg
+  | Gentoo    -> raise Pkg_engine_not_found
 
 let string_of_platform = function
   | Rhel3     -> "rhel3"
@@ -69,7 +72,8 @@ let string_of_platform = function
   | Solaris9  -> "sol9"
   | Solaris10 -> "sol10"
   | Debian    -> "deb"
-     
+  | Gentoo    -> "gentoo"
+
 let platform_of_string = function
   | "rhel3" -> Rhel3
   | "rhel4" -> Rhel4
@@ -85,6 +89,7 @@ let platform_of_string = function
   | "sol9"  -> Solaris9
   | "sol10" -> Solaris10
   | "deb"   -> Debian
+  | "gentoo" -> Gentoo
   |  s -> log_error (sprintf "Unsupported platform (%s)" s)
 
 let os_of_string = function
@@ -113,6 +118,7 @@ let linux_platform_mapping =
     ];
     "/etc/arch-release", ["^.*",Arch];
     "/etc/debian_version",["^.*",Debian];
+    "/etc/gentoo-release",["^.*",Gentoo];
   ]
     
 let rec select_platforms acc = function
