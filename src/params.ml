@@ -6,7 +6,7 @@ exception Unknown_parameter of string
 
 let read_from_file filename =
   let params = Hashtbl.create 32 in
-  let rex = Re_perl.compile_pat "^([^\\s]+)\\s+(.*)$" in
+  let rex = Re_perl.compile_pat "^([^\\s]+)\\s+(.*)\\s*$" in
   let ch = open_in filename in
   List.iter
     (fun s ->
