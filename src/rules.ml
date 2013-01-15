@@ -164,18 +164,8 @@ let install_rules ?(check_build=true) name =
 
 (*** Component rules *)
 
-let split re s =
-  let rec make acc pos =
-    try
-      let (a,b) =
-	Re.get_ofs (Re.exec ~pos re s) 0 in
-      Printf.printf "a:%d\nb:%d\npos:%d\n%!" a b pos;
-      make ((String.sub s pos a)::acc) b
-    with Not_found -> acc
-  in make [] 0
-  
 let split_by_space s =
-  split (Re.compile (Re.rep1 Re.space)) s
+  Pcre.split ~rex:(Re.compile (Re.rep1 Re.space)) s
   
 let add_make_opts v =
   (split_by_space

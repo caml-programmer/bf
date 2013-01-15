@@ -12,12 +12,12 @@ let read_from_file filename =
     (fun s ->
       try
 	let res = Re.exec rex s in
-	Hashtbl.replace params
-	  (Re.get res 0) 
-	  (Re.get res 1)
+	let key = Re.get res 1 in
+	let value = Re.get res 2 in
+	Hashtbl.replace params key value
       with Not_found -> ())
     (list_of_channel ch);
-  params  
+  params
 
 let read_params () =
   let filename =
