@@ -240,7 +240,7 @@ exception Bad_tag_date of string
 let resolve_tag_date tag =
   let (raw,_) =
     Call.read "git"
-      ["log";"-1";"--date=short";"--pretty=format:'%ad'";tag] in
+      ["log";"-1";"--date=short";"--pretty=format:%ad";tag] in
   let len = String.length raw in
   match
     List.map int_of_string
