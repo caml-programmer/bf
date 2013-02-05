@@ -3539,7 +3539,10 @@ let clean () =
 let droptags lifetime =
   let period =
     Lifetime.parse lifetime in
-  Lifetime.iter period Git.git_drop_tag
+  Lifetime.iter period 
+    (fun tag ->
+      printf "drop %s\n%!" tag;
+      Git.git_drop_tag tag)
     (List.map
       (fun tag ->
 	Git.resolve_tag_date tag,tag)
