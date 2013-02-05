@@ -53,6 +53,7 @@ let usage () =
   print_endline "   or: bf search <commit-id>";
   print_endline "   or: bf shell";
   print_endline "   or: bf clean";
+  print_endline "   or: bf droptags <lifetime>";
   print_endline "   or: bf log";
   print_endline "   or: bf tests";
   exit 1
@@ -371,6 +372,10 @@ let main () =
 	    if len = 3 then
 	      with_lock (fun () ->
 		Pack.search Sys.argv.(2))
+	    else usage ()
+	| "droptags" ->
+	    if len > 2 then
+	      Pack.droptags Sys.argv.(2)
 	    else usage ()
 	| "tests" ->
 	    Tests.run ()

@@ -3536,4 +3536,13 @@ let clean () =
     done
   with Exit -> ()
 
+let droptags lifetime =
+  let period =
+    Lifetime.parse lifetime in
+  Lifetime.iter period Git.git_drop_tag
+    (List.map
+      (fun tag ->
+	Git.resolve_tag_date tag,tag)
+      (Git.git_tag_list ()))
+
 

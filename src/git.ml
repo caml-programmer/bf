@@ -232,6 +232,26 @@ let git_tag_list () =
 let git_key_list () =
   (git_branch ()) @ (git_branch ~remote:true ()) @ (git_tag_list ())
 
+let git_drop_tag tag =
+  log_command ~env "git" ["-d";tag]
+
+exception Bad_tag_date of string
+
+let resolve_tag_date tag =
+  let (raw,_) =
+    Call.read "git"
+      ["log";"-1";"--date=short";"--pretty=format:'%ad'";tag] in
+  let len = String.length raw in
+  match
+    List.map int_of_string
+      (Strings.split '-'
+	(if raw.[len-1] = '\n' then 
+	  String.sub raw 0 (pred len)
+	else raw))
+  with [y;m;d] -> (y,m,d)
+    | _ -> raise (Bad_tag_date raw)
+
+
 exception Key_not_found of string
 
 let git_check_key l tag =
