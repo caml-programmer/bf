@@ -233,7 +233,7 @@ let git_key_list () =
   (git_branch ()) @ (git_branch ~remote:true ()) @ (git_tag_list ())
 
 let git_drop_tag tag =
-  log_command ~env "git" ["-d";tag]
+  log_command ~env "git" ["tag";"-d";tag]
 
 exception Bad_tag_date of string
 

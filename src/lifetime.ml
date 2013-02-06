@@ -57,7 +57,7 @@ let sub_interval cur period =
   let (py,pm,pd) = norm_p period in
   norm_c (cy-py,cm-pm,cd-pd)
 
-let iter period call data =
+let iter period resolver call data =
   let tm = Unix.localtime (Unix.time ()) in
   let (my,mm,md) =
     sub_interval
@@ -65,7 +65,8 @@ let iter period call data =
       tm.Unix.tm_mon + 1,
       tm.Unix.tm_mday) period in
   List.iter
-    (fun ((cy,cm,cd),value) ->
+    (fun value ->
+      let (cy,cm,cd) = resolver value in
       if cy < my then
 	call value
       else if cy = my then
