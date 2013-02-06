@@ -3545,7 +3545,8 @@ let droptags lifetime =
       Git.git_drop_tag tag)
     (List.map
       (fun tag ->
-	Git.resolve_tag_date tag,tag)
+	let (y,m,d) =
+	  Git.resolve_tag_date tag in
+	printf "resolve %s -> %d-%d-%d\n%!" tag y m d;
+	(y,m,d),tag)
       (Git.git_tag_list ()))
-
-
