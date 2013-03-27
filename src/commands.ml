@@ -288,10 +288,10 @@ let install_component component =
 		  in
 		  let state =
 		    create_top_state real_dir in
+		  Params.update_param "orig-top-dir" top_dir;
 		  if dest_dir <> "" then
 		    begin
 		      Params.update_param "install-dir" real_dir;
-		      Params.update_param "orig-top-dir" top_dir;
 		      Params.update_param "top-dir" real_dir;
 		    end;
 		  Rules.install_rules component.rules;
