@@ -133,12 +133,24 @@ let forward_component component =
 let forward components =
   non_empty_iter forward_component components
 
+let make_install_dir () =
+  let top_dir =
+    Params.get_param "top-dir" in
+  let dest_dir =
+    Params.get_param "dest-dir" in
+  if dest_dir = "" then
+    top_dir
+  else
+    Filename.concat dest_dir
+      (System.strip_root top_dir)
+
 let build_component_native component =
   if Sys.file_exists (with_rules ".bf-build" component) then
     log_message (component.name ^ " already built, nothing to do")
   else
     begin
       log_message (sprintf "building %s" (with_rules component.name component));
+      Params.update_param "install-dir" (make_install_dir ());
       Rules.build_rules component.rules;
       log_message (component.name ^ " built");
       let ch = open_out (with_rules ".bf-build" component) in
@@ -279,20 +291,15 @@ let install_component component =
 		    Params.get_param "top-dir" in
 		  let dest_dir =
 		    Params.get_param "dest-dir" in
-		  let real_dir =
-		    if dest_dir = "" then
-		      top_dir
-		    else
-		      Filename.concat dest_dir
-			(System.strip_root top_dir)
-		  in
+		  let install_dir =
+		    make_install_dir () in
 		  let state =
 		    create_top_state real_dir in
 		  Params.update_param "orig-top-dir" top_dir;
+		  Params.update_param "install-dir" install_dir;
 		  if dest_dir <> "" then
 		    begin
-		      Params.update_param "install-dir" real_dir;
-		      Params.update_param "top-dir" real_dir;
+		      Params.update_param "top-dir" install_dir; (* Deprecated: use install-dir *)
 		    end;
 		  Rules.install_rules component.rules;
 		  Params.update_param "top-dir" top_dir;
