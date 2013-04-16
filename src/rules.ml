@@ -291,7 +291,7 @@ let replace_param key value content =
 	| None -> "" in
     let result =
       if Re.execp (Re_perl.compile_pat ~opts:[`Caseless] ("^" ^ key ^ "\\s*=.*?$")) line then
-	(key ^ "=" ^ value)
+	((String.uppercase key) ^ "=" ^ value)
       else
 	line in
     (* printf "update-params key(%s) value(%s): %s\n%!" key value result; *)
