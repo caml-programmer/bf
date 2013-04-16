@@ -285,13 +285,17 @@ let read_command cmd =
 
 let replace_param key value content =
   let replace line =
-    if Re.execp (Re_perl.compile_pat ("^" ^ key ^ "\\s*=.*?$")) line then
-      (key ^ "=" ^
-      (match value with
+    let value =
+      match value with
 	| Some v -> v
-	| None -> ""))
-    else
-      line
+	| None -> "" in
+    let result =
+      if Re.execp (Re_perl.compile_pat ("^" ^ key ^ "\\s*=.*?$")) line then
+	(key ^ "=" ^ value)
+      else
+	line in
+    printf "update-params key(%s) value(%s): %s\n%!" key value result;
+    result
   in String.concat "\n"
        (List.map replace
 	 (Strings.split '\n' content))
@@ -305,7 +309,7 @@ let update_make_params v =
   let name = fst (List.hd v) in
   let params = List.tl v in
   let tmpname = name ^ ".tmp" in
-  let content =    
+  let content =
     System.read_file ~file:name in
   System.write_string
     ~file:tmpname ~string:(replace_params content params);
