@@ -290,11 +290,11 @@ let replace_param key value content =
 	| Some v -> v
 	| None -> "" in
     let result =
-      if Re.execp (Re_perl.compile_pat ("^" ^ key ^ "\\s*=.*?$")) line then
+      if Re.execp (Re_perl.compile_pat ~opts:[`Caseless] ("^" ^ key ^ "\\s*=.*?$")) line then
 	(key ^ "=" ^ value)
       else
 	line in
-    printf "update-params key(%s) value(%s): %s\n%!" key value result;
+    (* printf "update-params key(%s) value(%s): %s\n%!" key value result; *)
     result
   in String.concat "\n"
        (List.map replace
