@@ -294,7 +294,7 @@ let install_component component =
 		  let install_dir =
 		    make_install_dir () in
 		  let state =
-		    create_top_state real_dir in
+		    create_top_state install_dir in
 		  Params.update_param "orig-top-dir" top_dir;
 		  Params.update_param "install-dir" install_dir;
 		  if dest_dir <> "" then
@@ -304,7 +304,7 @@ let install_component component =
 		  Rules.install_rules component.rules;
 		  Params.update_param "top-dir" top_dir;
 		  generate_changes component.rules top_dir
-		    state (create_top_state real_dir);
+		    state (create_top_state install_dir);
 		  log_message (component.name ^ " installed");
 		  let ch = open_out (with_rules ".bf-install" component) in
 		  output_string ch (string_of_float (Unix.gettimeofday ()));
