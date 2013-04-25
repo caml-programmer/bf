@@ -194,6 +194,12 @@ let export args =
 	    Env.update key "")
     args
 
+let add_path args =
+  List.iter (fun v -> 
+    (Env.update "PATH" 
+      (v ^ ":" ^ (Env.get "PATH"))))
+    args
+
 let get_env name =
   try
     Some (Env.find_component name)

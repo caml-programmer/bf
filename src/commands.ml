@@ -844,6 +844,9 @@ let scm_simple_install v =
 let scm_export v =
   Rules.export (Scheme.make_params_of_sval v); Snull
 
+let scm_add_path v =
+  Rules.add_path (Scheme.string_list_of_sval_array v); Snull
+
 let scm_ac_configure v =
   Rules.ac_configure (Scheme.make_params_of_sval v); Snull
     
@@ -1078,6 +1081,7 @@ Ocs_env.set_pf1 Scheme.env scm_export "ml-export";;
 Ocs_env.set_pf1 Scheme.env scm_ac_configure "ml-ac-configure";;
 Ocs_env.set_pf1 Scheme.env scm_make "ml-make";;
 Ocs_env.set_pf1 Scheme.env scm_update_make_params "ml-update-make-params";;
+Ocs_env.set_pfn Scheme.env scm_add_path "add-path";
 
 Ocs_env.set_pfn Scheme.env scm_log_command "log-command";;
 Ocs_env.set_pfn Scheme.env scm_log_message "log-message";;

@@ -40,6 +40,9 @@ let prepare () =
 let update n v =
   Hashtbl.replace component_environment n v
 
+let get n =
+  Hashtbl.find component_environment n
+
 let find_system n =
   Hashtbl.find system_environment n
 
