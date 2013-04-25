@@ -8,7 +8,6 @@ all:
 install:
 	install -m 755 -d $(PREFIX) $(PREFIX)/bin
 	install -m 755 _build/src/bf.native $(PREFIX)/bin/bf
-	install -m 755 tools/ssh-copy-id $(PREFIX)/bin
 	install -m 755 tools/make-autologin $(PREFIX)/bin
 
 .PHONY: uninstall
