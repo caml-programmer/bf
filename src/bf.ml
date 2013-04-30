@@ -351,6 +351,7 @@ let main () =
 	    Pack.clean ()
 	| "make" ->
 	    Params.update_param "plugins-dir" "../pack";
+	    Params.update_param "orig-top-dir" (Params.get_param "top-dir");
 	    Params.update_param "install-dir" (Commands.make_install_dir ());
 	    if len = 3 then
 	      (match Sys.argv.(2) with
