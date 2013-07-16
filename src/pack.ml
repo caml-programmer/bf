@@ -1932,6 +1932,9 @@ let without_rev_require =
 let without_ver_require =
   Pcre.regexp "(.+)"
 
+let home_made_package pkg = 
+  (Pcre.pmatch ~rex:(Pcre.regexp (sprintf "^%s" (Params.get_param "pkg-prefix"))) pkg) && not (Pcre.pmatch ~rex:(Pcre.regexp (sprintf "^%s" (Params.get_param "pkg-prefix-exclude"))) pkg)
+  
 let extract_depend_list ~userhost pkg_path =
   List.rev
     (List.fold_left
@@ -1955,7 +1958,7 @@ let extract_depend_list ~userhost pkg_path =
 	      (pkg_name,None,None)::acc
 	    with Not_found -> acc))) []
       (System.read_lines
-	~filter:(Pcre.pmatch ~rex:(Pcre.regexp (sprintf "^%s" (Params.get_param "pkg-prefix"))))
+	~filter:home_made_package
 	(match userhost with
 	  | Some auth ->
 	      (sprintf "ssh %s rpm -qRp %s" auth pkg_path)
@@ -2262,7 +2265,7 @@ let deptree_of_pack ~default_branch specdir : pack_tree =
 	  let depends =
 	    List.fold_left (fun acc (pkg,vr_opt,_) ->
 	      try
-		if Pcre.pmatch ~rex:(Pcre.regexp (sprintf "^%s" (Params.get_param "pkg-prefix"))) pkg then
+		if home_made_package pkg then
 		  let new_specdir =
 		    specdir_of_pkg ~default_branch pkgdir pkg in
 		  let new_value =
@@ -2799,7 +2802,7 @@ let fork ?(depth=0) top_specdir src dst =
     List.map
       (fun (os,deplist) ->
 	os,(List.map (fun (pkgname,ov_opt,pkg_desc_opt) ->
-	  if Pcre.pmatch ~rex:(Pcre.regexp (sprintf "^%s" (Params.get_param "pkg-prefix"))) pkgname then
+	  if home_made_package pkgname then
 	    (pkgname,(change pkgname ov_opt),pkg_desc_opt)
 	  else
 	    (pkgname,ov_opt,pkg_desc_opt)) deplist))
