@@ -1932,8 +1932,13 @@ let without_rev_require =
 let without_ver_require =
   Pcre.regexp "(.+)"
 
-let home_made_package pkg = 
-  (Pcre.pmatch ~rex:(Pcre.regexp (sprintf "^%s" (Params.get_param "pkg-prefix"))) pkg) && not (Pcre.pmatch ~rex:(Pcre.regexp (sprintf "^%s" (Params.get_param "pkg-prefix-exclude"))) pkg)
+let home_made_package pkg =
+  let exclude =
+    try
+      let ex_prefix = Params.get_param "pkg-prefix-exclude" in
+      String.length ex_prefix <> 0 && Strings.have_prefix ex_prefix pkg
+    with Params.Unknown_parameter _ -> false in
+  (Strings.have_prefix (Params.get_param "pkg-prefix") pkg) && not exclude    
   
 let extract_depend_list ~userhost pkg_path =
   List.rev
