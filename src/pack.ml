@@ -1947,9 +1947,13 @@ let extract_depend_list ~userhost pkg_path =
 	try
 	  let a = Pcre.extract ~rex:full_require s in
 	  let pkg_name = a.(1) in
-	  let ver = a.(2) in
-	  let rev = try int_of_string a.(3) with _ -> raise (Cannot_extract_revision pkg_path) in
-	  (pkg_name,Some ver,Some rev)::acc
+	  if home_made_package pkg_name then
+	    begin
+	      let ver = a.(2) in
+	      let rev = try int_of_string a.(3) with _ -> raise (Cannot_extract_revision pkg_path) in
+	      (pkg_name,Some ver,Some rev)::acc
+	    end
+	  else acc
 	with Not_found ->
 	  (try
 	    let a = Pcre.extract ~rex:without_rev_require s in
@@ -2424,12 +2428,14 @@ let deptree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
 	    let depends =
 	      List.fold_left (fun acc (pkg,vr_opt,_) ->
 		try
-		  let new_specdir =
-		    specdir_of_pkg ~default_branch:(Some (branch_of_specdir specdir)) pkgdir pkg in
-		  let (ver,rev) = 
-		    read_pkg_release new_specdir in
 		  if home_made_package pkg then
-		    acc @ [new_specdir,ver,rev,(have_revision (parse_vr_opt vr_opt))] (* add specdir for post-processing *)
+		    begin
+		      let new_specdir =
+			specdir_of_pkg ~default_branch:(Some (branch_of_specdir specdir)) pkgdir pkg in
+		      let (ver,rev) = 
+			read_pkg_release new_specdir in
+		      acc @ [new_specdir,ver,rev,(have_revision (parse_vr_opt vr_opt))] (* add specdir for post-processing *)
+		    end
 		  else acc
 		with _ -> acc)
 		[] (make_depends ~ignore_last:false depfile)
