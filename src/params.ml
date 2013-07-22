@@ -15,7 +15,8 @@ let read_from_file filename =
 	let key = Re.get res 1 in
 	let value = Re.get res 2 in
 	Hashtbl.replace params key value
-      with Not_found -> ())
+      with Not_found ->
+	Printf.printf "ignore: %s\n%!" s)
     (list_of_channel ch);
   params
 
@@ -53,7 +54,7 @@ let set_param ~default s =
 ;;
 
 let get_param s =
-  try 
+  try
     Hashtbl.find user_params s
   with Not_found -> raise (Unknown_parameter s)
 ;;
@@ -100,6 +101,7 @@ set_param ~default:"microball.lpr.jet.msk.su" "pkg-storage";;
 set_param ~default:"" "http-proxy";;
 
 set_param ~default:"jet" "pkg-prefix";;
+set_param ~default:"" "pkg-prefix-exclude";;
 set_param ~default:"bf.session.log" "session-log";;
 set_param ~default:"bf.lock" "lock-file";;
 set_param ~default:"true" "use-external";; (* components in external packages *)
