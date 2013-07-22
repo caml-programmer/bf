@@ -2428,7 +2428,9 @@ let deptree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
 		    specdir_of_pkg ~default_branch:(Some (branch_of_specdir specdir)) pkgdir pkg in
 		  let (ver,rev) = 
 		    read_pkg_release new_specdir in
-		  acc @ [new_specdir,ver,rev,(have_revision (parse_vr_opt vr_opt))] (* add specdir for post-processing *)
+		  if home_made_package pkg then
+		    acc @ [new_specdir,ver,rev,(have_revision (parse_vr_opt vr_opt))] (* add specdir for post-processing *)
+		  else acc
 		with _ -> acc)
 		[] (make_depends ~ignore_last:false depfile)
 	    in
