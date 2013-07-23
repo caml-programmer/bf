@@ -1956,15 +1956,21 @@ let extract_depend_list ~userhost pkg_path =
 	  else acc
 	with Not_found ->
 	  (try
-	    let a = Pcre.extract ~rex:without_rev_require s in
+	    let a = Pcre.extract ~rex:without_rev_require s in	    
 	    let pkg_name = a.(1) in
-	    let ver = a.(2) in
-	    (pkg_name,Some ver,None)::acc
+	    if home_made_package pkg_name then
+	      begin
+		let ver = a.(2) in
+		(pkg_name,Some ver,None)::acc
+	      end
+	    else acc
 	  with Not_found ->
 	    (try 
 	      let a = Pcre.extract ~rex:without_ver_require s in
 	      let pkg_name = a.(1) in
-	      (pkg_name,None,None)::acc
+	      if home_made_package pkg_name then
+		(pkg_name,None,None)::acc
+	      else acc
 	    with Not_found -> acc))) []
       (System.read_lines
 	~filter:home_made_package
