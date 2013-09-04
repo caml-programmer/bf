@@ -67,7 +67,6 @@ let with_component_dir ?(low=false) ?(strict=true) component (thunk : unit -> un
 	remove_component component;
 	clone_component component;
 	with_dir (fun () ->
-	  git_track_new_branches ();
 	  checkout_component ~low component;
 	  true)
     | Tree_exists_with_given_key content_status ->
@@ -95,7 +94,6 @@ let with_component_dir ?(low=false) ?(strict=true) component (thunk : unit -> un
 		      begin
 			git_remote_update "origin";
 		      end;
-		    git_track_new_branches ();
 		  end
 	    | _ -> ());	  
 	  checkout_component ~low component;
@@ -348,7 +346,6 @@ let update_component component =
       (fun () ->
 	let start = git_current_branch () in
 	git_remote_update "origin";
-	git_track_new_branches ();
 	let update branch =
 	  if git_changed branch (origin branch) then
 	    begin
