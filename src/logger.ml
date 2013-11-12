@@ -165,3 +165,20 @@ let log_command ?(low=false) ?env ?error_handler prog args =
 	      (sprintf "failed: Unix.Unix_error(%s,%s,%s)" 
 		(Unix.error_message error)
 		name arg))
+
+let run_command prog args =
+  let program = with_path prog in
+  let command = program ^ " " ^ (String.concat " " args) in
+  match Unix.fork () with
+    | 0 ->  (* child *)
+	Unix.execv program (Array.of_list (program::args))
+    | pid ->
+	let (_,ps) = Unix.waitpid [] pid in
+	(match ps with
+	  | Unix.WEXITED rc -> rc
+	  | Unix.WSIGNALED n -> 
+	      log_message (sprintf "killed: %d [%s]" n command);
+	      raise Error
+	  | Unix.WSTOPPED n ->
+	      log_message (sprintf "stopped: %d" n);
+	      raise Error)

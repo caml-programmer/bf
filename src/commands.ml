@@ -861,6 +861,10 @@ let scm_log_command v =
   let l = Scheme.string_list_of_sval_array v in
   Logger.log_command (List.hd l) (List.tl l); Snull
 
+let scm_run_command v =
+  let l = Scheme.string_list_of_sval_array v in
+  Sint (Logger.run_command (List.hd l) (List.tl l))
+
 let scm_log_message v =
   let l = Scheme.string_list_of_sval_array v in
   Logger.log_message (String.concat "" l); Snull
@@ -1081,6 +1085,7 @@ Ocs_env.set_pf1 Scheme.env scm_update_make_params "ml-update-make-params";;
 Ocs_env.set_pfn Scheme.env scm_add_path "add-path";
 
 Ocs_env.set_pfn Scheme.env scm_log_command "log-command";;
+Ocs_env.set_pfn Scheme.env scm_run_command "run-command";;
 Ocs_env.set_pfn Scheme.env scm_log_message "log-message";;
 Ocs_env.set_pfn Scheme.env scm_log_error "log-error";;
 Ocs_env.set_pfn Scheme.env scm_path_concat "path-concat";;
