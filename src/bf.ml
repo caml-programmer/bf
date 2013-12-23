@@ -412,6 +412,7 @@ let print_current_state () =
   param "label";
   param "start-dir";
   param "pkg-storage";
+  param "pkg-branch";
   param "log-level";
   Printf.printf "**********************************\n%!"
    
