@@ -2728,12 +2728,14 @@ let update_external_depends local_depends specdir =
   write_depends
     (Filename.concat specdir "depends") fixed_depends
 
-let fork ?(depth=0) top_specdir src dst =
-  log_message
-    (sprintf "Create new pack branch %s from %s:\n%!" dst src);
-
+let fork ?(depth=0) top_specdir dst =
   check_specdir top_specdir;
   check_pack_component ();
+
+  let src = branch_of_specdir top_specdir in
+
+  log_message
+    (sprintf "Create new pack branch %s from %s:\n%!" dst src);
 
   let dir = Filename.dirname in
   let pack_dir = dir (dir top_specdir) in

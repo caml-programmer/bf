@@ -40,7 +40,7 @@ let usage () =
   print_endline "   or: bf pack <specdir> <version> <release>";
   print_endline "   or: bf update <specdir> [lazy] [<version>] [<release>]";
   print_endline "   or: bf upgrade <specdir> [lazy|complete|full] [<branch>]";
-  print_endline "   or: bf fork <specdir> <source-branch> <new-branch> [<single-rev-depth>]";
+  print_endline "   or: bf fork <specdir> <new-branch> [<single-rev-depth>]";
   print_endline "   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite|depends|packages]";
   print_endline "   or: bf clone <specdir> [overwrite] [norec] [<ver> <rev>]";
   print_endline "   or: bf link <pkg-path> [symlink]";
@@ -283,15 +283,15 @@ let main () =
 	      (fun () ->
 		Pack.upgrade Sys.argv.(2) upgrade_mode default_branch)
 	| "fork" ->
-	    if len <> 5 then
-	      if len <> 6 then
+	    if len <> 4 then
+	      if len <> 5 then
 		usage ()
 	      else
 		with_lock (fun () ->
-		  Pack.fork ~depth:(make_int Sys.argv.(5)) Sys.argv.(2) Sys.argv.(3) Sys.argv.(4))
+		  Pack.fork ~depth:(make_int Sys.argv.(4)) Sys.argv.(2) Sys.argv.(3))
 	    else
 	      with_lock (fun () ->
-		Pack.fork Sys.argv.(2) Sys.argv.(3) Sys.argv.(4))
+		Pack.fork Sys.argv.(2) Sys.argv.(3))
 	| "graph" ->
 	    if len <> 3 then
 	      if len <> 5 then
