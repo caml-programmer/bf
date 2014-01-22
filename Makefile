@@ -7,12 +7,13 @@ all:
 
 install:
 	install -m 755 -d $(PREFIX) $(PREFIX)/bin
-	install -m 755 _build/src/bf.native $(PREFIX)/bin/bf
-	install -m 755 tools/make-autologin $(PREFIX)/bin
+	cp _build/src/bf.native $(PREFIX)/bin/bf
+	cp tools/make-autologin $(PREFIX)/bin/make-autologin
 
 .PHONY: uninstall
 uninstall:
 	rm -f $(PREFIX)/bin/bf
+	rm -r $(PREFIX)/bin/make-autologin
 
 .PHONY: clean
 clean:
