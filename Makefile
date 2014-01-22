@@ -5,12 +5,12 @@ all:
 
 .PHONY: install
 
-install: uninstall
+install:
 	install -m 755 -d $(PREFIX) $(PREFIX)/bin
-	cp _build/src/bf.native $(PREFIX)/bin/bf
-	cp tools/make-autologin $(PREFIX)/bin/make-autologin
+	install -m 755 _build/src/bf.native $(PREFIX)/bin/bf
+	install -m 755 tools/make-autologin $(PREFIX)/bin/make-autologin
 
-.PHONY: uninstall
+.PHONY:
 uninstall:
 	rm -f $(PREFIX)/bin/bf
 	rm -r $(PREFIX)/bin/make-autologin
