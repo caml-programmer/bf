@@ -289,7 +289,7 @@ let git_diff_view ~tag_a ~tag_b =
 
 let git_status () =
   try
-    let lines = read_lines ~env ~ignore_error:true "git status" in
+    let lines = read_lines ~env ~ignore_error:true "git status --ignored" in
     if 
       List.length lines = 2 && List.nth lines 1 = "nothing to commit (working directory clean)"
     then [] else lines
