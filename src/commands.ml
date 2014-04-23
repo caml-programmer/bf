@@ -270,7 +270,7 @@ let install_component component =
   match component.label, component.pkg with
     | Tag _, Some pkg ->
 	log_message
-	  (component.name ^ (sprintf " must be installed by package (%s), noting to do" pkg));
+	  (component.name ^ (sprintf " must be installed by package (%s), nothing to do" pkg));
 	false
     | _ ->
 	let result = ref false in
@@ -279,7 +279,7 @@ let install_component component =
 	    (fun () ->
 	      if Sys.file_exists (with_rules ".bf-install" component)
 		&& Sys.file_exists (with_rules ".bf-build" component) then
-		  log_message ((with_rules component.name component) ^ " already installed, noting to do")
+		  log_message ((with_rules component.name component) ^ " already installed, nothing to do")
 	      else
 		begin
 		  if not (Sys.file_exists (with_rules ".bf-build" component)) then

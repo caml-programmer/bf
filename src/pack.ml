@@ -1673,10 +1673,10 @@ let package_update ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode=fal
 		  pkgname branch lazy_mode have_composite_changes have_pack_changes have_fs_changes (mk_tag tag));
 	      build ~prev:true tag
 	  | None ->
-	      (log_message (sprintf "pkg update (%s/%s): noting to do" pkgname branch);
+	      (log_message (sprintf "pkg update (%s/%s): nothing to do" pkgname branch);
 	      false)
       else
-	(log_message (sprintf "pkg update (%s/%s): noting to do" pkgname branch);	
+	(log_message (sprintf "pkg update (%s/%s): nothing to do" pkgname branch);	
 	false)
     end
   else
