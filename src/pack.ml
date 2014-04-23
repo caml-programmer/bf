@@ -3505,12 +3505,32 @@ let search commit_id =
 
 (* Clean old packages *)
 
+let version_compare a b =
+  let mk x =
+    List.filter ((<>) "")
+      (Strings.split '.' x) in
+  let rec cmp acc = function
+    | [],_ -> acc
+    | _,[] -> acc
+    | hd1::tl1, hd2::tl2 ->
+	let r = compare
+	  (int_of_string hd1)
+	  (int_of_string hd2) in
+	if r = 0 then
+	  cmp r (tl1,tl2)
+	else r in
+  let a = mk a in
+  let b = mk b in
+  let init =
+    compare (List.length a) (List.length b) in
+  cmp init (a,b)
+
 let pkg_compare a b =
   let (dir_a,name_a,pkg_a,platform_a,ext_a,arch_a,ver_a,rev_a) = snd a in
   let (dir_b,name_b,pkg_b,platform_b,ext_b,arch_b,ver_b,rev_b) = snd b in
   match compare name_a name_b with
     | 0 ->
-	(match compare ver_a ver_b with
+	(match version_compare ver_a ver_b with
 	  | 0 -> compare rev_a rev_b
 	  | x -> x)
     | x -> x
