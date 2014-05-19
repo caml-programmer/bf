@@ -845,17 +845,18 @@ let print_depends depends =
 	(match pkg_desc with Some s -> s | None -> "")))
     depends
 
-let call_after_build ~location ~fullname hooks =
+let call_after_build ~snapshot ~location ~fullname hooks =
   Rules.load_plugins ();
   (match hooks with
     | Some file -> Scheme.eval_file file
     | None -> ());
   if Scheme.defined "after-build" then
     Scheme.eval_code (fun _ -> ())
-      (sprintf "(after-build \"%s\" \"%s\" \"%s\")"
-	(System.hostname ()) location fullname)
+      (sprintf "(after-build \"%s\" \"%s\" \"%s\" %s)"
+	(System.hostname ()) location fullname 
+	(if snapshot then "#t" else "#f"))
 
-let call_before_build ~pkgname ~version ~revision ~platform hooks =
+let call_before_build ~snapshot ~pkgname ~version ~revision ~platform hooks =
   Rules.load_plugins ();
   (match hooks with
     | Some file -> Scheme.eval_file file
@@ -864,12 +865,13 @@ let call_before_build ~pkgname ~version ~revision ~platform hooks =
     let result = ref [] in
     Scheme.eval_code (fun v ->
       result := Scheme.map Scheme.make_string v)
-      (sprintf "(before-build \"%s\" \"%s\" \"%s\" \"%s\")"
-	pkgname version revision (string_of_platform platform));
+      (sprintf "(before-build \"%s\" \"%s\" \"%s\" \"%s\" %s)"
+	pkgname version revision (string_of_platform platform)
+	(if snapshot then "#t" else "#f"));
     !result
   else []
       
-let build_over_rpmbuild params =
+let build_over_rpmbuild ~snapshot params =
   let (pkgname,platform,version,release,spec,files,findreq,hooks) = params in
   let top_dir = Params.get_param "top-dir" in
   check_rh_build_env ();
@@ -880,7 +882,7 @@ let build_over_rpmbuild params =
       ~top_dir
       ~pkgname ~platform ~version ~release
       ~spec ~files ~findreq ()
-  in call_after_build ~location ~fullname hooks
+  in call_after_build ~snapshot ~location ~fullname hooks
 
 let check_composite_depends spec =
   let composite_depends =
@@ -957,7 +959,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		if Sys.file_exists hookfile then
 		  Some hookfile
 		else None
-	      in build_over_rpmbuild
+	      in build_over_rpmbuild ~snapshot
 		   (pkgname,platform,version,release,spec,files,findreq,hooks)
 	  | _-> assert false)
     | "2.0" ->
@@ -1032,7 +1034,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 	(match engine_of_platform platform with
 	  | Rpm_build ->
 	      let custom_pkg_files =
-		call_before_build
+		call_before_build ~snapshot
 		  ~pkgname:spec.pkgname ~version ~revision:release ~platform spec.hooks in
 	      
 	      let files =
@@ -1161,12 +1163,12 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 			  out "fi\n"))
 	      in
 	      
-	      build_over_rpmbuild 
+	      build_over_rpmbuild ~snapshot
 		(spec.pkgname,platform,version,release,specfile,files,findreq,spec.hooks)
 		
 	  | Pkg_trans ->
 	      let custom_pkg_files =
-		call_before_build
+		call_before_build ~snapshot
 		  ~pkgname:spec.pkgname ~version ~revision:release ~platform spec.hooks in
 	      
 	      let pkgtrans_key_format = String.uppercase in
@@ -1289,12 +1291,12 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 	      log_command "mv" ["-f";pkg_file_abs;"./"];
 	      (try Sys.remove pkg_file_gz with _ -> ());
 	      log_command "gzip" [pkg_file];
-	      call_after_build 
+	      call_after_build ~snapshot
 		~location:(Sys.getcwd ())
 		~fullname:pkg_file_gz spec.hooks
 	  | Deb_pkg ->
 	      let custom_pkg_files =
-		call_before_build
+		call_before_build ~snapshot
 		  ~pkgname:spec.pkgname ~version ~revision:release ~platform spec.hooks in
 	      
 	      let make_debian_depends deps =
