@@ -2637,7 +2637,7 @@ let top ?composite ?depends specdir =
       let updated = 
 	update_component c in
       let reinstalled =
-	install_component c in
+	install_component ~snapshot:true c in
       add (sprintf "%s updated(%b) reinstalled(%b)\n" c.name updated reinstalled))
     components;
   print_endline (Buffer.contents buf)

@@ -142,14 +142,14 @@ let make_install_dir () =
     Filename.concat dest_dir
       (System.strip_root top_dir)
 
-let build_component_native component =
+let build_component_native ?(snapshot=false) component =
   if Sys.file_exists (with_rules ".bf-build" component) then
     log_message (component.name ^ " already built, nothing to do")
   else
     begin
       log_message (sprintf "building %s" (with_rules component.name component));
       Params.update_param "install-dir" (make_install_dir ());
-      Rules.build_rules component.rules;
+      Rules.build_rules ~snapshot component.rules;
       log_message (component.name ^ " built");
       let ch = open_out (with_rules ".bf-build" component) in
       output_string ch (string_of_float (Unix.gettimeofday ()));
@@ -266,7 +266,7 @@ let generate_changes rules top_dir a b =
 	close_out ch
     | _ -> ()
 
-let install_component component =
+let install_component ?(snapshot=false) component =
   match component.label, component.pkg with
     | Tag _, Some pkg ->
 	log_message
@@ -283,7 +283,7 @@ let install_component component =
 	      else
 		begin
 		  if not (Sys.file_exists (with_rules ".bf-build" component)) then
-		    build_component_native component;
+		    build_component_native ~snapshot component;
 		  log_message ("installing " ^ component.name);
 		  let top_dir =
 		    Params.get_param "top-dir" in
@@ -299,7 +299,7 @@ let install_component component =
 		    begin
 		      Params.update_param "top-dir" install_dir; (* Deprecated: use install-dir *)
 		    end;
-		  Rules.install_rules component.rules;
+		  Rules.install_rules ~snapshot component.rules;
 		  Params.update_param "top-dir" top_dir;
 		  generate_changes component.rules top_dir
 		    state (create_top_state install_dir);
@@ -334,7 +334,7 @@ let reinstall_component component =
 let reinstall components =
   non_empty_iter reinstall_component components
 
-let update_component component =
+let update_component ?(snapshot=false) component =
   let exists s =
     Sys.file_exists (Filename.concat component.name s) in
   let status_changes =

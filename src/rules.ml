@@ -137,16 +137,24 @@ let components_of_composite ?replace composite =
 	| [] -> c)
     (load_composite composite)
 
-let build_rules name =
+let with_snapshot snapshot f =
+  Ocs_env.set_glob
+    Scheme.env (Ssymbol "snapshot") (if snapshot then Strue else Sfalse);
+  f ();
+  Ocs_env.set_glob Scheme.env (Ssymbol "snapshot") Sfalse  
+
+let build_rules ?(snapshot=false) name =
   load_plugins ();
   Env.prepare ();
   print_string "load rules...";
   Scheme.eval_file (rules_file name);
-  print_endline "ok";
-  Scheme.eval_code (fun _ -> ()) "(build ())";
-  Env.prepare ()
+  print_endline "ok"; 
+  with_snapshot snapshot 
+    (fun () ->
+      Scheme.eval_code (fun _ -> ()) "(build ())";
+      Env.prepare ())
 
-let install_rules ?(check_build=true) name =
+let install_rules ?(snapshot=false) ?(check_build=true) name =
   load_plugins ();
   Env.prepare ();
   print_string "load rules...";
@@ -156,8 +164,10 @@ let install_rules ?(check_build=true) name =
     (match name with None -> ".bf-build" | Some s -> ".bf-build." ^ s)
   then
     begin
-      Scheme.eval_code (fun _ -> ()) "(install ())";
-      Env.prepare ();
+      with_snapshot snapshot 
+	(fun () ->	  
+	  Scheme.eval_code (fun _ -> ()) "(install ())";
+	  Env.prepare ())
     end
   else
     log_error "current component is not built"
