@@ -3616,7 +3616,7 @@ let droptags lifetime =
 let make_snapshot_id () =
   let t = Unix.localtime (Unix.time ()) in
   let ver = 
-    sprintf "%04d%02d%02d"
+    sprintf "SS%04d%02d%02d"
       (t.Unix.tm_year+1900)
       (t.Unix.tm_mon+1)
       t.Unix.tm_mday in
