@@ -85,7 +85,8 @@ let load_composite file =
   Scheme.eval_code (fun v -> composite := Some v) "(composite)";
   match !composite with
     | None -> log_error "composite handler is not called"
-    | Some v -> v
+    | Some v -> 
+	(Scheme.map Scheme.component_of_sval v)
 
 let write_composite file components =
   let ch = open_out file in
@@ -124,18 +125,17 @@ let write_composite file components =
   out "))\n";
   close_out ch
 
-let components_of_composite composite =
-  let composite = load_composite composite in
-  let rec iter acc = function
-    | Snull -> acc
-    | Spair v ->
-	(match v.cdr with
-	  | Snull -> (Scheme.component_of_sval v.car)::acc
-	  | Spair v2 ->
-	      iter ((Scheme.component_of_sval v.car)::acc) (Spair v2)
-	  | _ -> log_error "invalid composition")
-    | _ -> log_error "invalid composition"
-  in List.rev (iter [] composite)
+let components_of_composite ?replace composite =
+  let replace =
+    match replace with
+      | None -> []
+      | Some x -> load_composite x in
+  List.map
+    (fun c ->
+      match List.filter (fun r -> r.Types.name = c.Types.name) replace with
+	| hd::_ -> hd
+	| [] -> c)
+    (load_composite composite)
 
 let build_rules name =
   load_plugins ();

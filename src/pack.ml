@@ -516,7 +516,7 @@ let string_of_pkgexn = function
       sprintf "Pkg_release_not_found(%s,%s)" s (Printexc.to_string exn)
   | exn -> Printexc.to_string exn
 
-let make_depends ?(interactive=false) ?(ignore_last=false) file =
+let make_depends ?snapshot ?(interactive=false) ?(ignore_last=false) file =
   let packdir = Filename.dirname (Filename.dirname (Filename.dirname file)) in
   let acc = ref ([] : depend list) in
   let add_depend v = acc := v::!acc in
@@ -536,36 +536,45 @@ let make_depends ?(interactive=false) ?(ignore_last=false) file =
 	let ver =
 	  Scheme.make_string (Scheme.fst v) in
 	pkg_op  := Some op;
-	(match op with
-	  | Pkg_last ->
-	      if ignore_last then
-		pkg_ver := Some ver
-	      else
-		with_platform 
-		  (fun os platform ->
-		    (try
-		      ignore
-			(with_dir packdir
-			  (fun () ->
-			    let branch =
-			      branch_of_specdir (Filename.dirname file) in
-			    let specdir =
-			      sprintf "%s/%s"
+	(match snapshot with
+	  | Some (ver,rev) ->
+	      (match op with
+		| Pkg_last -> 
+		    with_platform 
+		      (fun _ platform ->			
+			pkg_ver := Some (sprintf "%s-%s.%s" ver rev (string_of_platform platform)))
+		| _ ->  pkg_ver := Some ver)
+	  | None ->
+	      (match op with
+		| Pkg_last ->
+		    if ignore_last then
+		      pkg_ver := Some ver
+		    else
+		      with_platform 
+			(fun os platform ->
+			  (try
+			    ignore
+			      (with_dir packdir
+				(fun () ->
+				  let branch =
+				    branch_of_specdir (Filename.dirname file) in
+				  let specdir =
+				    sprintf "%s/%s"
 				(match !pkg_name with
-				| Some s -> s
-				| None -> log_error (sprintf "some package name - not found in %s" file))
-				branch
-			    in
+				  | Some s -> s
+				  | None -> log_error (sprintf "some package name - not found in %s" file))
+				      branch
+				  in
+				  pkg_ver := Some (sprintf "%s-%d.%s" ver
+				    (snd (read_pkg_release ~version:ver specdir))
+				    (string_of_platform platform))))			
+			  with exn ->
+			    log_message (sprintf "Warning: %s -> try using local pkg archive for search last pkg revision" (string_of_pkgexn exn));
 			    pkg_ver := Some (sprintf "%s-%d.%s" ver
-			      (snd (read_pkg_release ~version:ver specdir))
-			      (string_of_platform platform))))			
-		    with exn ->
-		      log_message (sprintf "Warning: %s -> try using local pkg archive for search last pkg revision" (string_of_pkgexn exn));
-		      pkg_ver := Some (sprintf "%s-%d.%s" ver
-			(find_pkg_revision ~interactive (match !pkg_name with Some s -> s | None -> raise Not_found) ver)
-			(string_of_platform platform))))
-	  | _ ->
-	      pkg_ver := Some ver)
+			      (find_pkg_revision ~interactive (match !pkg_name with Some s -> s | None -> raise Not_found) ver)
+			      (string_of_platform platform))))
+		| _ ->
+		    pkg_ver := Some ver))
       in
       
       (match name_v with
@@ -740,7 +749,7 @@ let write_depends file depends =
   out ")\n";
   close_out ch
 
-let spec_from_v2 ~version ~revision specdir =
+let spec_from_v2 ?(snapshot=false) ~version ~revision specdir =
   let f = Filename.concat specdir in
   let pkgname = 
     Filename.basename (Filename.dirname specdir) in
@@ -755,7 +764,11 @@ let spec_from_v2 ~version ~revision specdir =
     else
       None
   in
-  let depends = make_depends (f "depends") in
+  let depends = 
+    if snapshot then
+      make_depends ~snapshot:(version,revision) (f "depends")
+    else
+      make_depends (f "depends") in
   let rejects =
     let n = f "rejects" in
     if Sys.file_exists n then
@@ -918,7 +931,7 @@ let resolve_params find s =
       (try find k with Not_found -> s))
     s
 
-let build_package_impl ?(ready_spec=None) os platform (specdir,version,release) =
+let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir,version,release) =
   let abs_specdir =
     if String.length specdir > 0 && specdir.[0] = '/' then
       specdir
@@ -948,11 +961,11 @@ let build_package_impl ?(ready_spec=None) os platform (specdir,version,release) 
 		   (pkgname,platform,version,release,spec,files,findreq,hooks)
 	  | _-> assert false)
     | "2.0" ->
-	let spec = 
+	let spec =
 	  match ready_spec with
 	    | Some s -> s
 	    | None ->
-		spec_from_v2 ~version ~revision:release abs_specdir in
+		spec_from_v2 ~snapshot ~version ~revision:release abs_specdir in
 	let bf_table = Hashtbl.create 32 in
 	let reg k =
 	  if Hashtbl.mem bf_table k then "" 
@@ -1473,10 +1486,10 @@ let build_package_impl ?(ready_spec=None) os platform (specdir,version,release) 
     | version ->
 	raise (Unsupported_specdir_version version))
 
-let build_package_file ?(ready_spec=None) args =
+let build_package_file ?(snapshot=false) ?(ready_spec=None) args =
   with_platform
     (fun os platfrom ->
-      build_package_impl ~ready_spec os platfrom args)
+      build_package_impl ~snapshot ~ready_spec os platfrom args)
 
 exception Bad_specdir of string
 
@@ -1539,7 +1552,12 @@ let package_build (specdir,ver,rev,spec) =
     | exn -> log_error (Printexc.to_string exn));
   true
 
-let package_update ~specdir ?(check_pack=true) ?(check_fs=false) ?(lazy_mode=false) ?(interactive=false) ?(ver=None) ?(rev=None) () =
+let package_update ~specdir
+  ?(check_pack=true)
+  ?(check_fs=false)
+  ?(lazy_mode=false)
+  ?(interactive=false)
+  ?(ver=None) ?(rev=None) () =
   let specdir = System.path_strip_directory specdir in
   check_specdir specdir;
   if check_pack then
@@ -2577,26 +2595,29 @@ let upgrade specdir upgrade_mode default_branch =
     | Upgrade_default ->
 	complete_impl true
 
-let top specdir =
+let top ?composite ?depends specdir =
   let specdir =
     System.path_strip_directory specdir in
   check_specdir specdir;
   check_pack_component ();
-  let deptree =
-    toptree_of_specdir specdir in
   let depends =
-    list_of_deptree deptree in
+    match depends with
+      | Some deps -> deps
+      | None ->
+	  let deptree =
+	    toptree_of_specdir specdir in
+	  list_of_deptree deptree in
   log_message "depend list...";
   let components =
-    List.fold_left 
+    List.fold_left
       (fun acc (specdir,_,_) ->
 	log_message (sprintf "# %s" specdir);
 	let composite =
       	  Filename.concat specdir "composite" in
 	let new_components =
-	  List.filter 
+	  List.filter
 	    (fun c -> not (List.mem c acc))
-	    (Rules.components_of_composite composite) in
+	    (Rules.components_of_composite ~replace:composite composite) in
 	List.iter 
 	  (fun c ->
 	    let rules =
@@ -3588,3 +3609,41 @@ let droptags lifetime =
       printf "drop %s\n%!" tag;
       Git.git_drop_tag tag)
     (Git.git_tag_list ())
+
+
+(* Snapshot *)
+
+let make_snapshot_id () =
+  let t = Unix.localtime (Unix.time ()) in
+  let ver = 
+    sprintf "%04d%02d%02d"
+      (t.Unix.tm_year+1900)
+      (t.Unix.tm_mon+1)
+      t.Unix.tm_mday in
+  let rev =
+    sprintf "%02d%02d%02d"
+      (t.Unix.tm_hour)
+      (t.Unix.tm_min)
+      t.Unix.tm_sec in
+  (ver, rev)
+
+let snapshot ?composite specdir =
+  let specdir =
+    System.path_strip_directory specdir in
+  let (ver,rev) =
+    make_snapshot_id () in
+  check_specdir specdir;
+  check_pack_component ();
+  let toptree =
+    log_message "make depends tree...";
+    toptree_of_specdir specdir in
+  let depends = list_of_deptree toptree in
+  log_message "depend list...";
+  List.iter (fun (specdir,_,_) -> print_endline specdir) depends;
+  stop_delay 5;
+  top ~composite ~depends specdir;
+  List.iter
+    (fun (specdir,_,_) ->
+      build_package_file ~snapshot:true (specdir,ver,rev))
+    depends
+  

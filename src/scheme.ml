@@ -275,6 +275,9 @@ let rec map f = function
       r :: (map f x.cdr)
   | _ -> []
 
+let read_list =
+  map (fun v -> v)
+
 let condrun name f = function
   | Spair x ->
       if x.car = Ssymbol name then

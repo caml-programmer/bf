@@ -43,6 +43,7 @@ let usage () =
   print_endline "   or: bf fork <specdir> <new-branch> [<single-rev-depth>]";
   print_endline "   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite|depends|packages]";
   print_endline "   or: bf clone <specdir> [overwrite] [norec] [<ver> <rev>]";
+  print_endline "   or: bf snapshot <specdir> [<composite>]";
   print_endline "   or: bf link <pkg-path> [symlink]";
   print_endline "   or: bf top <specdir>";
   print_endline "   or: bf graph <specdir> [<ver> <rev>]";
@@ -345,6 +346,11 @@ let main () =
 	      if len = 4 && Sys.argv.(3) = "symlink" then
 		Pack.link ~hard:false Sys.argv.(1)
 	      else usage ()
+	| "snapshot" ->
+	    (match len with
+	      | 3 -> Pack.snapshot Sys.argv.(2)
+	      | 4 -> Pack.snapshot ~composite:Sys.argv.(3) Sys.argv.(2)
+	      | _ -> usage ())
 	| "shell" ->
 	    Scheme.shell ()
 	| "clean" ->
