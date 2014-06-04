@@ -2758,7 +2758,7 @@ let fork ?(depth=0) top_specdir dst =
   let src = branch_of_specdir top_specdir in
 
   log_message
-    (sprintf "Create new pack branch %s from %s:\n%!" dst src);
+    (sprintf "Create new pack branch %s from %s:\n" dst src);
 
   let dir = Filename.dirname in
   let pack_dir = dir (dir top_specdir) in
@@ -2777,13 +2777,21 @@ let fork ?(depth=0) top_specdir dst =
 	  if Sys.file_exists s then s
 	  else s ^ ".git"
 	in
+	let checkout_state key =
+	  log_message (sprintf "prepare component state: %s (%s)" c.name key);
+	  ignore
+	    (with_dir c.name
+	      (fun () ->
+		(match Git.git_current_branch () with
+		  | Some key' ->
+		      if key' <> key then
+			Git.git_checkout ~force:true ~key ()
+		  | _ -> Git.git_checkout ~force:true ~key ())))
+	in
 	(match c.label with
 	  | Current ->
 	      log_error (sprintf "used current branch for %s component forking\n%!" component_location)
-	  | Branch start -> ()
-	  | Tag s ->
-	      log_message (sprintf "Warning: tag %s unchanged while %s component forking\n%!" s component_location);
-	      ()))
+	  | Branch s | Tag s -> checkout_state s))
   in
 
   let branch_jobs = ref [] in
