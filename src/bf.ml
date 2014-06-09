@@ -176,6 +176,7 @@ let main () =
 	    if len > 2 then
 	      let specdir = Sys.argv.(2) in
 	      let version = Filename.concat specdir "version" in
+	      let composite = Filename.concat specdir "composite" in
 	      let (lazy_mode,lazy_pos) =
 		if      len > 3 && Sys.argv.(3) = "lazy" then true,3
 		else if len > 4 && Sys.argv.(4) = "lazy" then true,4
@@ -196,7 +197,7 @@ let main () =
 		  Some Sys.argv.(pos)
 		else None
 	      in
-	      if Sys.file_exists version then
+	      if Sys.file_exists version && Sys.file_exists composite then
 		with_lock (fun () ->
 		  ignore (Pack.package_update ~specdir ~lazy_mode ~ver ~rev ()))
 	      else
