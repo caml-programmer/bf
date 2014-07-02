@@ -69,11 +69,14 @@ let eval_sval s =
 
 let shell () =
   while true do
-    print_string "ocs> "; flush stdout;
-    (Ocs_eval.eval thread print
-      (Ocs_compile.compile env 
-	(Ocs_read.read_from_port 
-	  (Ocs_port.input_port stdin))))
+    try
+      print_string "ocs> "; flush stdout;
+      (Ocs_eval.eval thread print
+	(Ocs_compile.compile env 
+	  (Ocs_read.read_from_port 
+	    (Ocs_port.input_port stdin))))
+    with exn ->
+      Printf.eprintf "error> %s\n%!" (Printexc.to_string exn)
   done
 
 let defined name =
