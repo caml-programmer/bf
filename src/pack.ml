@@ -3106,6 +3106,7 @@ let diff_packages ?(changelog=false) specdir rev_a rev_b =
     deptree_of_specdir ~vr:(Some (vr_of_rev rev_a)) specdir in
   let tree_b =
     deptree_of_specdir ~vr:(Some (vr_of_rev rev_b)) specdir in
+  check_pack_component ();
   let depends_a =
     List.map (fun (p,v,r,s) -> p,(v,r))
       (list_of_deptree tree_a) in
