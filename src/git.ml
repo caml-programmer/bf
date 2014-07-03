@@ -104,7 +104,7 @@ let git_checkout
   ?branch
   ?(modify=false)
   ?(track=false) ?key ?files () =
-  let args = ref ["checkout"] in
+  let args = ref ["checkout";"-q"] in
   let add arg = args := !args @ [arg] in
   if force then add "-f";
   if track then add "--track";
