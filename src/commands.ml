@@ -116,7 +116,7 @@ let non_empty_list = function
 (* Projects support *)
 
 let prepare_component component =
-  Printf.printf "prepare-component %s %s\n" component.name (Sys.getcwd ());
+  log_message (sprintf "prepare-component %s %s\n" component.name (Sys.getcwd ()));
   ignore (with_component_dir ~strict:false component git_clean)
 
 let prepare components =
@@ -147,14 +147,17 @@ let build_component_native ?(snapshot=false) component =
     log_message (component.name ^ " already built, nothing to do")
   else
     begin
-      log_message (sprintf "building %s" (with_rules component.name component));
+      let t0 = Unix.gettimeofday () in
+      log_message (sprintf "build %s started" (with_rules component.name component));
       Params.update_param "install-dir" (make_install_dir ());
       Rules.build_rules ~snapshot component.rules;
       log_message (component.name ^ " built");
       let ch = open_out (with_rules ".bf-build" component) in
       output_string ch (string_of_float (Unix.gettimeofday ()));
       output_string ch "\n";
-      close_out ch
+      close_out ch;
+      let t1 = Unix.gettimeofday () in
+      log_message (sprintf "build %s finished (%f seconds)" (with_rules component.name component) (t1 -. t0));
     end
 
 let build_component component =
@@ -284,7 +287,8 @@ let install_component ?(snapshot=false) component =
 		begin
 		  if not (Sys.file_exists (with_rules ".bf-build" component)) then
 		    build_component_native ~snapshot component;
-		  log_message ("installing " ^ component.name);
+		  let t0 = Unix.gettimeofday () in
+		  log_message ("install " ^ component.name ^ " started");
 		  let top_dir =
 		    Params.get_param "top-dir" in
 		  let dest_dir =
@@ -303,7 +307,8 @@ let install_component ?(snapshot=false) component =
 		  Params.update_param "top-dir" top_dir;
 		  generate_changes component.rules top_dir
 		    state (create_top_state install_dir);
-		  log_message (component.name ^ " installed");
+		  let t1 = Unix.gettimeofday () in
+		  log_message ("install " ^ component.name ^ (sprintf " finished (%f seconds)" (t1 -. t0)));
 		  let ch = open_out (with_rules ".bf-install" component) in
 		  output_string ch (string_of_float (Unix.gettimeofday ()));
 		  output_string ch "\n";
