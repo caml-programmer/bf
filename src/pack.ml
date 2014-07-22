@@ -2675,6 +2675,17 @@ let clone ?(vr=None) ~recursive ~overwrite specdir =
 	ignore(package_build build_arg))
     (with_rec depends)
 
+
+type forktype =
+  | Trunk
+  | Increment_branch
+  | Extend_branch
+
+let string_of_forktype = function
+  | Trunk -> "trunk"
+  | Increment_branch -> "increment-branch"
+  | Extend_branch -> "extend-branch"
+
 exception Bad_version_format_for_major_increment of string
 
 let major_increment ver =
@@ -2704,6 +2715,8 @@ let minor_increment ver =
     int_of_string (String.sub ver (succ pos) (len - 1 - pos)) in
   (String.sub ver 0 (succ pos)) ^ (string_of_int (succ minor))
 
+let extend_version ver = ver ^ ".1"
+
 let write_release file l =
   let ch = open_out file in
   List.iter (fun s ->
@@ -2711,13 +2724,19 @@ let write_release file l =
     output_string ch "\n") l;
   close_out ch
 
-let change_release depth local_depth specdir =
+let change_release mode depth local_depth specdir =
   let (ver,rev) =
     read_pkg_release specdir in
-  if local_depth > depth then
-    [sprintf "%s %d" (major_increment ver) 0]
-  else
-    [sprintf "%s %d" (minor_increment ver) 0]
+  match mode with
+    | Trunk ->
+	if local_depth > depth then
+	  [sprintf "%s %d" (major_increment ver) 0]
+	else
+	  [sprintf "%s %d" (minor_increment ver) 0]
+    | Increment_branch ->
+	[sprintf "%s %d" (minor_increment ver) 0]
+    | Extend_branch ->
+	[sprintf "%s %d" (extend_version ver) 0]
 
 let make_external_depends packdir branch local_depends =
   List.filter
@@ -2727,7 +2746,7 @@ let make_external_depends packdir branch local_depends =
     (List.map (fun s -> Filename.concat packdir (sprintf "%s/%s" s branch))
       (System.list_of_directory packdir))
 
-let update_external_depends local_depends specdir =
+let update_external_depends mode local_depends specdir =
   let depends =
     parse_depends (Filename.concat specdir "depends") in
   let fixed_depends =
@@ -2739,46 +2758,79 @@ let update_external_depends local_depends specdir =
 	    Filename.concat (d (d specdir))
 	      (sprintf "%s/%s" pkgname (branch_of_specdir specdir)) in
 	  if List.mem_assoc specdir' local_depends then
-	    Some (op,major_increment ver)
+	    let increment v =
+	      match mode with
+		| Trunk -> major_increment v
+		| Increment_branch ->
+		    minor_increment v
+		| Extend_branch ->
+		    extend_version v in
+	    Some (op,increment ver)
 	  else
 	    Some (op,ver)
     in
     List.map (fun (os,deplist) ->
       os,(List.map (fun (pkgname,ov_opt,pkg_desc_opt) -> 
-	(pkgname,(change pkgname ov_opt),pkg_desc_opt)) deplist)) 
-      depends      
+	(pkgname,(change pkgname ov_opt),pkg_desc_opt)) deplist))
+      depends
   in
   write_depends
     (Filename.concat specdir "depends") fixed_depends
 
-let fork ?(depth=0) top_specdir dst =
-  check_specdir top_specdir;
-  check_pack_component ();
+exception Bad_project_branch_format of string
+exception Branch_with_different_project of string
+exception No_version_difference of string
+exception Reject_downgrade_version of string
+exception Destination_already_exists of string
 
-  let src = branch_of_specdir top_specdir in
+let parse_fork_branch s =
+  let len = String.length s in
+  let pos = String.rindex s '-' in
+  String.sub s 0 pos,
+  String.sub s (succ pos) (len - pos - 1)
+     
+let fork_type specdir dst =
+  let src = branch_of_specdir specdir in
+  if not (Version.exists dst) then
+    raise (Bad_project_branch_format dst);
 
-  log_message
-    (sprintf "Create new pack branch %s from %s:\n" dst src);
+  if Version.exists src then
+    let (src_project,src_version) =
+      parse_fork_branch src in
+    let (dst_project,dst_version) =
+      parse_fork_branch dst in
+    if src_project = dst_project then
+      let src_ver = Version.parse src_version in
+      let dst_ver = Version.parse dst_version in
+      let src_len = List.length src_ver in
+      let dst_len = List.length dst_ver in
+      match Version.compare src_ver dst_ver with
+	| 0  -> raise (No_version_difference dst)
+	| -1 -> raise (Reject_downgrade_version dst)
+	| 1 ->
+	    if src_len = dst_len then
+	      Increment_branch
+	    else
+	      Extend_branch
+	| _ -> assert false
+    else
+      raise (Branch_with_different_project dst_project)
+  else
+    Trunk
 
-  let dir = Filename.dirname in
-  let pack_dir = dir (dir top_specdir) in
-  let deptree = deptree_of_pack ~default_branch:(Some src) top_specdir in
-  let deplist = List.map (fun (k,v) -> fst k,v) (deplist_of_deptree deptree) (* TODO: using more corrent depths *) in
-  let depends = list_of_deptree deptree in
-  log_message "depend list...";
-  List.iter (fun s -> printf "%s\n" (fst s)) depends;
-
-  let check_components =
-    print_endline "check components...";
-    List.iter
-      (fun c ->
-	let component_location =
-	  let s = c.name in
-	  if Sys.file_exists s then s
-	  else s ^ ".git"
-	in
-	let checkout_state key =
-	  log_message (sprintf "prepare component state: %s (%s)" c.name key);
+let check_components =
+  print_endline "check components...";
+  List.iter
+    (fun c ->
+      let component_location =
+	let s = c.name in
+	if Sys.file_exists s then s
+	else s ^ ".git"
+      in
+      let checkout_state key =
+	log_message (sprintf "prepare component state: %s (%s)" c.name key);
+	
+	if Sys.file_exists c.name then
 	  ignore
 	    (with_dir c.name
 	      (fun () ->
@@ -2787,12 +2839,46 @@ let fork ?(depth=0) top_specdir dst =
 		      if key' <> key then
 			Git.git_checkout ~force:true ~key ()
 		  | _ -> Git.git_checkout ~force:true ~key ())))
-	in
-	(match c.label with
-	  | Current ->
-	      log_error (sprintf "used current branch for %s component forking\n%!" component_location)
-	  | Branch s | Tag s -> checkout_state s))
-  in
+	else
+	  prepare_component c
+      in
+      (match c.label with
+	| Current ->
+	    log_error (sprintf "used current branch for %s component forking\n%!" component_location)
+	| Branch s | Tag s -> checkout_state s))
+
+let commit_pack_changes (src,dst) pack_dir =
+  with_dir pack_dir
+    (fun () ->
+      Git.git_add ".";
+      Git.git_add "-u";
+      Git.git_commit (sprintf "add new pack branch %s from %s" dst src);
+      Git.git_push "origin")
+
+let fork ?(depth=0) top_specdir dst =
+  check_specdir top_specdir;
+  check_pack_component ();
+
+  let dir = Filename.dirname in
+  let src = branch_of_specdir top_specdir in
+  let dst_specdir =
+    dir top_specdir ^ "/" ^ dst in
+
+  if Sys.file_exists dst_specdir then
+    raise (Destination_already_exists dst_specdir);
+
+  let mode = fork_type top_specdir dst in
+
+  log_message
+    (sprintf "Create new pack branch %s from %s with mode [%s]:\n"
+      dst src (string_of_forktype mode));
+
+  let pack_dir = dir (dir top_specdir) in
+  let deptree = deptree_of_pack ~default_branch:(Some src) top_specdir in
+  let deplist = List.map (fun (k,v) -> fst k,v) (deplist_of_deptree deptree) in
+  let depends = list_of_deptree deptree in
+  log_message "depend list...";
+  List.iter (fun s -> printf "%s\n" (fst s)) depends;
 
   let branch_jobs = ref [] in
   let regjob loc f =
@@ -2846,10 +2932,19 @@ let fork ?(depth=0) top_specdir dst =
       match ov_opt with
 	| None -> None
 	| Some (op,ver) ->
-	    if local_depth > depth then
-	      Some (op,major_increment ver)
-	    else
-	      Some (op,minor_increment ver)
+	    let increment v =
+	      match mode with
+		| Trunk ->
+		    if local_depth > depth then
+		      major_increment v
+		    else
+		      minor_increment v
+		| Increment_branch ->
+		    minor_increment v
+		| Extend_branch ->
+		    extend_version v
+	    in
+	    Some (op,increment ver)
     in
     List.map
       (fun (os,deplist) ->
@@ -2865,15 +2960,6 @@ let fork ?(depth=0) top_specdir dst =
     check_components
       (components_of_composite
 	(Filename.concat specdir "composite")) in
-
-  let commit_pack_changes () =
-    with_dir pack_dir
-      (fun () ->
-	Git.git_add ".";
-	Git.git_add "-u";
-	Git.git_commit (sprintf "add new pack branch %s from %s" dst src);
-	Git.git_push "origin");
-  in
   
   let make_new_specdir specdir =
     Filename.concat (dir specdir) dst in
@@ -2921,21 +3007,20 @@ let fork ?(depth=0) top_specdir dst =
 	begin
 	  write_release
 	    (Filename.concat specdir "release")
-	    (change_release depth local_depth forkdir);
+	    (change_release mode depth local_depth forkdir);
 	end
       else
 	begin
 	  System.copy_file (Filename.concat specdir "release") (Filename.concat forkdir "release");
 	  write_release
 	    (Filename.concat specdir "release")
-	    (change_release depth local_depth forkdir)
+	    (change_release mode depth local_depth forkdir)
 	end
   in
 
   List.iter check depends;
-  List.iter
-    fork_components depends;
-  List.iter (update_external_depends depends)
+  List.iter fork_components depends;
+  List.iter (update_external_depends mode depends)
     (make_external_depends pack_dir 
       (branch_of_specdir top_specdir)
       depends);
@@ -2950,7 +3035,7 @@ let fork ?(depth=0) top_specdir dst =
     !branch_jobs;
   log_message "Delay before commit pack changes...";
   stop_delay 10;
-  commit_pack_changes ()
+  commit_pack_changes (src,dst) pack_dir
 
 exception Cannot_create_image of string
 exception Cannot_view_image of string
@@ -3537,32 +3622,12 @@ let search commit_id =
 
 (* Clean old packages *)
 
-let version_compare a b =
-  let mk x =
-    List.filter ((<>) "")
-      (Strings.split '.' x) in
-  let rec cmp acc = function
-    | [],_ -> acc
-    | _,[] -> acc
-    | hd1::tl1, hd2::tl2 ->
-	let r = compare
-	  (int_of_string hd1)
-	  (int_of_string hd2) in
-	if r = 0 then
-	  cmp r (tl1,tl2)
-	else r in
-  let a = mk a in
-  let b = mk b in
-  let init =
-    compare (List.length a) (List.length b) in
-  cmp init (a,b)
-
 let pkg_compare a b =
   let (dir_a,name_a,pkg_a,platform_a,ext_a,arch_a,ver_a,rev_a) = snd a in
   let (dir_b,name_b,pkg_b,platform_b,ext_b,arch_b,ver_b,rev_b) = snd b in
   match compare name_a name_b with
     | 0 ->
-	(match version_compare ver_a ver_b with
+	(match Version.compare (Version.parse ver_a) (Version.parse ver_b) with
 	  | 0 -> compare rev_a rev_b
 	  | x -> x)
     | x -> x
