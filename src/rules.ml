@@ -91,7 +91,10 @@ let load_composite file =
 let write_composite file components =
   let ch = open_out file in
   let out = output_string ch in
+  let first = ref true in
   let write c =
+    if not !first then
+      out "\n  ";
     out "(";
     out c.Types.name;
     (match c.Types.label with
@@ -118,7 +121,8 @@ let write_composite file components =
 	  out " (rules \"";
 	  out s;
 	  out "\")");   
-    out ")\n";
+    out ")";
+    first := false;
   in
   out "(define (composite)\n'(";
   List.iter write components;

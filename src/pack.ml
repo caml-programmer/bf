@@ -2687,6 +2687,7 @@ let string_of_forktype = function
   | Extend_branch -> "extend-branch"
 
 exception Bad_version_format_for_major_increment of string
+exception Bad_version_format_for_minor_increment of string
 
 let major_increment ver =
   try
@@ -2708,12 +2709,15 @@ let clear_version_symbols s =
   Buffer.contents b
 
 let minor_increment ver =
-  let ver = clear_version_symbols ver in
-  let pos = String.rindex ver '.' in
-  let len = String.length ver in
-  let minor =
-    int_of_string (String.sub ver (succ pos) (len - 1 - pos)) in
-  (String.sub ver 0 (succ pos)) ^ (string_of_int (succ minor))
+  try
+    let ver = clear_version_symbols ver in
+    let pos = String.rindex ver '.' in
+    let len = String.length ver in
+    let minor =
+      int_of_string (String.sub ver (succ pos) (len - 1 - pos)) in
+    (String.sub ver 0 (succ pos)) ^ (string_of_int (succ minor))
+  with _ ->
+    raise (Bad_version_format_for_minor_increment ver)
 
 let extend_version ver = ver ^ ".1"
 
@@ -2785,17 +2789,19 @@ exception Reject_downgrade_version of string
 exception Destination_already_exists of string
 
 let parse_fork_branch s =
-  let len = String.length s in
-  let pos = String.rindex s '-' in
-  String.sub s 0 pos,
-  String.sub s (succ pos) (len - pos - 1)
+  try
+    let len = String.length s in
+    let pos = String.rindex s '-' in
+    String.sub s 0 pos,
+    String.sub s (succ pos) (len - pos - 1)
+  with Not_found -> ("skvt",s)
      
 let fork_type specdir dst =
   let src = branch_of_specdir specdir in
   if not (Version.exists dst) then
     raise (Bad_project_branch_format dst);
 
-  if Version.exists src then
+  if Version.exists src || Version.is src then
     let (src_project,src_version) =
       parse_fork_branch src in
     let (dst_project,dst_version) =
@@ -2805,7 +2811,7 @@ let fork_type specdir dst =
       let dst_ver = Version.parse dst_version in
       let src_len = List.length src_ver in
       let dst_len = List.length dst_ver in
-      match Version.compare src_ver dst_ver with
+      match Version.compare dst_ver src_ver with
 	| 0  -> raise (No_version_difference dst)
 	| -1 -> raise (Reject_downgrade_version dst)
 	| 1 ->
@@ -2866,22 +2872,42 @@ let fork ?(depth=0) top_specdir dst =
   check_specdir top_specdir;
   check_pack_component ();
 
+  (* TODO: нужна проверка, что dst не использует версию из
+     от какой-либо пакетной ветки, проверять через
+     release-ные файлы *)
+
+  (* TODO: для надёжности функционирования
+     в режиме increment-branch - инкрементить
+     нужно тот же разряд, что и в ветке пакета
+     (для случаев, когда версия в зависимости имеет большее число
+     разрядов, либо надо уменьшать разрядность в таких случаях)
+  *)
+
   let dir = Filename.dirname in
   let src = branch_of_specdir top_specdir in
   let dst_specdir =
     dir top_specdir ^ "/" ^ dst in
-  let dst_capacity = Version.capacity dst in
-
-  let capacity_reduction v =
-    let c = Version.capacity v in
-    if c < dst_capacity then
-      v ^ "." ^  (mkextend (dst_capacity - c))
-    else v in
+  let dst_capacity = 
+    Version.capacity (snd (parse_fork_branch dst)) in
 
   if Sys.file_exists dst_specdir then
     raise (Destination_already_exists dst_specdir);
 
   let mode = fork_type top_specdir dst in
+
+  let capacity_reduction v =
+    let c = Version.capacity v in
+    let diff =
+      dst_capacity - c in
+    let n =
+      if mode = Extend_branch then 
+	pred diff
+      else diff in
+    if c < dst_capacity then
+      if n > 0 then
+	v ^ "." ^  (mkextend n)
+      else v
+    else v in
 
   log_message
     (sprintf "Create new pack branch %s from %s with mode [%s]:\n"
@@ -2974,70 +3000,96 @@ let fork ?(depth=0) top_specdir dst =
     check_components
       (components_of_composite
 	(Filename.concat specdir "composite")) in
-  
-  let make_new_specdir specdir =
+
+  let make_dst_specdir specdir =
     Filename.concat (dir specdir) dst in
-  
+
   let fork_components (specdir,_) =
+    let dst_specdir =
+      make_dst_specdir specdir in
+    let source =
+      Filename.concat specdir in    
+    let exists = Sys.file_exists in
+    let destination =
+      Filename.concat dst_specdir in
+
     let local_depth = List.assoc specdir deplist in
     let files = System.list_of_directory specdir in
-    let forkdir = make_new_specdir specdir in
-    let components = 
-      components_of_composite (Filename.concat specdir "composite") in
-    make_directory [forkdir];
+    let components =
+      components_of_composite (source "composite") in
+
+    make_directory [dst_specdir];
     
     let ignore = ["depends";"composite";"release"] in
     List.iter
       (fun n ->
 	if not (List.mem n ignore) then
 	  System.copy_file
-	    (Filename.concat specdir n)
-	    (Filename.concat forkdir n)) files;
+	    (source n)
+	    (destination n)) files;
     
-    if Sys.file_exists (Filename.concat specdir "composite") && (not (Sys.file_exists (Filename.concat forkdir "composite"))) then
-      write_composite (Filename.concat forkdir "composite") (change_components components);
+    (* composite handling *)
 
-    if Sys.file_exists (Filename.concat specdir "depends") then
-      begin
-	if Sys.file_exists (Filename.concat forkdir "depends") then
-	  begin (* it is necessary for aborting process after copy the depends file *)
-	    let depends =
-	      parse_depends (Filename.concat forkdir "depends") in
-	    write_depends
-	      (Filename.concat specdir "depends") (change_depends depends);
-	  end
-	else
-	  begin
-	    let depends =
-	      parse_depends (Filename.concat specdir "depends") in
-	    System.copy_file (Filename.concat specdir "depends") (Filename.concat forkdir "depends");
-	    write_depends
-	      (Filename.concat specdir "depends") (change_depends depends);
-	  end
-      end;
+    if exists (source "composite") && (not (exists (destination "composite"))) then
+      write_composite (destination "composite")
+	(change_components components);
     
-    if Sys.file_exists (Filename.concat specdir "release") then
-      if Sys.file_exists (Filename.concat forkdir "release") then
-	begin
-	  write_release
-	    (Filename.concat specdir "release")
-	    (change_release mode capacity_reduction depth local_depth forkdir);
-	end
-      else
-	begin
-	  System.copy_file (Filename.concat specdir "release") (Filename.concat forkdir "release");
-	  write_release
-	    (Filename.concat specdir "release")
-	    (change_release mode capacity_reduction depth local_depth forkdir)
-	end
+    (* depends handling *)
+    
+    if exists (source "depends") then
+      begin
+	match mode with
+	  | Trunk ->
+	      if exists (destination "depends") then
+		begin (* it is necessary for aborting process after copy the depends file *)
+		  let depends = parse_depends (destination "depends") in
+		  write_depends (source "depends") (change_depends depends);
+		end
+	      else
+		begin
+		  let depends = parse_depends (source "depends") in
+		  System.copy_file (source "depends") (destination "depends");
+		  write_depends (source "depends") (change_depends depends);
+		end
+	  | Increment_branch | Extend_branch ->
+	      let depends = parse_depends (source "depends") in
+	      write_depends (destination "depends") (change_depends depends)
+      end;
+
+    (* release handling *)
+    
+    if exists (source "release") then
+      begin
+	match mode with
+	  | Trunk ->
+	      if exists (destination "release") then
+		begin
+		  write_release (source "release")
+		    (change_release mode capacity_reduction depth local_depth dst_specdir);
+		end
+	      else
+		begin
+		  System.copy_file (source "release") (destination "release");
+		  write_release (source "release")
+		    (change_release mode capacity_reduction depth local_depth dst_specdir)
+		end
+	  | Increment_branch | Extend_branch ->
+	      write_release (destination "release")
+		(change_release mode capacity_reduction depth local_depth specdir)
+      end
   in
 
   List.iter check depends;
   List.iter fork_components depends;
-  List.iter (update_external_depends mode capacity_reduction depends)
-    (make_external_depends pack_dir 
-      (branch_of_specdir top_specdir)
-      depends);
+
+  if mode = Trunk then
+    (* Для режимов отличных от trunk - обновление
+       внешних зависимостей не производим *)
+    List.iter (update_external_depends mode capacity_reduction depends)
+      (make_external_depends pack_dir
+	(branch_of_specdir top_specdir)
+	depends);
+
   List.iter (fun x ->
     log_message (sprintf "Need branching %s" (fst x))) !branch_jobs;
   log_message "Delay before components branching...";
