@@ -3,6 +3,9 @@ let parse x =
     (List.filter ((<>) "")
       (Strings.split '.' x))
 
+let capacity x =
+  List.length (parse x)
+
 let compare a b =
   let rec cmp acc = function
     | [],_ -> acc

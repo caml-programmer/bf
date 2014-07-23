@@ -2724,9 +2724,10 @@ let write_release file l =
     output_string ch "\n") l;
   close_out ch
 
-let change_release mode depth local_depth specdir =
+let change_release mode capacity_reduction depth local_depth specdir =
   let (ver,rev) =
     read_pkg_release specdir in
+  let ver = capacity_reduction ver in
   match mode with
     | Trunk ->
 	if local_depth > depth then
@@ -2746,7 +2747,7 @@ let make_external_depends packdir branch local_depends =
     (List.map (fun s -> Filename.concat packdir (sprintf "%s/%s" s branch))
       (System.list_of_directory packdir))
 
-let update_external_depends mode local_depends specdir =
+let update_external_depends mode capacity_reduction local_depends specdir =
   let depends =
     parse_depends (Filename.concat specdir "depends") in
   let fixed_depends =
@@ -2765,7 +2766,7 @@ let update_external_depends mode local_depends specdir =
 		    minor_increment v
 		| Extend_branch ->
 		    extend_version v in
-	    Some (op,increment ver)
+	    Some (op,increment (capacity_reduction ver))
 	  else
 	    Some (op,ver)
     in
@@ -2855,6 +2856,12 @@ let commit_pack_changes (src,dst) pack_dir =
       Git.git_commit (sprintf "add new pack branch %s from %s" dst src);
       Git.git_push "origin")
 
+let mkextend n =
+  let rec mk acc = function
+    | 0 -> acc
+    | n -> mk ("0"::acc) (pred n)
+  in String.concat "." (mk [] n)
+
 let fork ?(depth=0) top_specdir dst =
   check_specdir top_specdir;
   check_pack_component ();
@@ -2863,6 +2870,13 @@ let fork ?(depth=0) top_specdir dst =
   let src = branch_of_specdir top_specdir in
   let dst_specdir =
     dir top_specdir ^ "/" ^ dst in
+  let dst_capacity = Version.capacity dst in
+
+  let capacity_reduction v =
+    let c = Version.capacity v in
+    if c < dst_capacity then
+      v ^ "." ^  (mkextend (dst_capacity - c))
+    else v in
 
   if Sys.file_exists dst_specdir then
     raise (Destination_already_exists dst_specdir);
@@ -2944,7 +2958,7 @@ let fork ?(depth=0) top_specdir dst =
 		| Extend_branch ->
 		    extend_version v
 	    in
-	    Some (op,increment ver)
+	    Some (op,increment (capacity_reduction ver))
     in
     List.map
       (fun (os,deplist) ->
@@ -3007,20 +3021,20 @@ let fork ?(depth=0) top_specdir dst =
 	begin
 	  write_release
 	    (Filename.concat specdir "release")
-	    (change_release mode depth local_depth forkdir);
+	    (change_release mode capacity_reduction depth local_depth forkdir);
 	end
       else
 	begin
 	  System.copy_file (Filename.concat specdir "release") (Filename.concat forkdir "release");
 	  write_release
 	    (Filename.concat specdir "release")
-	    (change_release mode depth local_depth forkdir)
+	    (change_release mode capacity_reduction depth local_depth forkdir)
 	end
   in
 
   List.iter check depends;
   List.iter fork_components depends;
-  List.iter (update_external_depends mode depends)
+  List.iter (update_external_depends mode capacity_reduction depends)
     (make_external_depends pack_dir 
       (branch_of_specdir top_specdir)
       depends);
