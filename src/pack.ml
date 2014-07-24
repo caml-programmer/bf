@@ -2686,38 +2686,12 @@ let string_of_forktype = function
   | Increment_branch -> "increment-branch"
   | Extend_branch -> "extend-branch"
 
-exception Bad_version_format_for_major_increment of string
-exception Bad_version_format_for_minor_increment of string
-
 let major_increment ver =
-  try
-    let pos = String.index ver '.' in
-    let len = String.length ver in
-    let major =
-      int_of_string (String.sub ver 0 pos) in
-    (string_of_int (succ major)) ^ (String.sub ver pos (len - pos))
-  with _ ->
-    raise (Bad_version_format_for_major_increment ver)
+  Version.increment 0 ver
     
-let clear_version_symbols s =
-  let b = Buffer.create 32 in
-  String.iter 
-    (function
-      | '0' .. '9'
-      | '.' as c -> Buffer.add_char b c
-      | _ -> ()) s;
-  Buffer.contents b
-
-let minor_increment ver =
-  try
-    let ver = clear_version_symbols ver in
-    let pos = String.rindex ver '.' in
-    let len = String.length ver in
-    let minor =
-      int_of_string (String.sub ver (succ pos) (len - 1 - pos)) in
-    (String.sub ver 0 (succ pos)) ^ (string_of_int (succ minor))
-  with _ ->
-    raise (Bad_version_format_for_minor_increment ver)
+let minor_increment dst_capacity ver =
+  Version.increment
+    (pred dst_capacity) ver
 
 let extend_version ver = ver ^ ".1"
 
@@ -2728,18 +2702,20 @@ let write_release file l =
     output_string ch "\n") l;
   close_out ch
 
-let change_release mode capacity_reduction depth local_depth specdir =
+let change_release mode dst_capacity capacity_reduction depth local_depth specdir =
   let (ver,rev) =
     read_pkg_release specdir in
   let ver = capacity_reduction ver in
   match mode with
     | Trunk ->
 	if local_depth > depth then
+	  (* для пакетов нижнего уровня *)
 	  [sprintf "%s %d" (major_increment ver) 0]
 	else
-	  [sprintf "%s %d" (minor_increment ver) 0]
+	  (* для пакетов верхнего уровня *)
+	  [sprintf "%s %d" (minor_increment dst_capacity ver) 0]
     | Increment_branch ->
-	[sprintf "%s %d" (minor_increment ver) 0]
+	[sprintf "%s %d" (minor_increment dst_capacity ver) 0]
     | Extend_branch ->
 	[sprintf "%s %d" (extend_version ver) 0]
 
@@ -2751,7 +2727,7 @@ let make_external_depends packdir branch local_depends =
     (List.map (fun s -> Filename.concat packdir (sprintf "%s/%s" s branch))
       (System.list_of_directory packdir))
 
-let update_external_depends mode capacity_reduction local_depends specdir =
+let update_external_depends mode dst_capacity capacity_reduction local_depends specdir =
   let depends =
     parse_depends (Filename.concat specdir "depends") in
   let fixed_depends =
@@ -2767,7 +2743,7 @@ let update_external_depends mode capacity_reduction local_depends specdir =
 	      match mode with
 		| Trunk -> major_increment v
 		| Increment_branch ->
-		    minor_increment v
+		    minor_increment dst_capacity v
 		| Extend_branch ->
 		    extend_version v in
 	    Some (op,increment (capacity_reduction ver))
@@ -2787,6 +2763,7 @@ exception Branch_with_different_project of string
 exception No_version_difference of string
 exception Reject_downgrade_version of string
 exception Destination_already_exists of string
+exception Destination_branch_already_used of string
 
 let parse_fork_branch s =
   try
@@ -2824,7 +2801,7 @@ let fork_type specdir dst =
       raise (Branch_with_different_project dst_project)
   else
     Trunk
-
+      
 let check_components =
   print_endline "check components...";
   List.iter
@@ -2868,26 +2845,26 @@ let mkextend n =
     | n -> mk ("0"::acc) (pred n)
   in String.concat "." (mk [] n)
 
+let check_destination_branch packdir dst =
+  List.iter (fun x ->
+    let pkgdir = Filename.concat packdir x in
+    let branch_path = Filename.concat pkgdir dst in
+    if System.is_directory pkgdir && Sys.file_exists branch_path then
+      raise (Destination_branch_already_used branch_path))
+  (System.list_of_directory packdir)  
+
 let fork ?(depth=0) top_specdir dst =
+  let dir = Filename.dirname in
+  let packdir = dir (dir top_specdir) in
+  
   check_specdir top_specdir;
   check_pack_component ();
+  check_destination_branch packdir dst;
 
-  (* TODO: нужна проверка, что dst не использует версию из
-     от какой-либо пакетной ветки, проверять через
-     release-ные файлы *)
-
-  (* TODO: для надёжности функционирования
-     в режиме increment-branch - инкрементить
-     нужно тот же разряд, что и в ветке пакета
-     (для случаев, когда версия в зависимости имеет большее число
-     разрядов, либо надо уменьшать разрядность в таких случаях)
-  *)
-
-  let dir = Filename.dirname in
   let src = branch_of_specdir top_specdir in
   let dst_specdir =
     dir top_specdir ^ "/" ^ dst in
-  let dst_capacity = 
+  let dst_capacity =
     Version.capacity (snd (parse_fork_branch dst)) in
 
   if Sys.file_exists dst_specdir then
@@ -2897,17 +2874,18 @@ let fork ?(depth=0) top_specdir dst =
 
   let capacity_reduction v =
     let c = Version.capacity v in
-    let diff =
-      dst_capacity - c in
-    let n =
-      if mode = Extend_branch then 
-	pred diff
-      else diff in
     if c < dst_capacity then
+      let n =
+	let diff =
+	  dst_capacity - c in    
+	if mode = Extend_branch then
+	  pred diff
+	else diff in
       if n > 0 then
 	v ^ "." ^  (mkextend n)
       else v
-    else v in
+    else v
+  in
 
   log_message
     (sprintf "Create new pack branch %s from %s with mode [%s]:\n"
@@ -2978,9 +2956,9 @@ let fork ?(depth=0) top_specdir dst =
 		    if local_depth > depth then
 		      major_increment v
 		    else
-		      minor_increment v
+		      minor_increment dst_capacity v
 		| Increment_branch ->
-		    minor_increment v
+		    minor_increment dst_capacity v
 		| Extend_branch ->
 		    extend_version v
 	    in
@@ -3065,17 +3043,17 @@ let fork ?(depth=0) top_specdir dst =
 	      if exists (destination "release") then
 		begin
 		  write_release (source "release")
-		    (change_release mode capacity_reduction depth local_depth dst_specdir);
+		    (change_release mode dst_capacity capacity_reduction depth local_depth dst_specdir);
 		end
 	      else
 		begin
 		  System.copy_file (source "release") (destination "release");
 		  write_release (source "release")
-		    (change_release mode capacity_reduction depth local_depth dst_specdir)
+		    (change_release mode dst_capacity capacity_reduction depth local_depth dst_specdir)
 		end
 	  | Increment_branch | Extend_branch ->
 	      write_release (destination "release")
-		(change_release mode capacity_reduction depth local_depth specdir)
+		(change_release mode dst_capacity capacity_reduction depth local_depth specdir)
       end
   in
 
@@ -3085,7 +3063,7 @@ let fork ?(depth=0) top_specdir dst =
   if mode = Trunk then
     (* Для режимов отличных от trunk - обновление
        внешних зависимостей не производим *)
-    List.iter (update_external_depends mode capacity_reduction depends)
+    List.iter (update_external_depends mode dst_capacity capacity_reduction depends)
       (make_external_depends pack_dir
 	(branch_of_specdir top_specdir)
 	depends);
