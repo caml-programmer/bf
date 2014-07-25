@@ -1,4 +1,5 @@
 exception Bad_version of string
+exception Bad_version_for_major_increment of string
 
 let clear s =
   let b = Buffer.create 32 in
@@ -79,3 +80,21 @@ let truncate len x =
 	else []
   in build (mk len v)
 	  
+let null_extend n =
+  let rec mk acc = function
+    | 0 -> acc
+    | n -> mk ("0"::acc) (pred n)
+  in String.concat "." (mk [] n)
+
+let major_increment base ver =
+  match parse ver with
+    | major::_ ->
+	string_of_int (succ major) ^ "." ^
+	null_extend (pred base)
+    | _ ->
+	raise (Bad_version_for_major_increment ver)
+    
+let minor_increment base ver =
+  increment (pred base) ver
+
+let extend ver = ver ^ ".1"

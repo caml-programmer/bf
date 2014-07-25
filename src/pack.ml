@@ -2686,15 +2686,6 @@ let string_of_forktype = function
   | Increment_branch -> "increment-branch"
   | Extend_branch -> "extend-branch"
 
-let major_increment ver =
-  Version.increment 0 ver
-    
-let minor_increment dst_capacity ver =
-  Version.increment
-    (pred dst_capacity) ver
-
-let extend_version ver = ver ^ ".1"
-
 let write_release file l =
   let ch = open_out file in
   List.iter (fun s ->
@@ -2710,14 +2701,14 @@ let change_release mode dst_capacity capacity_reduction depth local_depth specdi
     | Trunk ->
 	if local_depth > depth then
 	  (* для пакетов нижнего уровня *)
-	  [sprintf "%s %d" (major_increment ver) 0]
+	  [sprintf "%s %d" (Version.major_increment dst_capacity ver) 0]
 	else
 	  (* для пакетов верхнего уровня *)
-	  [sprintf "%s %d" (minor_increment dst_capacity ver) 0]
+	  [sprintf "%s %d" (Version.minor_increment dst_capacity ver) 0]
     | Increment_branch ->
-	[sprintf "%s %d" (minor_increment dst_capacity ver) 0]
+	[sprintf "%s %d" (Version.minor_increment dst_capacity ver) 0]
     | Extend_branch ->
-	[sprintf "%s %d" (extend_version ver) 0]
+	[sprintf "%s %d" (Version.extend ver) 0]
 
 let make_external_depends packdir branch local_depends =
   List.filter
@@ -2741,11 +2732,11 @@ let update_external_depends mode dst_capacity capacity_reduction local_depends s
 	  if List.mem_assoc specdir' local_depends then
 	    let increment v =
 	      match mode with
-		| Trunk -> major_increment v
+		| Trunk -> Version.major_increment dst_capacity v
 		| Increment_branch ->
-		    minor_increment dst_capacity v
+		    Version.minor_increment dst_capacity v
 		| Extend_branch ->
-		    extend_version v in
+		    Version.extend v in
 	    Some (op,increment (capacity_reduction ver))
 	  else
 	    Some (op,ver)
@@ -2839,12 +2830,6 @@ let commit_pack_changes (src,dst) pack_dir =
       Git.git_commit (sprintf "add new pack branch %s from %s" dst src);
       Git.git_push "origin")
 
-let mkextend n =
-  let rec mk acc = function
-    | 0 -> acc
-    | n -> mk ("0"::acc) (pred n)
-  in String.concat "." (mk [] n)
-
 let check_destination_branch packdir dst =
   List.iter (fun x ->
     let pkgdir = Filename.concat packdir x in
@@ -2856,7 +2841,7 @@ let check_destination_branch packdir dst =
 let fork ?(depth=0) top_specdir dst =
   let dir = Filename.dirname in
   let packdir = dir (dir top_specdir) in
-  
+
   check_specdir top_specdir;
   check_pack_component ();
   check_destination_branch packdir dst;
@@ -2874,15 +2859,13 @@ let fork ?(depth=0) top_specdir dst =
 
   let capacity_reduction v =
     let c = Version.capacity v in
-    if c < dst_capacity then
+    let base =
+      dst_capacity in
+    if c < base then
       let n =
-	let diff =
-	  dst_capacity - c in    
-	if mode = Extend_branch then
-	  pred diff
-	else diff in
+	base - c in
       if n > 0 then
-	v ^ "." ^  (mkextend n)
+	v ^ "." ^  (Version.null_extend n)
       else v
     else v
   in
@@ -2954,13 +2937,13 @@ let fork ?(depth=0) top_specdir dst =
 	      match mode with
 		| Trunk ->
 		    if local_depth > depth then
-		      major_increment v
+		      Version.major_increment dst_capacity v
 		    else
-		      minor_increment dst_capacity v
+		      Version.minor_increment dst_capacity v
 		| Increment_branch ->
-		    minor_increment dst_capacity v
+		    Version.minor_increment dst_capacity v
 		| Extend_branch ->
-		    extend_version v
+		    Version.extend v
 	    in
 	    Some (op,increment (capacity_reduction ver))
     in
