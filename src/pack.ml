@@ -2732,7 +2732,8 @@ let update_external_depends mode dst_capacity capacity_reduction local_depends s
 	  if List.mem_assoc specdir' local_depends then
 	    let increment v =
 	      match mode with
-		| Trunk -> Version.major_increment dst_capacity v
+		| Trunk ->
+		    Version.major_increment dst_capacity v
 		| Increment_branch ->
 		    Version.minor_increment dst_capacity v
 		| Extend_branch ->
@@ -2753,16 +2754,22 @@ exception Bad_project_branch_format of string
 exception Branch_with_different_project of string
 exception No_version_difference of string
 exception Reject_downgrade_version of string
+exception Reject_non_trunk_version of string
 exception Destination_already_exists of string
 exception Destination_branch_already_used of string
 
-let parse_fork_branch s =
+let parse_fork_branch specdir =
+  let s = branch_of_specdir specdir in
   try
     let len = String.length s in
     let pos = String.rindex s '-' in
     String.sub s 0 pos,
     String.sub s (succ pos) (len - pos - 1)
-  with Not_found -> ("skvt",s)
+  with Not_found ->
+    if Version.is s then
+      ("skvt",s)
+    else
+      s, (fst (read_pkg_release ~next:false specdir))
      
 let fork_type specdir dst =
   let src = branch_of_specdir specdir in
@@ -2771,9 +2778,9 @@ let fork_type specdir dst =
 
   if Version.exists src || Version.is src then
     let (src_project,src_version) =
-      parse_fork_branch src in
+      parse_fork_branch specdir in
     let (dst_project,dst_version) =
-      parse_fork_branch dst in
+      parse_fork_branch (Filename.concat (Filename.dirname specdir) dst) in
     if src_project = dst_project then
       let src_ver = Version.parse src_version in
       let dst_ver = Version.parse dst_version in
@@ -2790,8 +2797,18 @@ let fork_type specdir dst =
 	| _ -> assert false
     else
       raise (Branch_with_different_project dst_project)
-  else
-    Trunk
+  else    
+    let src_ver =
+      Version.parse (snd (parse_fork_branch specdir)) in
+    let dst =
+      snd (parse_fork_branch (Filename.concat (Filename.dirname specdir) dst)) in
+    let dst_ver =
+      Version.parse dst in
+    match Version.compare dst_ver src_ver with
+      |  0 -> Trunk
+      |  1 -> raise (Reject_non_trunk_version dst)
+      | -1 -> raise (Reject_downgrade_version dst)
+      |  _ -> assert false
       
 let check_components =
   print_endline "check components...";
@@ -2836,7 +2853,7 @@ let check_destination_branch packdir dst =
     let branch_path = Filename.concat pkgdir dst in
     if System.is_directory pkgdir && Sys.file_exists branch_path then
       raise (Destination_branch_already_used branch_path))
-  (System.list_of_directory packdir)  
+  (System.list_of_directory packdir) 
 
 let fork ?(depth=0) top_specdir dst =
   let dir = Filename.dirname in
@@ -2857,10 +2874,24 @@ let fork ?(depth=0) top_specdir dst =
 
   let mode = fork_type top_specdir dst in
 
+  let src_capacity =
+    if mode = Trunk then
+      Version.capacity (fst (read_pkg_release ~next:false top_specdir))
+    else
+      Version.capacity (snd (parse_fork_branch src))
+  in
+
   let capacity_reduction v =
     let c = Version.capacity v in
     let base =
-      dst_capacity in
+      match mode with
+	| Trunk ->
+	    dst_capacity
+	| Increment_branch ->
+	    dst_capacity
+	| Extend_branch ->
+	    src_capacity
+    in
     if c < base then
       let n =
 	base - c in
