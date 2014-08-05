@@ -17,11 +17,11 @@ let git_commit ?(empty=false) msg =
   else
     log_command ~env "git" ["commit";"-m";msg]
    
-let git_fetch ?refspec ?(tags=false) url =
-  let opts = if tags then ["--tags"] else [] in
+let git_fetch ?refspec ?(tags=false) () =
+  let opts = if tags then ["-q";"--tags"] else ["-q"] in
   match refspec with
-    | Some spec -> log_command ~env "git" (["fetch"] @ opts @ [url;spec])
-    | None -> log_command ~env "git" (["fetch"] @ opts @ [url])
+    | Some spec -> ignore(run_command "git" (["fetch"] @ opts @ [spec]))
+    | None -> ignore(run_command "git" (["fetch"] @ opts))
 
 let git_merge remote =
   log_command ~env "git" ["merge";remote]

@@ -630,6 +630,9 @@ let changelog_component ?(branch=None) ?(diff=false) ?(since=None) tag_a tag_b c
   let chunks = ref [] in
   ignore (with_component_dir ~low:true ~strict:false component
     (fun () ->
+      
+      Git.git_fetch ~tags:true ();
+
       let pack =
 	if component.name = "pack" then
 	  match branch with
