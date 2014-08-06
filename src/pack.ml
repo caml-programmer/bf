@@ -1944,10 +1944,10 @@ let extract_packbranch ~userhost pkg_path =
 	String.sub hd (succ pos) (len - pos - 1)
 
 let full_require =
-  Pcre.regexp "([^\\ ]+)\\s+=\\s+([^-]+)-(\\d+)\\."
+  Pcre.regexp "([^\\ ]+)\\s+[<>]?=\\s+([^-]+)-(\\d+)\\."
 
 let without_rev_require =
-  Pcre.regexp "([^\\ ]+)\\s+=\\s+(.+)"
+  Pcre.regexp "([^\\ ]+)\\s+[<>]?=\\s+(.+)"
 
 let without_ver_require =
   Pcre.regexp "(.+)"
@@ -2000,7 +2000,7 @@ let extract_depend_list ~userhost pkg_path =
 	  | None -> 
 	      (sprintf "rpm -qRp %s" pkg_path))))
 
-let name_of_pkg_path pkg_path =
+let name_of_pkg_path pkg_path =  
   let pkg = Filename.basename pkg_path in
   let platform = extract_platform pkg in
   let extension = extract_extension pkg in
