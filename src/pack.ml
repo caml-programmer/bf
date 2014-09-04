@@ -516,6 +516,14 @@ let string_of_pkgexn = function
       sprintf "Pkg_release_not_found(%s,%s)" s (Printexc.to_string exn)
   | exn -> Printexc.to_string exn
 
+let home_made_package pkg =
+  let exclude =
+    try
+      let ex_prefix = Params.get_param "pkg-prefix-exclude" in
+      String.length ex_prefix <> 0 && Strings.have_prefix ex_prefix pkg
+    with Params.Unknown_parameter _ -> false in
+  (Strings.have_prefix (Params.get_param "pkg-prefix") pkg) && not exclude
+
 let make_depends ?snapshot ?(interactive=false) ?(ignore_last=false) file =
   let packdir = Filename.dirname (Filename.dirname (Filename.dirname file)) in
   let acc = ref ([] : depend list) in
@@ -537,13 +545,21 @@ let make_depends ?snapshot ?(interactive=false) ?(ignore_last=false) file =
 	  Scheme.make_string (Scheme.fst v) in
 	pkg_op  := Some op;
 	(match snapshot with
-	  | Some (ver,rev) ->
+	  | Some (ver',rev') ->
 	      (match op with
 		| Pkg_last -> 
 		    with_platform 
 		      (fun _ platform ->
-			pkg_ver := Some (sprintf "%s-%s.%s" ver rev (string_of_platform platform)))
-		| _ ->  pkg_ver := Some ver)
+			pkg_ver := Some (sprintf "%s-%s.%s" ver' rev' (string_of_platform platform)))
+		| _ ->
+		    (match !pkg_name with
+		      | Some pkg ->
+			  if home_made_package pkg then
+			    pkg_ver := Some ver'
+			  else 
+			    pkg_ver := Some ver
+		      | None ->
+			  pkg_ver := Some ver'))
 	  | None ->
 	      (match op with
 		| Pkg_last ->
@@ -1951,14 +1967,6 @@ let without_rev_require =
 
 let without_ver_require =
   Pcre.regexp "(.+)"
-
-let home_made_package pkg =
-  let exclude =
-    try
-      let ex_prefix = Params.get_param "pkg-prefix-exclude" in
-      String.length ex_prefix <> 0 && Strings.have_prefix ex_prefix pkg
-    with Params.Unknown_parameter _ -> false in
-  (Strings.have_prefix (Params.get_param "pkg-prefix") pkg) && not exclude    
   
 let extract_depend_list ~userhost pkg_path =
   List.rev
