@@ -541,7 +541,7 @@ let make_depends ?snapshot ?(interactive=false) ?(ignore_last=false) file =
 	      (match op with
 		| Pkg_last -> 
 		    with_platform 
-		      (fun _ platform ->			
+		      (fun _ platform ->
 			pkg_ver := Some (sprintf "%s-%s.%s" ver rev (string_of_platform platform)))
 		| _ ->  pkg_ver := Some ver)
 	  | None ->
@@ -2177,7 +2177,7 @@ let link ~hard pkg_path =
       sprintf "%s-%s-%d.%s.%s.%s"
 	e.pkg_name e.pkg_version 
 	e.pkg_revision (string_of_platform e.pkg_platform) e.pkg_arch
-	e.pkg_extension 
+	e.pkg_extension
     in
     let file =
       Filename.concat pkg_dir name in
@@ -2186,8 +2186,8 @@ let link ~hard pkg_path =
     let do_hardlink () =
       Unix.link file name in
     if hard then
-      begin 
-	try 
+      begin
+	try
 	  do_hardlink ()
 	with exn ->
 	  log_message (sprintf "warning: cannot create hardlink: %s by %s\n" name (Printexc.to_string exn));

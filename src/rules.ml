@@ -136,7 +136,11 @@ let components_of_composite ?replace composite =
       | Some x -> load_composite x in
   List.map
     (fun c ->
-      match List.filter (fun r -> r.Types.name = c.Types.name) replace with
+      match List.filter 
+	(fun r -> 
+	  r.Types.name  = c.Types.name &&
+	  r.Types.rules = c.Types.rules)
+	replace with
 	| hd::_ -> hd
 	| [] -> c)
     (load_composite composite)
