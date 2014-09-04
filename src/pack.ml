@@ -2605,7 +2605,7 @@ let upgrade specdir upgrade_mode default_branch =
     | Upgrade_default ->
 	complete_impl true
 
-let top ?composite ?depends specdir =
+let top ?(replace_composite=None) ?depends specdir =
   let specdir =
     System.path_strip_directory specdir in
   check_specdir specdir;
@@ -2627,7 +2627,7 @@ let top ?composite ?depends specdir =
 	let new_components =
 	  List.filter
 	    (fun c -> not (List.mem c acc))
-	    (Rules.components_of_composite ~replace:composite composite) in
+	    (Rules.components_of_composite ~replace_composite composite) in
 	List.iter 
 	  (fun c ->
 	    let rules =
@@ -3769,7 +3769,7 @@ let make_snapshot_id () =
       t.Unix.tm_sec in
   (ver, rev)
 
-let snapshot ?composite specdir =
+let snapshot ?(composite=None) specdir =
   let specdir =
     System.path_strip_directory specdir in
   let (ver,rev) =
@@ -3783,7 +3783,7 @@ let snapshot ?composite specdir =
   log_message "depend list...";
   List.iter (fun (specdir,_,_) -> print_endline specdir) depends;
   stop_delay 5;
-  top ~composite ~depends specdir;
+  top ~replace_composite:composite ~depends specdir;
   List.iter
     (fun (specdir,_,_) ->
       build_package_file ~snapshot:true (specdir,ver,rev))

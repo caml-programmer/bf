@@ -129,11 +129,12 @@ let write_composite file components =
   out "))\n";
   close_out ch
 
-let components_of_composite ?replace composite =
+let components_of_composite ?(replace_composite=None) composite =
   let replace =
-    match replace with
+    match replace_composite with
       | None -> []
-      | Some x -> load_composite x in
+      | Some x ->
+	  load_composite x in
   List.map
     (fun c ->
       match List.filter 
@@ -141,8 +142,12 @@ let components_of_composite ?replace composite =
 	  r.Types.name  = c.Types.name &&
 	  r.Types.rules = c.Types.rules)
 	replace with
-	| hd::_ -> hd
-	| [] -> c)
+	  | r::_ ->
+	      printf "replace %s.%s.%s -> %s.%s.%s\n%!"
+		c.Types.name (Types.string_of_label c.Types.label) (Types.string_of_rules c.Types.rules)
+		r.Types.name (Types.string_of_label r.Types.label) (Types.string_of_rules r.Types.rules);
+	      r
+	  | [] -> c)
     (load_composite composite)
 
 let with_snapshot snapshot f =

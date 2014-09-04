@@ -350,7 +350,10 @@ let main () =
 	| "snapshot" ->
 	    (match len with
 	      | 3 -> Pack.snapshot Sys.argv.(2)
-	      | 4 -> Pack.snapshot ~composite:Sys.argv.(3) Sys.argv.(2)
+	      | 4 -> 
+		  if Sys.file_exists Sys.argv.(3) then
+		    Pack.snapshot ~composite:(Some Sys.argv.(3)) Sys.argv.(2)
+		  else usage ()
 	      | _ -> usage ())
 	| "shell" ->
 	    Scheme.shell ()

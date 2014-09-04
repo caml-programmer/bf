@@ -18,6 +18,10 @@ let string_of_label_type = function
   | Branch _ -> "branch"
   | Current  -> "current"
 
+let string_of_rules = function
+  | None -> ""
+  | Some r -> r
+
 type content_status =
   | Tree_prepared               (* nothing to do *)
   | Tree_changed of string list (* checkout -f && clean -d *)
