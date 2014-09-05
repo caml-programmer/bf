@@ -553,8 +553,8 @@ let make_depends ?snapshot ?(interactive=false) ?(ignore_last=false) file =
 			pkg_ver := Some (sprintf "%s-%s.%s" ver' rev' (string_of_platform platform)))
 		| _ ->
 		    (match !pkg_name with
-		      | Some pkg ->
-			  if home_made_package pkg then
+		      | Some pkg ->			  
+			  if Strings.have_prefix (Params.get_param "pkg-prefix") pkg then
 			    pkg_ver := Some ver'
 			  else 
 			    pkg_ver := Some ver
