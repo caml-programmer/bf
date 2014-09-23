@@ -519,8 +519,9 @@ let string_of_pkgexn = function
 let home_made_package pkg =
   let exclude =
     try
-      let ex_prefix = Params.get_param "pkg-prefix-exclude" in
-      String.length ex_prefix <> 0 && Strings.have_prefix ex_prefix pkg
+      let ex_prefix_str = Params.get_param "pkg-prefix-exclude" in
+      let ex_prefix_list = Str.split (Str.regexp "[ ]+") ex_prefix_str in
+      List.exists (fun ex_prefix -> String.length ex_prefix <> 0 && Strings.have_prefix ex_prefix pkg) ex_prefix_list
     with Params.Unknown_parameter _ -> false in
   (Strings.have_prefix (Params.get_param "pkg-prefix") pkg) && not exclude
 
