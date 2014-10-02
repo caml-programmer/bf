@@ -111,6 +111,33 @@ let analyze_arguments () =
 	Is_components
 	  (List.map make_component (List.tl (List.tl (Array.to_list Sys.argv))))
 
+type teleport_mode =
+  | Goto_bf_rules
+  | Goto_bf_params
+
+exception Rules_not_found
+exception Params_not_found
+
+let with_teleport mode f =
+  let location =
+    Sys.getcwd () in
+  let new_location =
+    match mode with
+      | Goto_bf_rules ->
+	  (match Params.up_search ~default:None ".bf-rules" with
+	    | None -> raise Rules_not_found
+	    | Some x -> Filename.dirname x)
+      | Goto_bf_params ->
+	  (match Params.up_search ~default:None ".bf-params" with
+	    | None -> raise Params_not_found
+	    | Some x -> Filename.dirname x)
+  in
+  let goto x =
+    Sys.chdir new_location;
+    Params.update_param "start-dir" new_location;
+    Params.update_param "log-dir" new_location in
+  goto new_location; f (); goto location
+
 let main () =
   let len = Array.length Sys.argv in
     if len > 1 then
@@ -360,21 +387,23 @@ let main () =
 	| "clean" ->
 	    Pack.clean ()
 	| "make" ->
-	    Params.update_param "plugins-dir" "../pack";
-	    Params.update_param "orig-top-dir" (Params.get_param "top-dir");
-	    Params.update_param "install-dir" (Commands.make_install_dir ());
-	    if len = 3 then
-	      (match Sys.argv.(2) with
-		| "build" -> Rules.build_rules None
-		| "install" -> Rules.install_rules ~check_build:false None
-		| _ -> usage ())
-	    else if len = 4 then
-	      (match Sys.argv.(2) with
-		| "build" -> Rules.build_rules (Some Sys.argv.(3))
-		| "install" -> Rules.install_rules ~check_build:false (Some Sys.argv.(3))
-		| _ -> usage ())
-	    else
-	      usage ()
+	    with_teleport Goto_bf_rules
+	      (fun () ->
+		Params.update_param "plugins-dir" "../pack";
+		Params.update_param "orig-top-dir" (Params.get_param "top-dir");
+		Params.update_param "install-dir" (Commands.make_install_dir ());
+		if len = 3 then
+		  (match Sys.argv.(2) with
+		    | "build" -> Rules.build_rules None
+		    | "install" -> Rules.install_rules ~check_build:false None
+		    | _ -> usage ())
+		else if len = 4 then
+		  (match Sys.argv.(2) with
+		    | "build" -> Rules.build_rules (Some Sys.argv.(3))
+		    | "install" -> Rules.install_rules ~check_build:false (Some Sys.argv.(3))
+		    | _ -> usage ())
+		else
+		  usage ())
 	| "versions" ->
 	    if len <> 3 then
 	      usage ()
@@ -395,20 +424,6 @@ let main () =
 	    analyze ()
     else usage ()
       
-let teleport f =
-  (* todo: more advanced teleport *)
-  if Sys.file_exists ".bf-rules" then (* todo: use alternative rules *)
-    begin
-      Sys.chdir "..";
-      Params.update_param "start-dir"
-	((Params.get_param "start-dir") ^ "/..");
-      Params.update_param "log-dir"
-	((Params.get_param "log-dir") ^ "/..");
-      f ()
-    end
-  else
-    f ()
-
 let print_current_state () =
   let param name =
     Printf.printf "%s: %s\n" name (Params.get_param name) in

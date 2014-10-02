@@ -20,17 +20,26 @@ let read_from_file filename =
     (list_of_channel ch);
   params
 
-let read_params () =
-  let filename =
-    if Sys.file_exists ".bf-params" then
-      Some ".bf-params"
+let up_search ~default name =
+  let rec search dir =
+    let f = Filename.concat dir name in
+    if Sys.file_exists f then
+      Some f
     else
-      if Sys.file_exists "../.bf-params" then
-	Some "../.bf-params"
+      if dir = "/" then
+	default
       else
-	if Sys.file_exists "/etc/bf-params"
-	then Some "/etc/bf-params" else None
-  in match filename with
+	search (Filename.dirname dir)
+  in search (Sys.getcwd ())  
+
+let read_params () =
+  let default =
+    let def = "/etc/bf-params" in
+    if Sys.file_exists def then
+      Some def
+    else
+      None in
+  match up_search ~default ".bf-params" with
     | None ->  Hashtbl.create 32
     | Some filename ->
 	read_from_file filename
