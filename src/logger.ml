@@ -22,7 +22,7 @@ let prepare file =
   else open_out_gen [Open_wronly; Open_append; Open_creat] 0o644 file
 
 let session_port = (* for common session logfile *)
-  prepare (Params.get_param "session-log")
+  lazy (prepare (Params.get_param "session-log"))
 ;;
 
 let current_time () = Unix.gettimeofday ()
@@ -63,7 +63,7 @@ let log_message ?(low=false) ?key ?logger message =
   in
   let write p s =
     output_string p s; flush p in
-  write session_port s;
+  write (Lazy.force session_port) s;
   write port s;
   if not low then
     ( write stdout s );

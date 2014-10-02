@@ -5,19 +5,20 @@ open Types
 (* Locking *)
 
 let fd_lock =
-  Unix.openfile (Params.get_param "lock-file")
-    [Unix.O_CREAT;Unix.O_RDONLY;Unix.O_WRONLY] 0o644
+  lazy
+    (Unix.openfile (Params.get_param "lock-file")
+      [Unix.O_CREAT;Unix.O_RDONLY;Unix.O_WRONLY] 0o644)
 ;;
 
 let lock () =
   print_string "locking...";
-  Unix.lockf fd_lock Unix.F_LOCK 1;
+  Unix.lockf (Lazy.force fd_lock) Unix.F_LOCK 1;
   print_endline "ok"
 
 let unlock () =
   print_string "unlocking...";
-  Unix.lockf fd_lock Unix.F_ULOCK 1;
-  Unix.close fd_lock;
+  Unix.lockf (Lazy.force fd_lock) Unix.F_ULOCK 1;
+  Unix.close (Lazy.force fd_lock);
   print_endline "ok"
 
 let with_lock f =
@@ -134,8 +135,7 @@ let with_teleport mode f =
   in
   let goto x =
     Sys.chdir new_location;
-    Params.update_param "start-dir" new_location;
-    Params.update_param "log-dir" new_location in
+    Params.update_param "start-dir" new_location in
   goto new_location; f (); goto location
 
 let main () =
@@ -389,21 +389,26 @@ let main () =
 	| "make" ->
 	    with_teleport Goto_bf_rules
 	      (fun () ->
+		Params.update_param "log-level" "high";
 		Params.update_param "plugins-dir" "../pack";
 		Params.update_param "orig-top-dir" (Params.get_param "top-dir");
 		Params.update_param "install-dir" (Commands.make_install_dir ());
-		if len = 3 then
-		  (match Sys.argv.(2) with
-		    | "build" -> Rules.build_rules None
-		    | "install" -> Rules.install_rules ~check_build:false None
-		    | _ -> usage ())
-		else if len = 4 then
-		  (match Sys.argv.(2) with
-		    | "build" -> Rules.build_rules (Some Sys.argv.(3))
-		    | "install" -> Rules.install_rules ~check_build:false (Some Sys.argv.(3))
-		    | _ -> usage ())
-		else
-		  usage ())
+		match len with
+		  | 2 ->
+		      Rules.build_rules None;
+		      Rules.install_rules ~check_build:false None
+		  | 3 ->
+		      (match Sys.argv.(2) with
+			| "build" -> Rules.build_rules None
+			| "install" -> Rules.install_rules ~check_build:false None
+			| _ -> usage ())
+		  | 4 ->
+		      (match Sys.argv.(2) with
+			| "build" -> Rules.build_rules (Some Sys.argv.(3))
+			| "install" -> Rules.install_rules ~check_build:false (Some Sys.argv.(3))
+			| _ -> usage ())
+		  | _ ->
+		      usage ())
 	| "versions" ->
 	    if len <> 3 then
 	      usage ()
