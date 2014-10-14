@@ -1961,10 +1961,10 @@ let extract_packbranch ~userhost pkg_path =
 	String.sub hd (succ pos) (len - pos - 1)
 
 let full_require =
-  Pcre.regexp "([^\\ ]+)\\s+[<>]?=\\s+([^-]+)-(\\d+)\\."
+  Pcre.regexp "([^\\ ]+)\\s+([<>]?=)\\s+([^-]+)-(\\d+)\\."
 
 let without_rev_require =
-  Pcre.regexp "([^\\ ]+)\\s+[<>]?=\\s+(.+)"
+  Pcre.regexp "([^\\ ]+)\\s+([<>]?=)\\s+(.+)"
 
 let without_ver_require =
   Pcre.regexp "(.+)"
@@ -1978,9 +1978,10 @@ let extract_depend_list ~userhost pkg_path =
 	  let pkg_name = a.(1) in
 	  if home_made_package pkg_name then
 	    begin
-	      let ver = a.(2) in
-	      let rev = try int_of_string a.(3) with _ -> raise (Cannot_extract_revision pkg_path) in
-	      (pkg_name,Some ver,Some rev)::acc
+	      let operand = a.(2) in
+	      let ver = a.(3) in
+	      let rev = try int_of_string a.(4) with _ -> raise (Cannot_extract_revision pkg_path) in
+	      (pkg_name,Some ver,Some rev, Some operand)::acc
 	    end
 	  else acc
 	with Not_found ->
@@ -1989,8 +1990,9 @@ let extract_depend_list ~userhost pkg_path =
 	    let pkg_name = a.(1) in
 	    if home_made_package pkg_name then
 	      begin
-		let ver = a.(2) in
-		(pkg_name,Some ver,None)::acc
+		let operand = a.(2) in
+		let ver = a.(3) in
+		(pkg_name,Some ver,None, Some operand)::acc
 	      end
 	    else acc
 	  with Not_found ->
@@ -1998,7 +2000,7 @@ let extract_depend_list ~userhost pkg_path =
 	      let a = Pcre.extract ~rex:without_ver_require s in
 	      let pkg_name = a.(1) in
 	      if home_made_package pkg_name then
-		(pkg_name,None,None)::acc
+		(pkg_name,None,None, None)::acc
 	      else acc
 	    with Not_found -> acc))) []
       (System.read_lines
@@ -2049,19 +2051,39 @@ let make_pkg_record ~userhost pkg_path =
     pkg_branch = pack_branch;
   }
 
+let soft_dep pkg_name pkg_path =
+  let pat = sprintf "%s-" pkg_name in
+  let rex = Pcre.regexp pat in
+  let dist_path = System.path_directory pkg_path in
+  let files = List.filter (Pcre.pmatch ~rex) (System.list_of_directory dist_path) in
+  let files_sorted = List.fast_sort (
+    fun x y ->
+      if(String.length x > String.length y)
+	then -1
+	else begin
+	  if(String.length x < String.length y)
+	  then 1
+	  else begin
+	    if(x > y)
+	    then -1
+	    else 1
+	  end
+	end
+  ) files in
+  let dep_package = List.hd files_sorted in
+  sprintf "%s/%s" dist_path dep_package
+
 let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
   let pre_table = Hashtbl.create 32 in
   
   let rec scan pkg_path =
     log_message (sprintf "scanning %s" pkg_path);
     let e = make_pkg_record ~userhost pkg_path in
-    let deps =
-      extract_depend_list ~userhost pkg_path in
-    
+    let deps = extract_depend_list ~userhost pkg_path in
     Hashtbl.add pre_table e.pkg_name (e,deps);
 
     List.iter
-      (fun (pkg_name,ver_opt,rev_opt) ->
+      (fun (pkg_name,ver_opt,rev_opt,operand_opt) ->
 	(match ver_opt, rev_opt with
 	  | Some ver, Some rev ->
 	      if Hashtbl.mem pre_table pkg_name then
@@ -2078,7 +2100,16 @@ let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
 		sprintf "%s/%s-%s-%d.%s.%s.%s" e.pkg_dir pkg_name ver rev (string_of_platform e.pkg_platform) e.pkg_arch e.pkg_extension in
 	      if not (Hashtbl.mem pre_table pkg_name) then
 		scan new_path
-	  | _ -> ()))
+	  | _ ->
+	    let operand = 
+	      match operand_opt with
+	        | Some o -> o
+	        | None -> ""
+	    in
+	    if(operand = ">=") then
+	      let new_path = soft_dep pkg_name pkg_path in
+              scan new_path
+	    else ()))
       deps
   in
   
@@ -2098,12 +2129,19 @@ let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
     else
       let pkg_name = name_of_pkg_path pkg_path in
       let (e,deps) = Hashtbl.find pre_table pkg_name in
-
       Hashtbl.add table pkg_path (e.pkg_version,e.pkg_revision);
 
       let depend_paths =
 	List.map
-	  (fun (pkg_name,ver_opt,rev_opt) ->
+	  (fun (pkg_name,ver_opt,rev_opt,operand_opt) ->
+	    let operand = 
+	      match operand_opt with
+	        | Some o -> o
+	        | None -> ""
+	    in
+	    if(operand = ">=") then
+	      soft_dep pkg_name pkg_path
+	    else
 	    let ver =
 	      match ver_opt with
 		| Some v -> v
