@@ -2082,12 +2082,12 @@ let comape_versions ver1 ver2 =
       end
       else begin
 	let hd1 = try
-	  int_of_string (List.hd list1) 
+	  int_of_string hd1_s 
 	with Failure(int_of_string) -> 
 	  -1
 	in
 	let hd2 = try
-	  int_of_string (List.hd list2) 
+	  int_of_string hd2_s 
 	with Failure(int_of_string) -> 
 	  -1
 	in
@@ -2102,7 +2102,6 @@ let comape_versions ver1 ver2 =
     end
   in
   compare_lists ver1_dot ver2_dot
-
 
 let soft_dep pkg_name pkg_path =
   let pat = sprintf "%s-" pkg_name in
