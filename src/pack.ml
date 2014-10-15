@@ -2054,26 +2054,62 @@ let make_pkg_record ~userhost pkg_path =
     pkg_branch = pack_branch;
   }
 
+let comape_versions ver1 ver2 =
+  let ver1_dot = Strings.split '.' ver1 in 
+  let ver2_dot = Strings.split '.' ver2 in 
+  let rec compare_lists list1 list2 = 
+    if(List.length list1 = 0 || List.length list2 = 0)
+    then begin
+      if(List.length list1 = 0 && List.length list2 = 0)
+      then 0
+      else begin
+	if(List.length list1 = 0) 
+	then -1
+	else 1
+      end
+    end
+    else begin
+      let hd1_s = List.hd list1 in
+      let hd2_s = List.hd list2 in
+      let hd1_hyp = Strings.split '-' hd1_s in 
+      let hd2_hyp = Strings.split '-' hd2_s in 
+      if(List.length hd1_hyp > 1 || List.length hd2_hyp > 1)
+      then begin
+        let sub_compare = compare_lists hd1_hyp hd2_hyp in
+        if(sub_compare = 0)
+        then compare_lists (List.tl list1) (List.tl list2)
+        else sub_compare
+      end
+      else begin
+	let hd1 = try
+	  int_of_string (List.hd list1) 
+	with Failure(int_of_string) -> 
+	  -1
+	in
+	let hd2 = try
+	  int_of_string (List.hd list2) 
+	with Failure(int_of_string) -> 
+	  -1
+	in
+	if(hd1 > hd2) 
+	then 1
+	else begin
+	  if(hd1 < hd2)
+	  then -1
+	  else compare_lists (List.tl list1) (List.tl list2)
+	end
+      end
+    end
+  in
+  compare_lists ver1_dot ver2_dot
+
+
 let soft_dep pkg_name pkg_path =
   let pat = sprintf "%s-" pkg_name in
   let rex = Pcre.regexp pat in
   let dist_path = System.path_directory pkg_path in
   let files = List.filter (Pcre.pmatch ~rex) (System.list_of_directory dist_path) in
-  let files_sorted = List.fast_sort (
-    fun x y ->
-      if(String.length x > String.length y)
-	then -1
-	else begin
-	  if(String.length x < String.length y)
-	  then 1
-	  else begin
-	    if(x > y)
-	    then -1
-	    else 1
-	  end
-	end
-  ) files in
-  let dep_package = List.hd files_sorted in
+  let dep_package = List.fold_left (fun acc elem -> (if((comape_versions acc elem) >0) then acc else elem)) "" files in
   sprintf "%s/%s" dist_path dep_package
 
 let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
