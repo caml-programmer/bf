@@ -862,16 +862,39 @@ let print_depends depends =
 	(match pkg_desc with Some s -> s | None -> "")))
     depends
 
+exception Pack_branch_is_not_found of string
+
+let extract_packbranch ~userhost pkg_path =
+  match
+    (match userhost with
+      | Some auth ->
+	  (System.read_lines ~filter:(Pcre.pmatch ~rex:(Pcre.regexp "packbranch-"))
+	    (sprintf "ssh %s rpm -qp --provides %s" auth pkg_path))
+      | None ->
+	  (System.read_lines ~filter:(Pcre.pmatch ~rex:(Pcre.regexp "packbranch-"))
+	    (sprintf "rpm -qp --provides %s" pkg_path)))
+  with [] -> raise (Pack_branch_is_not_found pkg_path)
+    | hd::_ ->
+	let pos = String.index hd '-' in
+	let len =
+	  try
+	    String.index hd ' '
+	  with Not_found -> String.length hd
+	in
+	String.sub hd (succ pos) (len - pos - 1)
+
 let call_after_build ~snapshot ~location ~fullname hooks =
   Rules.load_plugins ();
   (match hooks with
     | Some file -> Scheme.eval_file file
     | None -> ());
+  let full_path =  sprintf "%s/%s" location fullname in
+  let branch = extract_packbranch None full_path in
   if Scheme.defined "after-build" then
     Scheme.eval_code (fun _ -> ())
-      (sprintf "(after-build \"%s\" \"%s\" \"%s\" %s)"
+      (sprintf "(after-build \"%s\" \"%s\" \"%s\" %s \"%s\")"
 	(System.hostname ()) location fullname 
-	(if snapshot then "#t" else "#f"))
+	(if snapshot then "#t" else "#f") branch)
 
 let call_before_build ~snapshot ~pkgname ~version ~revision ~platform hooks =
   Rules.load_plugins ();
@@ -1864,7 +1887,6 @@ exception Cannot_extract_revision of string
 exception Cannot_extract_version of string
 exception Cannot_extract_extension of string
 exception Cannot_extract_pkgname of string
-exception Pack_branch_is_not_found of string
 
 let extract_extension pkg_name =
   try
@@ -1940,25 +1962,6 @@ let new_only e =
 
 let with_overwrite ow l =
   if ow then l else List.filter new_only l
-
-let extract_packbranch ~userhost pkg_path =
-  match
-    (match userhost with
-      | Some auth ->
-	  (System.read_lines ~filter:(Pcre.pmatch ~rex:(Pcre.regexp "packbranch-"))
-	    (sprintf "ssh %s rpm -qp --provides %s" auth pkg_path))
-      | None ->
-	  (System.read_lines ~filter:(Pcre.pmatch ~rex:(Pcre.regexp "packbranch-"))
-	    (sprintf "rpm -qp --provides %s" pkg_path)))
-  with [] -> raise (Pack_branch_is_not_found pkg_path)
-    | hd::_ ->
-	let pos = String.index hd '-' in
-	let len =
-	  try
-	    String.index hd ' '
-	  with Not_found -> String.length hd
-	in
-	String.sub hd (succ pos) (len - pos - 1)
 
 let full_require =
   Pcre.regexp "([^\\ ]+)\\s+([<>]?=)\\s+([^-]+)-(\\d+)\\."
