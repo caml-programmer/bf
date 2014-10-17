@@ -883,7 +883,7 @@ let extract_packbranch ~userhost pkg_path =
 	in
 	String.sub hd (succ pos) (len - pos - 1)
 
-let call_after_build ~snapshot ~location ~fullname hooks =
+let call_after_build ~snapshot ~location ~fullname hooks version release =
   Rules.load_plugins ();
   (match hooks with
     | Some file -> Scheme.eval_file file
@@ -892,9 +892,9 @@ let call_after_build ~snapshot ~location ~fullname hooks =
   let branch = extract_packbranch None full_path in
   if Scheme.defined "after-build" then
     Scheme.eval_code (fun _ -> ())
-      (sprintf "(after-build \"%s\" \"%s\" \"%s\" %s \"%s\")"
-	(System.hostname ()) location fullname 
-	(if snapshot then "#t" else "#f") branch)
+      (sprintf "(after-build \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %s)"
+	(System.hostname ()) location fullname version release branch
+	(if snapshot then "#t" else "#f"))
 
 let call_before_build ~snapshot ~pkgname ~version ~revision ~platform hooks =
   Rules.load_plugins ();
@@ -922,7 +922,7 @@ let build_over_rpmbuild ~snapshot params =
       ~top_dir
       ~pkgname ~platform ~version ~release
       ~spec ~files ~findreq ()
-  in call_after_build ~snapshot ~location ~fullname hooks
+  in call_after_build ~snapshot ~location ~fullname hooks version release
 
 let check_composite_depends spec =
   let composite_depends =
@@ -1333,7 +1333,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 	      log_command "gzip" [pkg_file];
 	      call_after_build ~snapshot
 		~location:(Sys.getcwd ())
-		~fullname:pkg_file_gz spec.hooks
+		~fullname:pkg_file_gz spec.hooks version release
 	  | Deb_pkg ->
 	      let custom_pkg_files =
 		call_before_build ~snapshot
