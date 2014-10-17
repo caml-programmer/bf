@@ -2113,6 +2113,7 @@ let soft_dep pkg_name pkg_path =
 
 let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
   let pre_table = Hashtbl.create 32 in
+  let nonstrict_table = Hashtbl.create 32 in
   
   let rec scan pkg_path =
     log_message (sprintf "scanning %s" pkg_path);
@@ -2120,19 +2121,26 @@ let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
     let deps = extract_depend_list ~userhost pkg_path in
     Hashtbl.add pre_table e.pkg_name (e,deps);
 
-    List.iter
-      (fun (pkg_name,ver_opt,rev_opt,operand_opt) ->
-	(match ver_opt, rev_opt with
+    let scan_deps pkg_name ver_opt rev_opt operand_opt = (match ver_opt, rev_opt with
 	  | Some ver, Some rev ->
 	      if Hashtbl.mem pre_table pkg_name then
 		begin
 		  let (e,_) = Hashtbl.find pre_table pkg_name in
 		  if ver <> e.pkg_version || rev <> e.pkg_revision then
 		    begin
-		      log_message (sprintf "Already registered: pkg(%s) ver(%s)/rev(%d) and next found: ver(%s)/rev(%d) not equivalent."
-			pkg_name e.pkg_version e.pkg_revision ver rev);
-		      raise (Cannot_resolve_dependes pkg_path)
-		    end;
+		      let ns = Hashtbl.mem nonstrict_table pkg_name in
+		      if ns then
+			begin
+			  Hashtbl.remove pre_table pkg_name;
+			  Hashtbl.remove nonstrict_table pkg_name;
+			end
+		      else
+			begin
+			  log_message (sprintf "Already registered: pkg(%s) ver(%s)/rev(%d) and next found: ver(%s)/rev(%d) not equivalent."
+			    pkg_name e.pkg_version e.pkg_revision ver rev);
+			  raise (Cannot_resolve_dependes pkg_path)
+			end
+		    end
 		end;
 	      let new_path =
 		sprintf "%s/%s-%s-%d.%s.%s.%s" e.pkg_dir pkg_name ver rev (string_of_platform e.pkg_platform) e.pkg_arch e.pkg_extension in
@@ -2146,11 +2154,22 @@ let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
 	    in
 	    if(operand = ">=") then
 	      let new_path = soft_dep pkg_name pkg_path in
+	      let () = Hashtbl.add nonstrict_table pkg_name true in
               scan new_path
-	    else ()))
-      deps
+	    else ())
+    in
+    let (nonstrict, strict) = List.partition (fun (pkg_name,ver_opt,rev_opt,operand_opt)->
+	      (match operand_opt with
+	        | Some o -> (o = ">=")
+	        | None -> false)) deps
+    in
+    let () = List.iter
+      (fun (pkg_name,ver_opt,rev_opt,operand_opt) ->scan_deps pkg_name ver_opt rev_opt operand_opt)
+      strict
+    in List.iter
+      (fun (pkg_name,ver_opt,rev_opt,operand_opt) ->scan_deps pkg_name ver_opt rev_opt operand_opt)
+      nonstrict
   in
-  
   scan pkg_path;
 
   let table = Hashtbl.create 32 in
