@@ -2103,8 +2103,10 @@ let comape_versions ver1 ver2 =
   in
   compare_lists ver1_dot ver2_dot
 
-let soft_dep pkg_name pkg_path =
-  let pat = sprintf "%s-" pkg_name in
+let soft_dep pkg_name pkg_path ver =
+  let pat = if(ver = "") 
+	    then sprintf "%s-" pkg_name
+	    else sprintf "%s-%s" pkg_name ver in
   let rex = Pcre.regexp pat in
   let dist_path = System.path_directory pkg_path in
   let files = List.filter (Pcre.pmatch ~rex) (System.list_of_directory dist_path) in
@@ -2147,13 +2149,13 @@ let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
 	      if not (Hashtbl.mem pre_table pkg_name) then
 		scan new_path
 	  | _ ->
-	    let operand = 
+	    let operand =
 	      match operand_opt with
 	        | Some o -> o
 	        | None -> ""
 	    in
-	    if(operand = ">=") then
-	      let new_path = soft_dep pkg_name pkg_path in
+	    if(operand = ">=" || operand = "=") then
+	      let new_path = soft_dep pkg_name pkg_path "" in
 	      let () = Hashtbl.add nonstrict_table pkg_name true in
               scan new_path
 	    else ())
@@ -2196,31 +2198,47 @@ let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
 	        | Some o -> o
 	        | None -> ""
 	    in
-	    if(operand = ">=") then
-	      soft_dep pkg_name pkg_path
+	    if(operand = ">=" || operand = "=") then
+	      begin
+		if(operand = ">=") then
+		  soft_dep pkg_name pkg_path ""
+		else
+		  let ver =
+		    match ver_opt with
+		      | Some v -> v
+		      | None ->
+			  try
+			    let (e,_) =
+			      Hashtbl.find pre_table pkg_name in
+			    e.pkg_version
+			  with Not_found ->
+			    log_error (sprintf "cannot resolve version for %s" pkg_name)
+		  in
+		  soft_dep pkg_name pkg_path ver
+	      end
 	    else
-	    let ver =
-	      match ver_opt with
-		| Some v -> v
-		| None ->
-		    try
-		      let (e,_) =
-			Hashtbl.find pre_table pkg_name in
-		      e.pkg_version
-		    with Not_found ->
-		      log_error (sprintf "cannot resolve version for %s" pkg_name)
-	    in
-	    let rev =
-	      match rev_opt with
-		| Some r -> r
-		| None ->
-		    try
-		      let (e,_) =
-			Hashtbl.find pre_table pkg_name in
-		      e.pkg_revision
-		    with Not_found -> 
-		      log_error (sprintf "cannot resolve revision for %s" pkg_name)
-	    in sprintf "%s/%s-%s-%d.%s.%s.%s" e.pkg_dir pkg_name ver rev (string_of_platform e.pkg_platform) e.pkg_arch e.pkg_extension)
+	      let ver =
+		match ver_opt with
+		  | Some v -> v
+		  | None ->
+		      try
+			let (e,_) =
+			  Hashtbl.find pre_table pkg_name in
+			e.pkg_version
+		      with Not_found ->
+			log_error (sprintf "cannot resolve version for %s" pkg_name)
+	      in
+	      let rev =
+		match rev_opt with
+		  | Some r -> r
+		  | None ->
+		      try
+			let (e,_) =
+			  Hashtbl.find pre_table pkg_name in
+			e.pkg_revision
+		      with Not_found -> 
+			log_error (sprintf "cannot resolve revision for %s" pkg_name)
+	      in sprintf "%s/%s-%s-%d.%s.%s.%s" e.pkg_dir pkg_name ver rev (string_of_platform e.pkg_platform) e.pkg_arch e.pkg_extension)
 	  deps
       in
       resolve depth pkg_path;
