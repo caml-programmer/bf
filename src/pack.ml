@@ -1883,6 +1883,7 @@ type pack_tree =
 exception Cannot_extract_arch of string
 exception Cannot_extract_platform of string
 exception Cannot_resolve_dependes of string
+exception Cannot_resolve_soft_dependes of string
 exception Cannot_extract_revision of string
 exception Cannot_extract_version of string
 exception Cannot_extract_extension of string
@@ -2111,7 +2112,9 @@ let soft_dep pkg_name pkg_path ver =
   let dist_path = System.path_directory pkg_path in
   let files = List.filter (Pcre.pmatch ~rex) (System.list_of_directory dist_path) in
   let dep_package = List.fold_left (fun acc elem -> (if((comape_versions acc elem) >0) then acc else elem)) "" files in
-  sprintf "%s/%s" dist_path dep_package
+  if(dep_package = "")
+  then raise (Cannot_resolve_soft_dependes pkg_name)
+  else sprintf "%s/%s" dist_path dep_package
 
 let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
   let pre_table = Hashtbl.create 32 in
