@@ -2126,7 +2126,9 @@ let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
     let deps = extract_depend_list ~userhost pkg_path in
     Hashtbl.add pre_table e.pkg_name (e,deps);
 
-    let scan_deps pkg_name ver_opt rev_opt operand_opt = (match ver_opt, rev_opt with
+    List.iter 
+      (fun (pkg_name,ver_opt,rev_opt,operand_opt) ->
+        (match ver_opt, rev_opt with
 	  | Some ver, Some rev ->
 	      if Hashtbl.mem pre_table pkg_name then
 		begin
@@ -2161,19 +2163,8 @@ let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
 	      let new_path = soft_dep pkg_name pkg_path "" in
 	      let () = Hashtbl.add nonstrict_table pkg_name true in
               scan new_path
-	    else ())
-    in
-    let (nonstrict, strict) = List.partition (fun (pkg_name,ver_opt,rev_opt,operand_opt)->
-	      (match operand_opt with
-	        | Some o -> (o = ">=")
-	        | None -> false)) deps
-    in
-    let () = List.iter
-      (fun (pkg_name,ver_opt,rev_opt,operand_opt) ->scan_deps pkg_name ver_opt rev_opt operand_opt)
-      strict
-    in List.iter
-      (fun (pkg_name,ver_opt,rev_opt,operand_opt) ->scan_deps pkg_name ver_opt rev_opt operand_opt)
-      nonstrict
+	    else ()))
+    deps
   in
   scan pkg_path;
 
@@ -2201,36 +2192,27 @@ let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
 	        | Some o -> o
 	        | None -> ""
 	    in
+	    let extract_version ver_opt = 
+	      match ver_opt with
+		| Some v -> v
+		| None ->
+		    try
+		      let (e,_) =
+			Hashtbl.find pre_table pkg_name in
+		      e.pkg_version
+		    with Not_found ->
+		      log_error (sprintf "cannot resolve version for %s" pkg_name)
+	    in
 	    if(operand = ">=" || operand = "=") then
 	      begin
 		if(operand = ">=") then
 		  soft_dep pkg_name pkg_path ""
 		else
-		  let ver =
-		    match ver_opt with
-		      | Some v -> v
-		      | None ->
-			  try
-			    let (e,_) =
-			      Hashtbl.find pre_table pkg_name in
-			    e.pkg_version
-			  with Not_found ->
-			    log_error (sprintf "cannot resolve version for %s" pkg_name)
-		  in
+		  let ver = extract_version ver_opt in
 		  soft_dep pkg_name pkg_path ver
 	      end
 	    else
-	      let ver =
-		match ver_opt with
-		  | Some v -> v
-		  | None ->
-		      try
-			let (e,_) =
-			  Hashtbl.find pre_table pkg_name in
-			e.pkg_version
-		      with Not_found ->
-			log_error (sprintf "cannot resolve version for %s" pkg_name)
-	      in
+	      let ver = extract_version ver_opt in
 	      let rev =
 		match rev_opt with
 		  | Some r -> r
