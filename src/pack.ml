@@ -2298,7 +2298,8 @@ let link ~hard pkg_path =
     let do_symlink () =
       Unix.symlink file name in
     let do_hardlink () =
-      Unix.link file name in
+      log_command "ln" ["-f";file;name];
+    in
     if hard then
       begin
 	try
