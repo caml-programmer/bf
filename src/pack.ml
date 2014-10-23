@@ -2055,66 +2055,64 @@ let make_pkg_record ~userhost pkg_path =
     pkg_branch = pack_branch;
   }
 
+let optint_of_string s =
+  try
+    Some (int_of_string s)
+  with Failure(int_of_string) ->
+    None
+
+let rec compare_version_lists l1 l2 =
+  match l1, l2 with
+    | [], [] -> 0
+    | [], _ -> -1
+    | _, [] ->  1
+    | hd1::tl1, hd2::tl2 ->
+	let hd1_hyp = Strings.split '-' hd1 in
+	let hd2_hyp = Strings.split '-' hd2 in
+	(match hd1_hyp, hd2_hyp with
+	  | _::_, _
+	  | _, _::_ ->
+	      (match compare_version_lists hd1_hyp hd2_hyp with
+		| 0 -> compare_version_lists tl1 tl2
+		| r -> r)
+	  | _, _ ->
+	      match optint_of_string hd1, optint_of_string hd2 with
+		| None, None       -> compare_version_lists tl1 tl2
+		| None, Some n2    -> -1
+		| Some n1, None    ->  1
+		| Some n1, Some n2 ->
+		    match compare n1 n2 with
+		      | 0 -> compare_version_lists tl1 tl2
+		      | r -> r)
+
 let comape_versions ver1 ver2 =
-  let ver1_dot = Strings.split '.' ver1 in 
-  let ver2_dot = Strings.split '.' ver2 in 
-  let rec compare_lists list1 list2 = 
-    if(List.length list1 = 0 || List.length list2 = 0)
-    then begin
-      if(List.length list1 = 0 && List.length list2 = 0)
-      then 0
-      else begin
-	if(List.length list1 = 0) 
-	then -1
-	else 1
-      end
-    end
-    else begin
-      let hd1_s = List.hd list1 in
-      let hd2_s = List.hd list2 in
-      let hd1_hyp = Strings.split '-' hd1_s in 
-      let hd2_hyp = Strings.split '-' hd2_s in 
-      if(List.length hd1_hyp > 1 || List.length hd2_hyp > 1)
-      then begin
-        let sub_compare = compare_lists hd1_hyp hd2_hyp in
-        if(sub_compare = 0)
-        then compare_lists (List.tl list1) (List.tl list2)
-        else sub_compare
-      end
-      else begin
-	let hd1 = try
-	  int_of_string hd1_s 
-	with Failure(int_of_string) -> 
-	  -1
-	in
-	let hd2 = try
-	  int_of_string hd2_s 
-	with Failure(int_of_string) -> 
-	  -1
-	in
-	if(hd1 > hd2) 
-	then 1
-	else begin
-	  if(hd1 < hd2)
-	  then -1
-	  else compare_lists (List.tl list1) (List.tl list2)
-	end
-      end
-    end
-  in
-  compare_lists ver1_dot ver2_dot
+  compare_version_lists
+    (Strings.split '.' ver1)
+    (Strings.split '.' ver2)
 
 let soft_dep pkg_name pkg_path ver =
-  let pat = if(ver = "") 
-	    then sprintf "%s-" pkg_name
-	    else sprintf "%s-%s" pkg_name ver in
-  let rex = Pcre.regexp pat in
-  let dist_path = System.path_directory pkg_path in
-  let files = List.filter (Pcre.pmatch ~rex) (System.list_of_directory dist_path) in
-  let dep_package = List.fold_left (fun acc elem -> (if((comape_versions acc elem) >0) then acc else elem)) "" files in
-  if(dep_package = "")
-  then raise (Cannot_resolve_soft_dependes pkg_name)
-  else sprintf "%s/%s" dist_path dep_package
+  let rex =
+    Pcre.regexp (sprintf "%s-%s" pkg_name ver) in
+  let dist_path =
+    Filename.dirname pkg_path in
+  let files =
+    List.filter
+      (Pcre.pmatch ~rex)
+      (System.list_of_directory dist_path) in
+  let dep_package = 
+    List.fold_left
+      (fun acc file ->
+	match acc with
+	  | None -> Some file
+	  | Some acc_file ->
+	      if comape_versions acc_file file > 0 then
+		acc
+	      else
+		Some file) None files in
+  match dep_package with
+    | None   -> raise (Cannot_resolve_soft_dependes pkg_name)
+    | Some p ->
+	sprintf "%s/%s" dist_path p
 
 let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
   let pre_table = Hashtbl.create 32 in
@@ -2139,7 +2137,10 @@ let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
 			let operand = Hashtbl.find operand_table pkg_name in
 			let verrev_old = sprintf "%s-%d" e.pkg_version e.pkg_revision in
 			let verrev_new = sprintf "%s-%d" ver rev in
-			if ((operand = ">=" && ((comape_versions verrev_new verrev_old) > 0)) || (operand = "=" && ver <> e.pkg_version)) then
+			if 
+			  (operand = ">=" && comape_versions verrev_new verrev_old > 0) ||
+			  (operand =  "=" && ver <> e.pkg_version)
+			then
 			  begin
 			    Hashtbl.remove pre_table pkg_name;
 			    Hashtbl.remove operand_table pkg_name;
@@ -2161,16 +2162,13 @@ let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
 	      if not (Hashtbl.mem pre_table pkg_name) then
 		scan new_path
 	  | _ ->
-	    let operand =
 	      match operand_opt with
-	        | Some o -> o
-	        | None -> ""
-	    in
-	    if(operand = ">=" || operand = "=") then
-	      let new_path = soft_dep pkg_name pkg_path "" in
-	      let () = Hashtbl.add operand_table pkg_name operand in
-              scan new_path
-	    else ()))
+		| Some op when op = "=" || op = ">=" ->
+		    let new_path =
+		      soft_dep pkg_name pkg_path "" in
+		    Hashtbl.add operand_table pkg_name op;
+		    scan new_path
+		| _ -> ()))
     deps
   in
   scan pkg_path;
@@ -2194,11 +2192,6 @@ let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
       let depend_paths =
 	List.map
 	  (fun (pkg_name,ver_opt,rev_opt,operand_opt) ->
-	    let operand = 
-	      match operand_opt with
-	        | Some o -> o
-	        | None -> ""
-	    in
 	    let extract_version ver_opt = 
 	      match ver_opt with
 		| Some v -> v
@@ -2210,27 +2203,23 @@ let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
 		    with Not_found ->
 		      log_error (sprintf "cannot resolve version for %s" pkg_name)
 	    in
-	    if(operand = ">=" || operand = "=") then
-	      begin
-		if(operand = ">=") then
-		  soft_dep pkg_name pkg_path ""
-		else
+	    match operand_opt with
+	      | Some ">=" -> soft_dep pkg_name pkg_path ""
+	      | Some "="  -> soft_dep pkg_name pkg_path (extract_version ver_opt)
+	      | _ ->
 		  let ver = extract_version ver_opt in
-		  soft_dep pkg_name pkg_path ver
-	      end
-	    else
-	      let ver = extract_version ver_opt in
-	      let rev =
-		match rev_opt with
-		  | Some r -> r
-		  | None ->
-		      try
-			let (e,_) =
-			  Hashtbl.find pre_table pkg_name in
-			e.pkg_revision
-		      with Not_found -> 
-			log_error (sprintf "cannot resolve revision for %s" pkg_name)
-	      in sprintf "%s/%s-%s-%d.%s.%s.%s" e.pkg_dir pkg_name ver rev (string_of_platform e.pkg_platform) e.pkg_arch e.pkg_extension)
+		  let rev =
+		    match rev_opt with
+		      | Some r -> r
+		      | None ->
+			  try
+			    let (e,_) =
+			      Hashtbl.find pre_table pkg_name in
+			    e.pkg_revision
+			  with Not_found -> 
+			    log_error (sprintf "cannot resolve revision for %s" pkg_name)
+		  in sprintf "%s/%s-%s-%d.%s.%s.%s" e.pkg_dir pkg_name ver rev
+		       (string_of_platform e.pkg_platform) e.pkg_arch e.pkg_extension)
 	  deps
       in
       resolve depth pkg_path;
