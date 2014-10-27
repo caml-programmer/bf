@@ -3,6 +3,7 @@
 open Types
 open Rules
 open Commands
+open Components
 open Logger
 open Ocs_env
 open Ocs_types
@@ -571,10 +572,10 @@ let make_depends ?snapshot ?(interactive=false) ?(ignore_last=false) file =
 			(fun os platform ->
 			  (try
 			    ignore
-			      (with_dir packdir
+			      (System.with_dir packdir
 				(fun () ->
 				  let branch =
-				    branch_of_specdir (Filename.dirname file) in
+				    Specdir.branch (Filename.dirname file) in
 				  let specdir =
 				    sprintf "%s/%s"
 				(match !pkg_name with
@@ -810,7 +811,7 @@ let spec_from_v2 ?(snapshot=false) ~version ~revision specdir =
     else []
   in
   let components =
-    components_of_composite (f "composite") in
+    Composite.components (f "composite") in
   let pre_install =
     load (f "pre-install") in
   let pre_update =
@@ -884,7 +885,7 @@ let extract_packbranch ~userhost pkg_path =
 	String.sub hd (succ pos) (len - pos - 1)
 
 let call_after_build ~snapshot ~location ~fullname hooks version release =
-  Rules.load_plugins ();
+  Plugins.load ();
   (match hooks with
     | Some file -> Scheme.eval_file file
     | None -> ());
@@ -897,7 +898,7 @@ let call_after_build ~snapshot ~location ~fullname hooks version release =
 	(if snapshot then "#t" else "#f"))
 
 let call_before_build ~snapshot ~pkgname ~version ~revision ~platform hooks =
-  Rules.load_plugins ();
+  Plugins.load ();
   (match hooks with
     | Some file -> Scheme.eval_file file
     | None -> ());
@@ -1038,16 +1039,16 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 			(sprintf "bf list for (%s) is not found -> need installing" name);
 		      let tag =
 			let k =
-			  mk_tag ((pkgname_of_specdir abs_specdir), version, (int_of_string release)) in
+			  mk_tag ((Specdir.pkgname abs_specdir), version, (int_of_string release)) in
 			let tag_exists = ref false in
-			ignore(with_component_dir ~strict:false c
+			ignore(Component.with_component_dir ~strict:false c
 			  (fun () -> 
 			    tag_exists := List.mem k (Git.git_tag_list ())));
 			if !tag_exists then
 			  Some k
 			else None
 		      in
-		      reinstall (with_tag tag [c]);
+		      reinstall (Components.with_tag tag [c]);
 		      add_with_check ()
 		    end
 		  else
@@ -1315,9 +1316,9 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 	      let pkg_file_abs = Filename.concat pkg_spool pkg_file in
 	      let pkg_file_gz = pkg_file ^ ".gz" in
 	      
-	      Rules.remove_directory (Filename.concat pkg_spool pkg_name);
+	      Commands.remove_directory (Filename.concat pkg_spool pkg_name);
 
-	      with_dir abs_specdir
+	      System.with_dir abs_specdir
 		(fun () ->
 		  let root =
 		    match dest_dir () with
@@ -1421,7 +1422,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		Unix.chmod file 0o755
 	      in
 
-	      with_dir abs_specdir
+	      System.with_dir abs_specdir
 		(fun () ->
 		  let doc_location =
 		    sprintf "debian/usr/share/doc/%s" spec.pkgname in
@@ -1537,8 +1538,8 @@ exception Bad_specdir of string
 
 let check_specdir specdir =
   try
-    ignore(pkgname_of_specdir specdir);
-    ignore(branch_of_specdir specdir);
+    ignore(Specdir.pkgname specdir);
+    ignore(Specdir.branch specdir);
     let p =
       Filename.basename
 	(Filename.dirname 
@@ -1550,10 +1551,10 @@ let check_specdir specdir =
 
 let check_pack_component () =
   let component = 
-    make_component ~label:(Branch "master") "pack" in
-  ignore(update_pack component);
+    Component.make ~label:(Branch "master") "pack" in
+  ignore(Component.update_pack component);
   ignore
-    (with_dir component.name
+    (System.with_dir component.name
       (fun () ->
 	(match Git.git_current_branch () with
 	  | Some "master" -> ()
@@ -1568,7 +1569,7 @@ exception Cannot_build_package of string
 let package_build (specdir,ver,rev,spec) =
   let specdir =
     System.path_strip_directory specdir in
-  let pkgname = pkgname_of_specdir specdir in
+  let pkgname = Specdir.pkgname specdir in
   let tag = (pkgname,ver,rev) in
   
   check_specdir specdir;
@@ -1577,14 +1578,14 @@ let package_build (specdir,ver,rev,spec) =
     if Params.get_param "use-external" = "true" then
       spec.components
     else
-      only_local spec.components in
+      Components.only_local spec.components in
   
-  List.iter fetch_tags components;
+  List.iter Component.fetch_tags components;
 
-  if not (tag_ready ~tag:(mk_tag tag) components) then
+  if not (Components.tag_ready ~tag:(mk_tag tag) components) then
     raise (Cannot_build_package (mk_tag tag));
   ignore
-    (install (with_tag (Some (mk_tag tag))
+    (install (Components.with_tag (Some (mk_tag tag))
       (* выкидываем pack-компонент, чтобы не было ненужных checkout'ов в pack'e *)
       (List.filter (fun c -> c.name <> "pack") components)));
   (try
@@ -1605,11 +1606,11 @@ let package_update ~specdir
   if check_pack then
     check_pack_component ();
 
-  let pkgname = pkgname_of_specdir specdir in
-  let branch = branch_of_specdir specdir in
+  let pkgname = Specdir.pkgname specdir in
+  let branch = Specdir.branch specdir in
 
   let have_pack_changes =
-    pack_changes specdir (make_component ~label:(Branch "master") "pack") in
+    pack_changes specdir (Component.make ~label:(Branch "master") "pack") in
 
   let conv_revision r =
     try int_of_string r with _ -> raise (Revision_must_be_digital r) in
@@ -1658,10 +1659,10 @@ let package_update ~specdir
   
   let components =    
     let l =
-      Rules.components_of_composite 
+      Composite.components
 	(Filename.concat specdir "composite") in
     if Params.get_param "use-external" = "true" 
-    then l else only_local l in
+    then l else Components.only_local l in
   
   let have_composite_changes =
     update components in
@@ -1670,7 +1671,7 @@ let package_update ~specdir
     List.exists
       (fun component -> 
 	Hashtbl.mem reinstalled_components component.name)
-      (only_external components) in
+      (Components.only_external components) in
 
   let add_reinstall c =
     Hashtbl.replace reinstalled_components c.name false in
@@ -1678,24 +1679,24 @@ let package_update ~specdir
   let force_rebuild c =
     log_message
       (sprintf "force %s rebuilding by external components changes" c.name);
-    with_dir c.name
+    System.with_dir c.name
       (fun () ->
-	if Sys.file_exists (with_rules ".bf-build" c) then
-	  Unix.unlink (with_rules ".bf-build" c);
-	if Sys.file_exists (with_rules ".bf-install" c) then
-	  Unix.unlink (with_rules ".bf-install" c))
+	if Sys.file_exists (Component.with_rules ".bf-build" c) then
+	  Unix.unlink (Component.with_rules ".bf-build" c);
+	if Sys.file_exists (Component.with_rules ".bf-install" c) then
+	  Unix.unlink (Component.with_rules ".bf-install" c))
   in
   
   let build ?(prev=false) tag =
     let (pkgname,version,revision) = tag in
 
     if have_external_components_changes then
-      List.iter force_rebuild (only_local components);
+      List.iter force_rebuild (Components.only_local components);
     
-    if not (tag_ready ~tag:(mk_tag tag) components) then
+    if not (Components.tag_ready ~tag:(mk_tag tag) components) then
       begin
 	List.iter add_reinstall (install components);
-	make_tag (mk_tag tag) (only_local components)
+	Components.make_tag (mk_tag tag) (Components.only_local components)
       end;
     
     List.iter add_reinstall
@@ -1706,18 +1707,18 @@ let package_update ~specdir
     (try
       build_package_file (specdir,version,string_of_int revision);
       if not !custom_revision && not prev then
-	ignore(reg_pkg_release specdir version revision)
+	ignore(Release.reg_pkg_release specdir version revision)
     with
       | Permanent_error s ->
 	  if not !custom_revision && not prev then
-	    ignore(reg_pkg_release specdir version revision);
+	    ignore(Release.reg_pkg_release specdir version revision);
 	  log_error s;
       | exn -> log_error (Printexc.to_string exn));
     
     (match prev_tag with
       | Some old ->
 	  (try
-	    changelog_components components (mk_tag old) (mk_tag tag)
+	    Components.changelog components (mk_tag old) (mk_tag tag)
 	  with exn ->
 	    log_message (Printexc.to_string exn))
       | None -> ());
@@ -2253,7 +2254,7 @@ let rec download_packages userhost l =
     (fun e ->
       let src =
 	sprintf "%s:%s" userhost e.pkg_path in
-      Rules.send_file_over_ssh src ".") l
+      Commands.send_file_over_ssh src ".") l
 
 let clone_by_pkgfile userhost pkg_path mode =
   let overwrite = mode <> "default" in
@@ -2471,7 +2472,7 @@ let toptree_of_specdir ?(log=true) specdir : top_tree =
 	    List.fold_left (fun acc (pkg,_,_) ->
 	      try
 		let new_specdir = 
-		  specdir_of_pkg ~default_branch:(Some (branch_of_specdir specdir)) pkgdir pkg in
+		  specdir_of_pkg ~default_branch:(Some (Specdir.branch specdir)) pkgdir pkg in
 		if Hashtbl.mem table new_specdir then
 		  begin
 		    acc @ [new_specdir] (* add specdir for post-processing *)
@@ -2512,7 +2513,7 @@ let deptree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
     if log then
       log_message (sprintf "%s resolve %s %s %d" (String.make depth ' ') specdir ver rev) in
   let checkout_pack key =
-    with_dir pkgdir
+    System.with_dir pkgdir
       (Git.git_checkout ~low:true ~key) in
 
   let (ver,rev) =
@@ -2527,7 +2528,7 @@ let deptree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
 	if mode then
 	  begin	    
 	    checkout_pack 
-	      (mk_tag ((pkgname_of_specdir specdir), ver, rev));
+	      (mk_tag ((Specdir.pkgname specdir), ver, rev));
 	    let spec =
 	      spec_from_v2
 		~version:ver
@@ -2542,7 +2543,7 @@ let deptree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
     else
       begin
 	checkout_pack 
-	  (mk_tag ((pkgname_of_specdir specdir), ver, rev));
+	  (mk_tag ((Specdir.pkgname specdir), ver, rev));
 	
 	if Sys.file_exists specdir then
 	  let spec = 
@@ -2561,7 +2562,7 @@ let deptree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
 		  if home_made_package pkg then
 		    begin
 		      let new_specdir =
-			specdir_of_pkg ~default_branch:(Some (branch_of_specdir specdir)) pkgdir pkg in
+			specdir_of_pkg ~default_branch:(Some (Specdir.branch specdir)) pkgdir pkg in
 		      let (ver,rev) = 
 			read_pkg_release new_specdir in
 		      acc @ [new_specdir,ver,rev,(have_revision (parse_vr_opt vr_opt))] (* add specdir for post-processing *)
@@ -2588,7 +2589,7 @@ let deptree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
     try
       make 0 (specdir,ver,rev,true)
     with Exit -> checkout_pack "master";
-      raise (Tree_error (sprintf "not found specdir (%s) for pack state: %s/%s-%d\n%!" specdir (pkgname_of_specdir specdir) ver rev));
+      raise (Tree_error (sprintf "not found specdir (%s) for pack state: %s/%s-%d\n%!" specdir (Specdir.pkgname specdir) ver rev));
   in
 
   checkout_pack "master";
@@ -2723,7 +2724,7 @@ let top ?(replace_composite=None) ?depends specdir =
 	let new_components =
 	  List.filter
 	    (fun c -> not (List.mem c acc))
-	    (Rules.components_of_composite ~replace_composite composite) in
+	    (Composite.components ~replace_composite composite) in
 	List.iter 
 	  (fun c ->
 	    let rules =
@@ -2739,9 +2740,9 @@ let top ?(replace_composite=None) ?depends specdir =
   List.iter
     (fun c ->
       let updated = 
-	update_component c in
+	Component.update c in
       let reinstalled =
-	install_component ~snapshot:true c in
+	Component.install ~snapshot:true c in
       add (sprintf "%s updated(%b) reinstalled(%b)\n" c.name updated reinstalled))
     components;
   print_endline (Buffer.contents buf)
@@ -2761,7 +2762,7 @@ let clone ?(vr=None) ~recursive ~overwrite specdir =
   List.iter (fun (s,_,_,_) -> printf "%s\n" s) depends;
   
   let with_rec l =
-    (if recursive then l else [last l]) in
+    (if recursive then l else [Lists.last l]) in
 
   log_message "depend list...";
   List.iter (fun (pkg,ver,rev,spec) -> printf "%s %s %d\n%!" pkg ver rev) (with_rec depends);
@@ -2769,7 +2770,7 @@ let clone ?(vr=None) ~recursive ~overwrite specdir =
   
   let pkg_exists specdir ver rev =
     let rex =
-      Pcre.regexp (sprintf "%s\\-%s\\-%d\\." (pkgname_of_specdir specdir) ver rev) in
+      Pcre.regexp (sprintf "%s\\-%s\\-%d\\." (Specdir.pkgname specdir) ver rev) in
     List.exists (Pcre.pmatch ~rex) (System.list_of_directory ".")
   in
   
@@ -2832,7 +2833,7 @@ let update_external_depends mode dst_capacity capacity_reduction local_depends s
 	  let specdir' =
 	    let d = Filename.dirname in
 	    Filename.concat (d (d specdir))
-	      (sprintf "%s/%s" pkgname (branch_of_specdir specdir)) in
+	      (sprintf "%s/%s" pkgname (Specdir.branch specdir)) in
 	  if List.mem_assoc specdir' local_depends then
 	    let increment v =
 	      match mode with
@@ -2863,7 +2864,7 @@ exception Destination_already_exists of string
 exception Destination_branch_already_used of string
 
 let parse_fork_branch specdir =
-  let s = branch_of_specdir specdir in
+  let s = Specdir.branch specdir in
   try
     let len = String.length s in
     let pos = String.rindex s '-' in
@@ -2876,7 +2877,7 @@ let parse_fork_branch specdir =
       s, (fst (read_pkg_release ~next:false specdir))
      
 let fork_type specdir dst =
-  let src = branch_of_specdir specdir in
+  let src = Specdir.branch specdir in
   if not (Version.exists dst) then
     raise (Bad_project_branch_format dst);
 
@@ -2928,7 +2929,7 @@ let check_components =
 	
 	if Sys.file_exists c.name then
 	  ignore
-	    (with_dir c.name
+	    (System.with_dir c.name
 	      (fun () ->
 		(match Git.git_current_branch () with
 		  | Some key' ->
@@ -2936,7 +2937,7 @@ let check_components =
 			Git.git_checkout ~force:true ~key ()
 		  | _ -> Git.git_checkout ~force:true ~key ())))
 	else
-	  prepare_component c
+	  Component.prepare c
       in
       (match c.label with
 	| Current ->
@@ -2944,7 +2945,7 @@ let check_components =
 	| Branch s | Tag s -> checkout_state s))
 
 let commit_pack_changes (src,dst) pack_dir =
-  with_dir pack_dir
+  System.with_dir pack_dir
     (fun () ->
       Git.git_add ".";
       Git.git_add "-u";
@@ -2967,7 +2968,7 @@ let fork ?(depth=0) top_specdir dst =
   check_pack_component ();
   check_destination_branch packdir dst;
 
-  let src = branch_of_specdir top_specdir in
+  let src = Specdir.branch top_specdir in
   let dst_specdir =
     dir top_specdir ^ "/" ^ dst in
   let dst_capacity =
@@ -3031,7 +3032,7 @@ let fork ?(depth=0) top_specdir dst =
 	in
 	let make_new_branch ?(start=None) () =
 	  Git.git_pull "origin";
-	  if not (List.mem (origin dst) (Git.git_branch ~remote:true ())) then
+	  if not (List.mem (Branch.origin dst) (Git.git_branch ~remote:true ())) then
 	    if List.mem dst (Git.git_branch ()) then
 	      Git.git_push ~refspec:dst "origin"
 	    else
@@ -3094,7 +3095,7 @@ let fork ?(depth=0) top_specdir dst =
 
   let check (specdir,_) =
     check_components
-      (components_of_composite
+      (Composite.components
 	(Filename.concat specdir "composite")) in
 
   let make_dst_specdir specdir =
@@ -3112,7 +3113,7 @@ let fork ?(depth=0) top_specdir dst =
     let local_depth = List.assoc specdir deplist in
     let files = System.list_of_directory specdir in
     let components =
-      components_of_composite (source "composite") in
+      Composite.components (source "composite") in
 
     make_directory [dst_specdir];
     
@@ -3127,7 +3128,7 @@ let fork ?(depth=0) top_specdir dst =
     (* composite handling *)
 
     if exists (source "composite") && (not (exists (destination "composite"))) then
-      write_composite (destination "composite")
+      Composite.write (destination "composite")
 	(change_components components);
     
     (* depends handling *)
@@ -3183,7 +3184,7 @@ let fork ?(depth=0) top_specdir dst =
        внешних зависимостей не производим *)
     List.iter (update_external_depends mode dst_capacity capacity_reduction depends)
       (make_external_depends pack_dir
-	(branch_of_specdir top_specdir)
+	(Specdir.branch top_specdir)
 	depends);
 
   List.iter (fun x ->
@@ -3193,7 +3194,7 @@ let fork ?(depth=0) top_specdir dst =
   List.iter
     (fun (loc,f) -> 
       log_message (sprintf "Branching %s" loc);
-      with_dir loc f)
+      System.with_dir loc f)
     !branch_jobs;
   log_message "Delay before commit pack changes...";
   stop_delay 10;
@@ -3217,7 +3218,7 @@ let graph ?ver ?rev specdir =
     list_of_deptree tree in
   
   List.iter 
-    (fun (n,v,r,_) -> printf "%s %s %d\n" (pkgname_of_specdir n) v r) depends;
+    (fun (n,v,r,_) -> printf "%s %s %d\n" (Specdir.pkgname n) v r) depends;
   let ch = open_out dotfile in
   let out = output_string ch in
   
@@ -3229,7 +3230,7 @@ let graph ?ver ?rev specdir =
   List.iter
     (fun (n,v,r,_) ->
       out (sprintf "\"%s\\n%s-%d\"
-    [shape=box,style=\"rounded,filled\",fillcolor=\"#77CC77\"]\n" (pkgname_of_specdir n) v r))
+    [shape=box,style=\"rounded,filled\",fillcolor=\"#77CC77\"]\n" (Specdir.pkgname n) v r))
     depends;
 
   let rec write_links parent = function
@@ -3239,8 +3240,8 @@ let graph ?ver ?rev specdir =
 	  | Some p ->
 	      let (pn,pv,pr,_) = p in
 	      out (sprintf "\"%s\\n%s-%d\" -> \"%s\\n%s-%d\"\n" 
-		(pkgname_of_specdir pn) pv pr 
-		(pkgname_of_specdir en) ev er);
+		(Specdir.pkgname pn) pv pr 
+		(Specdir.pkgname en) ev er);
 	      write_links (Some e) tree
 	  | None ->
 	      write_links (Some e) tree)
@@ -3270,7 +3271,7 @@ let basegraph specdir mode =
   let dotfile = "graph.dot" in
   let pngfile = "graph.png" in
 
-  let tree = deptree_of_pack ~default_branch:(Some (branch_of_specdir specdir)) specdir in
+  let tree = deptree_of_pack ~default_branch:(Some (Specdir.branch specdir)) specdir in
   let depends =
     list_of_deptree (map_deptree fst tree) in
 
@@ -3291,7 +3292,7 @@ let basegraph specdir mode =
   List.iter
     (fun n ->
       out (sprintf "\"%s\" 
-                    [shape=box,style=\"rounded,filled\",fillcolor=\"#77CC77\"]\n" (pkgname_of_specdir n)))
+                    [shape=box,style=\"rounded,filled\",fillcolor=\"#77CC77\"]\n" (Specdir.pkgname n)))
     depends;
 
   let rec write_links parent = function
@@ -3303,15 +3304,15 @@ let basegraph specdir mode =
 	      if have_revision evr_opt then
 		if mode = "full" || mode = "hard" then
 		  out (sprintf "\"%s\" -> \"%s\" [label=\"%s\", color=\"black\"]\n"
-		    (pkgname_of_specdir pn)
-		    (pkgname_of_specdir en)
+		    (Specdir.pkgname pn)
+		    (Specdir.pkgname en)
 		    (string_of_vr evr_opt))
 		else ()
 	      else
 		if mode = "full" || mode = "soft" then
 		  out (sprintf "\"%s\" -> \"%s\" [label=\"%s\", color=\"black\", style=\"dashed\"]\n"
-		    (pkgname_of_specdir pn)
-		    (pkgname_of_specdir en)
+		    (Specdir.pkgname pn)
+		    (Specdir.pkgname en)
 		    (string_of_vr evr_opt))
 		else ();
 	      write_links (Some e) tree
@@ -3370,13 +3371,13 @@ let diff_packages ?(changelog=false) specdir rev_a rev_b =
 	  begin
 	    let composite =
 	      Filename.concat pkgname_b "composite" in
-	    let pkgname = pkgname_of_specdir pkgname_b in
+	    let pkgname = Specdir.pkgname pkgname_b in
 	    let tag_a = sprintf "%s/%s-%d" pkgname ver_a rev_a in
 	    let tag_b = sprintf "%s/%s-%d" pkgname ver_b rev_b in
 	    if tag_a <> tag_b then
 	      List.iter (List.iter print_endline)
-		(List.map (changelog_component tag_a tag_b)
-		  (List.filter (fun c -> c.name <> "pack" && c.pkg = None && (not c.nopack)) (Rules.components_of_composite composite)))
+		(List.map (Component.changelog tag_a tag_b)
+		  (List.filter (fun c -> c.name <> "pack" && c.pkg = None && (not c.nopack)) (Composite.components composite)))
 	  end
       with Not_found ->
 	printf "+ %s %s %d\n%!" pkgname_b ver_b rev_b))
@@ -3410,7 +3411,7 @@ let last_versions pkgdir =
     let release =
       Filename.concat b "release" in
     if Sys.file_exists release then
-      match Str.split (Str.regexp "\\ +") (last (System.list_of_channel (open_in release))) with
+      match Str.split (Str.regexp "\\ +") (Lists.last (System.list_of_channel (open_in release))) with
 	| [ver;_] -> ver
 	| _ ->
 	    raise (Bad_release release)
@@ -3423,9 +3424,9 @@ let last_versions pkgdir =
   then
     raise (Bad_pkgdir pkgdir);
 
-  with_dir packdir (fun () -> Git.git_pull "origin");
+  System.with_dir packdir (fun () -> Git.git_pull "origin");
   
-  with_dir pkgdir
+  System.with_dir pkgdir
     (fun () ->
       let branches =
 	List.map
@@ -3618,7 +3619,7 @@ let search commit_id =
   let packdir = search_pack () in
   
   (* Check pack state *)
-  with_dir packdir (fun () ->
+  System.with_dir packdir (fun () ->
     printf "check pack state...";
     match Git.git_current_branch () with
       | Some "master" -> printf "ok\n%!"
@@ -3654,7 +3655,7 @@ let search commit_id =
     let (component_package,_) = split_tag tag in
     let equivalents = search_eq_tags tag in
     let tops = ref [] in
-    with_dir packdir
+    System.with_dir packdir
       (fun () ->
 	(* Состояние pack-а необходимо перевести на момент создания тега *)
 	Git.git_checkout ~low:true ~key:tag ();
@@ -3683,7 +3684,7 @@ let search commit_id =
 			    List.exists
 			      (fun c ->
 				(c.name = component || c.name ^ ".git" = component) && c.label = Branch component_branch)
-			      (Rules.components_of_composite composite)
+			      (Composite.components composite)
 			  else false)
 			(list_of_deptree tree)
 		    then

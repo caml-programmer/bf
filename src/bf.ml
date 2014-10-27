@@ -76,7 +76,7 @@ let analyze_arguments () =
 	if Sys.file_exists two && System.is_regular two then
 	  Is_composite two
 	else
-	  Is_components [ make_component two ]
+	  Is_components [ Component.make two ]
     | 4 ->
 	let two = Sys.argv.(2) in
 	if Sys.file_exists two && System.is_regular two then
@@ -86,7 +86,7 @@ let analyze_arguments () =
 	    | "branch" | "tag" -> usage ()
 	    |  _ -> 
 		 Is_components 
-		  [ make_component Sys.argv.(2); make_component Sys.argv.(3) ])
+		  [ Component.make Sys.argv.(2); Component.make Sys.argv.(3) ])
     | 5 ->
 	(match  Sys.argv.(3) with
 	  | "branch" ->
@@ -104,13 +104,13 @@ let analyze_arguments () =
 	  |  _ ->
 	       Is_components
 		[ 
-		  make_component Sys.argv.(2);
-		  make_component Sys.argv.(3);
-		  make_component Sys.argv.(4);
+		  Component.make Sys.argv.(2);
+		  Component.make Sys.argv.(3);
+		  Component.make Sys.argv.(4);
 		])
     | _ ->
 	Is_components
-	  (List.map make_component (List.tl (List.tl (Array.to_list Sys.argv))))
+	  (List.map Component.make (List.tl (List.tl (Array.to_list Sys.argv))))
 
 type teleport_mode =
   | Goto_bf_rules
@@ -146,49 +146,49 @@ let main () =
 	match analyze_arguments () with
 	  | Is_components components ->
 	      (match action with
-		| "prepare"   -> Commands.prepare   components
-		| "build"     -> Commands.build     components
-		| "rebuild"   -> Commands.rebuild   components
-		| "install"   -> ignore(Commands.install components)
-		| "reinstall" -> Commands.reinstall components
-		| "update"    -> ignore(Commands.update components)
-		| "forward"   -> Commands.forward   components
-		| "status"    -> Commands.status    components
+		| "prepare"   -> Components.prepare   components
+		| "build"     -> Components.build     components
+		| "rebuild"   -> Components.rebuild   components
+		| "install"   -> ignore(Components.install components)
+		| "reinstall" -> Components.reinstall components
+		| "update"    -> ignore(Components.update components)
+		| "forward"   -> Components.forward   components
+		| "status"    -> Components.status    components
 		| _           -> usage ())
 	  | Is_component_with_label component ->
 	      (match action with
-		| "prepare"   -> Commands.prepare   [component]
-		| "build"     -> Commands.build     [component]
-		| "rebuild"   -> Commands.rebuild   [component]
-		| "install"   -> ignore(Commands.install [component])
-		| "reinstall" -> Commands.reinstall [component]
-		| "update"    -> ignore(Commands.update [component])
-		| "forward"   -> Commands.forward   [component]
-		| "status"    -> Commands.status    [component]
+		| "prepare"   -> Components.prepare   [component]
+		| "build"     -> Components.build     [component]
+		| "rebuild"   -> Components.rebuild   [component]
+		| "install"   -> ignore(Components.install [component])
+		| "reinstall" -> Components.reinstall [component]
+		| "update"    -> ignore(Components.update [component])
+		| "forward"   -> Components.forward   [component]
+		| "status"    -> Components.status    [component]
 		| _           -> usage ())
 	  | Is_composite composite ->
 	      Params.set_composite_mode ();
 	      (match action with
-		| "prepare"   -> Commands.prepare_composite   composite
-		| "build"     -> Commands.build_composite     composite
-		| "rebuild"   -> Commands.rebuild_composite   composite
-		| "install"   -> ignore(Commands.install_composite composite)
-		| "reinstall" -> Commands.reinstall_composite composite
-		| "update"    -> ignore(Commands.update_composite composite)
-		| "forward"   -> Commands.forward_composite   composite
-		| "status"    -> Commands.status_composite    composite
+		| "prepare"   -> Composite.prepare composite
+		| "build"     -> Composite.build composite
+		| "rebuild"   -> Composite.rebuild composite
+		| "install"   -> ignore(Composite.install composite)
+		| "reinstall" -> Composite.reinstall composite
+		| "update"    -> ignore(Composite.update composite)
+		| "forward"   -> Composite.forward composite
+		| "status"    -> Composite.status composite
 		| _           -> usage ())
 	  | Is_composite_with_tag (composite,tag) ->
 	      Params.set_composite_mode ();
 	      (match action with
-		| "prepare"   -> Commands.prepare_composite   ~tag composite
-		| "build"     -> Commands.build_composite     ~tag composite
-		| "rebuild"   -> Commands.rebuild_composite   ~tag composite
-		| "install"   -> ignore(Commands.install_composite  ~tag composite)
-		| "reinstall" -> Commands.reinstall_composite ~tag composite
-		| "update"    -> ignore(Commands.update_composite ~tag composite)
-		| "forward"   -> Commands.forward_composite   ~tag composite
-		| "status"    -> Commands.status_composite    ~tag composite
+		| "prepare"   -> Composite.prepare   ~tag composite
+		| "build"     -> Composite.build     ~tag composite
+		| "rebuild"   -> Composite.rebuild   ~tag composite
+		| "install"   -> ignore(Composite.install  ~tag composite)
+		| "reinstall" -> Composite.reinstall ~tag composite
+		| "update"    -> ignore(Composite.update ~tag composite)
+		| "forward"   -> Composite.forward   ~tag composite
+		| "status"    -> Composite.status    ~tag composite
 		| _           -> usage ())
       in match action with
 	| "pack" ->
@@ -233,7 +233,7 @@ let main () =
 	      analyze ()
 	| "log" ->
 	    if len = 2 then
-	      Rules.log_viewer ()
+	      Commands.log_viewer ()
 	    else usage ()
 	| "clone" ->
 	    if Sys.file_exists Sys.argv.(2) then
@@ -346,23 +346,23 @@ let main () =
 	| "tag" ->
 	    if len = 4 then
 	      with_lock (fun () ->
-		Commands.tag_composite Sys.argv.(2) Sys.argv.(3))
+		Composite.tag Sys.argv.(2) Sys.argv.(3))
 	    else usage ()
 	| "review" ->
 	    if len = 4 then
-	      Commands.review_composite Sys.argv.(2) Sys.argv.(3)
+	      Composite.review Sys.argv.(2) Sys.argv.(3)
 	    else usage ()
 	| "diff" ->
 	    if len = 5 then
 	      if Filename.basename Sys.argv.(2) = "composite" then
-		Commands.diff_composite Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
+		Composite.diff Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	      else
 		Pack.diff_packages Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	    else usage ()
 	| "changelog" ->
 	    if len = 5 || len = 6 then
 	      if Filename.basename Sys.argv.(2) = "composite" then
-		Commands.changelog_composite ~interactive:true
+		Composite.changelog ~interactive:true
 		  ~compact:(len=6) Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	      else
 		Pack.changelog_packages Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
@@ -392,7 +392,7 @@ let main () =
 		Params.update_param "log-level" "high";
 		Params.update_param "plugins-dir" "../pack";
 		Params.update_param "orig-top-dir" (Params.get_param "top-dir");
-		Params.update_param "install-dir" (Commands.make_install_dir ());
+		Params.update_param "install-dir" (Params.make_install_dir ());
 		match len with
 		  | 2 ->
 		      Rules.build_rules None;

@@ -36,12 +36,6 @@ type tag_status =
   | Tag_created
   | Tag_creation_problem
 
-type fs_entry =
-  | File of string
-  | Dir of string
-
-type fs_state = (fs_entry,float) Hashtbl.t
-
 type version = string
 type revision = int
 
@@ -50,6 +44,3 @@ type upgrade_mode =
   | Upgrade_lazy
   | Upgrade_complete
   | Upgrade_default
-
-let make_component ?(label=Current) ?(pkg=None) ?(rules=None) ?(nopack=false) s =
-  { name = s; label = Current; pkg = pkg; rules = rules; nopack = nopack }

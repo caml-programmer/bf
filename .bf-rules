@@ -2,4 +2,4 @@
         (log-command "./configure")
 	(make))
 (define (install args)
-	(log-command "su" "-c" "make install"))
+       (log-command "sudo" "make" "install"))

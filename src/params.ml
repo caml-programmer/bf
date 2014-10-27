@@ -116,3 +116,14 @@ set_param ~default:"bf.session.log" "session-log";;
 set_param ~default:"bf.lock" "lock-file";;
 set_param ~default:"true" "use-external";; (* components in external packages *)
 set_param ~default:"false" "single-pack-fetch";; (* for upgrade action *)
+
+(* Utils *)
+
+let make_install_dir () =
+  let top_dir = get_param "top-dir" in
+  let dest_dir = get_param "dest-dir" in
+  if dest_dir = "" then
+    top_dir
+  else
+    Filename.concat dest_dir
+      (System.strip_root top_dir)

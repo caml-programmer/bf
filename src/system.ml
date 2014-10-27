@@ -321,3 +321,70 @@ let pid_exists file =
       int_of_string (Buffer.contents b)
   in Sys.command (sprintf "kill -0 %d" pid) = 0
 
+exception Cannot_create_symlink of (string * string)
+
+let create_symlink src dst =
+  if is_symlink dst && Unix.readlink dst = src
+  then ()
+  else
+    if is_symlink dst then
+      begin
+	Unix.unlink dst;
+	Unix.symlink src dst
+      end
+    else
+      match dst with
+	| "." ->
+	    Unix.symlink src (Filename.basename src)
+	|  _ ->
+	     if Sys.file_exists dst then
+	       raise (Cannot_create_symlink (src,dst))
+	     else
+	       Unix.symlink src dst
+
+let create_link src dst =
+  Unix.link src dst
+
+let read_directory dir =
+  let dh = Unix.opendir dir in
+  let rec read acc = 
+    try
+      let s = Unix.readdir dh in
+      if s <> "." && s <> ".." then
+	read (s::acc)
+      else
+	read acc
+    with End_of_file ->
+      Unix.closedir dh; List.rev acc
+  in read []
+
+let with_dir dir f =
+  let cur = Sys.getcwd () in
+  try
+    Sys.chdir dir;
+    let r = f () in
+    Sys.chdir cur;
+    r
+  with exn ->
+    Sys.chdir cur; raise exn
+
+let move_file src dir =
+  let name = Filename.basename src in
+  let dst = Filename.concat dir name in
+  Sys.rename src dst
+
+exception Cannot_create_directory of string
+
+let make_directory_r ?(mode=0o755) s =
+  let rec make rest s =
+    let dir = Filename.dirname s in
+    if is_directory dir then
+      begin
+	Unix.mkdir s mode;
+	List.iter
+	  (fun s -> Unix.mkdir s mode)
+	  rest
+      end
+    else
+      make (s::rest) dir
+  in make [] (path_strip_directory s)

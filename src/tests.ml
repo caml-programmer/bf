@@ -17,7 +17,7 @@ let regexp4 () =
     "a b  c    d" = ["a";"b";"c";"d"]
 
 let regexp5 () =
-  Rules.replace_param "A" (Some "/c") "SRC_DIR=/jet\nA=/b" = "SRC_DIR=/jet\nA=/c"
+  Commands.replace_param "A" (Some "/c") "SRC_DIR=/jet\nA=/b" = "SRC_DIR=/jet\nA=/c"
 
 let logcommand1 () =
   try
