@@ -127,3 +127,9 @@ let make_install_dir () =
   else
     Filename.concat dest_dir
       (System.strip_root top_dir)
+
+let dest_dir () =
+  let dest_dir = get_param "dest-dir" in
+  if dest_dir <> "" then
+    Some dest_dir
+  else None

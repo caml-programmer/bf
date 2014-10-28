@@ -7,333 +7,8 @@ open Components
 open Logger
 open Ocs_env
 open Ocs_types
+open Platform
 open Printf
-
-type os =
-  | Linux
-  | SunOS
-
-type pkg_engine =
-  | Rpm_build
-  | Pkg_trans
-  | Deb_pkg
-
-type platform =
-  | Rhel3
-  | Rhel4
-  | Rhel5
-  | Rhel6
-  | Cent4
-  | Cent5
-  | Cent6
-  | Fedora10
-  | Alt
-  | Arch
-  | Solaris8
-  | Solaris9
-  | Solaris10
-  | Debian
-  | Gentoo
-  | Unknown_linux
-
-type platform_mapping =
-    (string * ((string * platform) list)) list
-
-exception Permanent_error of string
-exception Pkg_engine_not_found
-
-let engine_of_platform = function
-  | Rhel3     -> Rpm_build
-  | Rhel4     -> Rpm_build
-  | Rhel5     -> Rpm_build
-  | Rhel6     -> Rpm_build
-  | Cent4     -> Rpm_build
-  | Cent5     -> Rpm_build
-  | Cent6     -> Rpm_build
-  | Fedora10  -> Rpm_build
-  | Alt       -> Rpm_build
-  | Arch      -> Rpm_build
-  | Solaris8  -> Pkg_trans
-  | Solaris9  -> Pkg_trans
-  | Solaris10 -> Pkg_trans
-  | Debian    -> Deb_pkg
-  | Gentoo | Unknown_linux
-      -> raise Pkg_engine_not_found
-
-let string_of_platform = function
-  | Rhel3     -> "rhel3"
-  | Rhel4     -> "rhel4"
-  | Rhel5     -> "rhel5"
-  | Rhel6     -> "rhel6"
-  | Cent4     -> "cent4"
-  | Cent5     -> "cent5"
-  | Cent6     -> "cent6"
-  | Fedora10  -> "f10"
-  | Alt       -> "alt"
-  | Arch      -> "arch"
-  | Solaris8  -> "sol8"
-  | Solaris9  -> "sol9"
-  | Solaris10 -> "sol10"
-  | Debian    -> "deb"
-  | Gentoo    -> "gentoo"
-  | Unknown_linux -> "linux"
-
-let platform_of_string = function
-  | "rhel3" -> Rhel3
-  | "rhel4" -> Rhel4
-  | "rhel5" -> Rhel5
-  | "rhel6" -> Rhel6
-  | "cent4" -> Cent4
-  | "cent5" -> Cent5
-  | "cent6" -> Cent6
-  | "f10"   -> Fedora10
-  | "alt"   -> Alt
-  | "arch"  -> Arch
-  | "sol8"  -> Solaris8
-  | "sol9"  -> Solaris9
-  | "sol10" -> Solaris10
-  | "deb"   -> Debian
-  | "gentoo" -> Gentoo
-  | "linux" -> Unknown_linux
-  |  s -> log_error (sprintf "Unsupported platform (%s)" s)
-
-let os_of_string = function
-  | "linux" -> Linux
-  | "sunos" -> SunOS
-  | s -> log_error (sprintf "Unsupported OS (%s)" s)
-      
-let os_as_string = System.uname
-
-let os () =
-  os_of_string (os_as_string ())
-
-let linux_platform_mapping =
-  [
-    "/etc/redhat-release",
-    [
-      "^Red Hat Enterprise.*?release 3",Rhel3;
-      "^Red Hat Enterprise.*?release 4",Rhel4;
-      "^Red Hat Enterprise.*?release 5",Rhel5;
-      "^Red Hat Enterprise.*?release 6",Rhel6;
-      "^CentOS.*?release 4",Cent4;
-      "^CentOS.*?release 5",Cent5;
-      "^CentOS.*?release 6",Cent6;
-      "^Fedora.*?release 10",Fedora10;
-      "^ALT Linux",Alt
-    ];
-    "/etc/arch-release", ["^.*",Arch];
-    "/etc/debian_version",["^.*",Debian];
-    "/etc/gentoo-release",["^.*",Gentoo];
-  ]
-    
-let rec select_platforms acc = function
-  | [] -> acc
-  | (file,mapping)::tl ->
-      if Sys.file_exists file then
-	begin
-	  let s = System.read_file ~file in
-	  let l = 
-	    List.filter
-	      (fun (pat,_) -> Pcre.pmatch ~rex:(Pcre.regexp pat) s) mapping in
-	  (match l with
-	    | (_,platform)::_ -> 
-		select_platforms (acc @ [platform]) tl
-	    | _ -> 
-		select_platforms acc tl)
-	end
-      else select_platforms acc tl
-
-let sunos_platfrom () =
-  match System.uname ~flag:'r' () with
-    | "5.8"  -> Solaris8
-    | "5.9"  -> Solaris9
-    | "5.10" -> Solaris10
-    |  s     ->	log_error (sprintf "Unsupported SunOS (%s)" s)
-
-let with_platform (f : os -> platform -> 'a) =
-  let os = os () in
-  match os with
-    | Linux ->
-	let platform =
-	  (match select_platforms [] linux_platform_mapping with
-	    | [] -> Unknown_linux
-	    | p::_ -> p)
-	in f os platform
-    | SunOS ->
-	f os (sunos_platfrom ())
-
-let check_rh_build_env () =
-  System.check_commands ["rpmbuild"]
-
-let rpmbuild
-  ?(top_label="topdir") ?(top_dir="/tmp/rpmbuild")
-  ?(nocopy="/") ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
-  ?(format="%%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm")
-  ~pkgname ~platform ~version ~release ~spec ~files ~findreq () =
-  let args = ref [] in
-  let add s = args := !args @ [s] in
-  let define n v =
-    add "--define"; add (sprintf "%s %s" n v)
-  in
-  let arch = System.arch () in
-  let location = Sys.getcwd () in
-  let rhsys = string_of_platform platform in
-  add "-bb";
-  add ("--target=" ^ arch);
-  add spec;
-  define "_rpmdir" location;
-  define "fileslist" files; (* must be absolute *)
-  define top_label top_dir;
-  define "nocopy" nocopy;
-  define "buildroot" buildroot;
-  define "_build_name_fmt" format;
-  define "pkgname" pkgname;
-  define "pkgvers" version;
-  define "pkgrel" release;
-  define "rhsys" rhsys;
-  define "findreq" findreq;
-  define "_unpackaged_files_terminate_build" "0";
-
-  let cmd = 
-    sprintf "rpmbuild %s" 
-      (String.concat " " (List.map (fun x -> "'" ^ x ^ "'") !args)) in
-
-  log_message (sprintf "run: %s" cmd);
-  
-  let fullname =
-    sprintf "%s-%s-%s.%s.%s.rpm"
-      pkgname version release rhsys arch in
-  if Sys.file_exists (Filename.concat location fullname) then
-    location,fullname
-  else
-    begin
-      let pid = Unix.fork () in
-      if pid > 0 then
-	begin
-	  log_message (sprintf "waiting for build package as pid %d" pid);
-	  try
-	    while true do
-	      match Unix.waitpid [Unix.WNOHANG] pid with
-		| 0,_ -> 
-		    Unix.sleep 1
-		| n,Unix.WEXITED 0 when n = pid ->
-		    raise Not_found
-		| _,_ ->
-		    log_error
-		      (sprintf "Cannot build package: %s/%s" location fullname)
-	    done; location,fullname
-	  with 
-	    | Not_found ->
-		location,fullname
-	    | exn ->
-		log_error
-		  (sprintf "Cannot build package[%s]: %s/%s" (Printexc.to_string exn) location fullname)
-	end
-      else
-	begin
-	  let _ =
-	    Unix.execvp "rpmbuild" (Array.of_list ("rpmbuild"::!args)) in
-	  exit 0
-	end
-    end
-
-type content =
-    [
-    | `File of string
-    | `Dir of string
-    | `Empty_dir of string
-    | `None
-    ]
-
-let dest_dir () =
-  let dest_dir = Params.get_param "dest-dir" in
-  if dest_dir <> "" then
-    Some dest_dir
-  else None  
-
-let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot")) ~top_dir files =
-  remove_directory buildroot;
-  make_directory [buildroot];
-  
-  let match_prefix p v =
-    let pl = String.length p in
-    let vl = String.length v in
-    vl >= pl && String.sub v 0 pl = p
-  in
-  let parse_line s =
-    let make_path s =
-      let n =
-	  Strings.substring_replace ("%dir ","")
-	  (Strings.substring_replace ("%topdir",top_dir)
-	    (Strings.substring_replace ("%config\\(noreplace\\) %topdir",top_dir) s)) in
-      let m = 
-	let l = String.length n in
-	if l > 0 && n.[0] = '/' then
-	  String.sub n 1 (pred l)
-	else n
-      in m
-    in
-    let len = String.length s in
-    if match_prefix "%dir " s then
-      `Empty_dir (make_path s)
-    else if match_prefix "%config(noreplace) %topdir" s then
-      `File (make_path s)
-    else if match_prefix "%nocopy" s || match_prefix "#" s then
-      `None
-    else
-      if s.[pred len] = '/' then
-	`Dir (make_path s)
-      else
-	`File (make_path s)
-  in
-  let ch = open_in files in
-  try
-    while true do
-      let raw = input_line ch in
-      match parse_line raw with
-	| `File s ->
-	    (try
-	      let ns =
-		match dest_dir () with
-		  | Some d -> Filename.concat d (System.strip_root s)
-		  | None   -> s in
-	      let dname =
-		Filename.concat buildroot (Filename.dirname s) in
-	      let src = "/" ^ ns in
-	      let dst = Filename.concat buildroot s in
-	      System.create_directory_r dname;
-	      System.link_or_copy src dst
-	    with exn ->
-	      log_message ("f " ^ s);
-	      raise exn)
-	| `Dir s ->
-	    (try
-	      let ns =
-		match dest_dir () with 
-		  | Some d -> Filename.concat d (System.strip_root s)
-		  | None   -> s in
-	      let dname =
-		Filename.concat buildroot (Filename.dirname s) in
-	      let src = "/" ^ ns in
-	      let dst = Filename.concat buildroot s in
-	      System.create_directory_r dname;
-	      remove_directory (Filename.concat buildroot s);
-	      System.copy_dir src dst;
-	    with exn ->
-	      log_message ("d " ^ s);
-	      raise exn)
-	| `Empty_dir s ->
-	    (try
-	      let dst = Filename.concat buildroot s in
-	      System.create_directory_r dst
-	    with exn ->
-	      log_message ("e " ^ s);
-	      raise exn)
-	| `None ->
-	    log_message 
-	      (sprintf "copy_to_buildroot: skipped %s" raw)
-    done
-  with End_of_file -> close_in ch
 
 exception Invalid_specdir_format
 exception Unsupported_specdir_version of string
@@ -915,11 +590,11 @@ let call_before_build ~snapshot ~pkgname ~version ~revision ~platform hooks =
 let build_over_rpmbuild ~snapshot params =
   let (pkgname,platform,version,release,spec,files,findreq,hooks) = params in
   let top_dir = Params.get_param "top-dir" in
-  check_rh_build_env ();
+  System.check_commands ["rpmbuild"];
   log_command "chmod" ["+x";findreq];
-  copy_to_buildroot ~top_dir files;
+  Rpm.copy_to_buildroot ~top_dir files;
   let (location,fullname) =
-    rpmbuild
+    Rpm.build
       ~top_dir
       ~pkgname ~platform ~version ~release
       ~spec ~files ~findreq ()
@@ -1321,7 +996,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 	      System.with_dir abs_specdir
 		(fun () ->
 		  let root =
-		    match dest_dir () with
+		    match Params.dest_dir () with
 		      | Some d -> d
 		      | None -> "/" in
 		  log_command "pkgmk"
@@ -1401,7 +1076,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
                         let dir = Filename.dirname dst in
 			make_directory [dir];
 			System.link_or_copy
-			  (match dest_dir () with
+			  (match Params.dest_dir () with
 			    | Some d -> Filename.concat d src
 			    | None -> src) dst
 		    | _ -> ())
