@@ -2,6 +2,13 @@ open Printf
 open Platform
 open Logger
 
+let key_format s =
+  let l = String.length s in
+  if l > 0 then
+    let r = String.sub s 0 l in
+    r.[0] <- Char.uppercase r.[0]; r
+  else s
+   
 let build
   ?(top_label="topdir") ?(top_dir="/tmp/rpmbuild")
   ?(nocopy="/") ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))

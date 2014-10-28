@@ -47,3 +47,5 @@ let string_of_pkg_op = function
 let string_of_op = function
   | Pkg_last -> "last"
   | v -> string_of_pkg_op v
+
+exception Pack_branch_is_not_found of string

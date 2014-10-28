@@ -196,7 +196,7 @@ let main () =
 	      let specdir = Sys.argv.(2) in
 	      let version = Sys.argv.(3) in
 	      let release = Sys.argv.(4) in
-	      Pack.build_package_file
+	      Pkgbuild.build_package_file
 		(specdir,version,release)
 	    else usage ()
 	| "update" ->
