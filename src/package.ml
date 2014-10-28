@@ -1,44 +1,193 @@
 open Printf
+open Types
+open Logger
+open Spectype
 
-exception Release_not_found of (string * exn)
+let reinstalled_components = (* for update and upgrade actions *)
+  Hashtbl.create 32;;
 
-let vr_compare a b =
-  let r = compare (fst b) (fst a) in
-  if r = 0 then
-    compare (snd b) (snd a)
-  else r
+exception Cannot_build_package of string
 
-let max_vr l =
-  List.hd (List.sort vr_compare l)
-     
-let release ?(next=false) ?version specdir =
-  let with_next n = if next then succ n else n in
-  let make s =
-    let (ver,rev) =
-      let pos = String.index s ' ' in
-      String.sub s 0 pos,
-      (with_next
-	(int_of_string
-	  (String.sub s (succ pos) (String.length s - pos - 1))))
-    in (ver,rev)
-  in
-  let filter (v,r) =
-    match version with
-      | Some v' -> v' = v
-      | None -> true
-  in
-  let file = Filename.concat specdir "release" in
+let build (specdir,ver,rev,spec) =
+  let specdir =
+    System.path_strip_directory specdir in
+  let pkgname = Specdir.pkgname specdir in
+  let tag = (pkgname,ver,rev) in
+  
+  Check.specdir specdir;
+    
+  let components =
+    if Params.get_param "use-external" = "true" then
+      spec.components
+    else
+      Components.only_local spec.components in
+  
+  List.iter Component.fetch_tags components;
+
+  if not (Components.tag_ready ~tag:(Tag.mk tag) components) then
+    raise (Cannot_build_package (Tag.mk tag));
+  ignore
+    (Components.install (Components.with_tag (Some (Tag.mk tag))
+      (* выкидываем pack-компонент, чтобы не было ненужных checkout'ов в pack'e *)
+      (List.filter (fun c -> c.name <> "pack") components)));
   (try
-    if Sys.file_exists file then
-      let ch = open_in file in
-      max_vr (List.filter filter
-	(List.map make (System.list_of_channel ch)))
-    else raise Exit
-  with exn -> 
-    raise (Release_not_found (specdir,exn)))
+    Pkgbuild.build_package_file ~ready_spec:(Some spec) (specdir,ver,string_of_int rev);
+  with
+    | Platform.Permanent_error s -> log_error s;
+    | exn -> log_error (Printexc.to_string exn));
+  true
 
+exception Revision_must_be_digital of string
 
-let string_of_pkgexn = function
-  | Release_not_found (s,exn) ->
-      sprintf "Package.Release_not_found(%s,%s)" s (Printexc.to_string exn)
-  | exn -> Printexc.to_string exn
+let update ~specdir
+  ?(check_pack=true)
+  ?(check_fs=false)
+  ?(lazy_mode=false)
+  ?(interactive=false)
+  ?(ver=None) ?(rev=None) () =
+  let specdir = System.path_strip_directory specdir in
+  Check.specdir specdir;
+  if check_pack then
+    Check.pack_component ();
+
+  let pkgname = Specdir.pkgname specdir in
+  let branch = Specdir.branch specdir in
+
+  let have_pack_changes =
+    Changes.pack specdir (Component.make ~label:(Branch "master") "pack") in
+
+  let conv_revision r =
+    try int_of_string r with _ -> raise (Revision_must_be_digital r) in
+
+  let custom_revision = ref false in
+  
+  let (version,revision) =
+    (try
+      (match ver with
+	| Some v ->
+	    custom_revision := true;
+	    v, (match rev with Some r -> conv_revision r | None -> log_error (sprintf "cannot update %s: revision does not set" pkgname))
+	| None ->
+	    Release.read ~next:true specdir)
+    with Release.Not_found _ ->
+      log_message (sprintf "Warning: Try using local pkg archive for search next package (%s %s) release" pkgname branch);
+      let ver' =
+	match ver with
+	  | Some v -> v
+	  | None -> Pkgsearch.version ~interactive pkgname
+      in
+      let rev' =
+	match rev with
+	  | Some r -> conv_revision r
+	  | None -> succ (Pkgsearch.revision ~interactive pkgname ver')
+      in (ver',rev'))
+  in
+
+  let have_fs_changes =
+    if check_fs then
+      begin
+	let pat = 
+	  sprintf "%s-%s-%d" pkgname version (pred revision) in
+	let rex = Pcre.regexp pat in
+	not (List.exists (Pcre.pmatch ~rex) (System.list_of_directory "."))
+      end
+    else false in
+
+  let tag =
+    (pkgname,version,revision) in
+  
+  let prev_tag =
+    if revision > 0 then
+      Some (pkgname,version,(pred revision))
+    else None in
+  
+  let components =    
+    let l =
+      Composite.components
+	(Filename.concat specdir "composite") in
+    if Params.get_param "use-external" = "true" 
+    then l else Components.only_local l in
+  
+  let have_composite_changes =
+    Components.update components in
+  
+  let have_external_components_changes =
+    List.exists
+      (fun component -> 
+	Hashtbl.mem reinstalled_components component.name)
+      (Components.only_external components) in
+
+  let add_reinstall c =
+    Hashtbl.replace reinstalled_components c.name false in
+
+  let force_rebuild c =
+    log_message
+      (sprintf "force %s rebuilding by external components changes" c.name);
+    System.with_dir c.name
+      (fun () ->
+	if Sys.file_exists (Component.with_rules ".bf-build" c) then
+	  Unix.unlink (Component.with_rules ".bf-build" c);
+	if Sys.file_exists (Component.with_rules ".bf-install" c) then
+	  Unix.unlink (Component.with_rules ".bf-install" c))
+  in
+  
+  let build ?(prev=false) tag =
+    let (pkgname,version,revision) = tag in
+
+    if have_external_components_changes then
+      List.iter force_rebuild (Components.only_local components);
+    
+    if not (Components.tag_ready ~tag:(Tag.mk tag) components) then
+      begin
+	List.iter add_reinstall (Components.install components);
+	Components.make_tag (Tag.mk tag) (Components.only_local components)
+      end;
+    
+    List.iter add_reinstall
+      (Components.install (Components.with_tag (Some (Tag.mk tag))
+	(* выкидываем pack-компонент, чтобы не было ненужных checkout'ов в pack'e *)
+	(List.filter (fun c -> c.name <> "pack") components)));
+    
+    (try
+      Pkgbuild.build_package_file (specdir,version,string_of_int revision);
+      if not !custom_revision && not prev then
+	ignore(Release.reg_pkg_release specdir version revision)
+    with
+      | Platform.Permanent_error s ->
+	  if not !custom_revision && not prev then
+	    ignore(Release.reg_pkg_release specdir version revision);
+	  log_error s;
+      | exn -> log_error (Printexc.to_string exn));
+    
+    (match prev_tag with
+      | Some old ->
+	  (try
+	    Components.changelog components (Tag.mk old) (Tag.mk tag)
+	  with exn ->
+	    log_message (Printexc.to_string exn))
+      | None -> ());
+    true
+  in
+  if lazy_mode && not have_composite_changes && not have_pack_changes then
+    begin
+      if have_fs_changes then
+	match prev_tag with
+	  | Some tag ->
+	      log_message 
+		(sprintf "pkg update (%s/%s): lazy-mode(%b), composite-changes(%b), pack-changes(%b), fs-changes(%b) -> previous-build(%s)"
+		  pkgname branch lazy_mode have_composite_changes have_pack_changes have_fs_changes (Tag.mk tag));
+	      build ~prev:true tag
+	  | None ->
+	      (log_message (sprintf "pkg update (%s/%s): nothing to do" pkgname branch);
+	      false)
+      else
+	(log_message (sprintf "pkg update (%s/%s): nothing to do" pkgname branch);	
+	false)
+    end
+  else
+    begin    
+      log_message 
+	(sprintf "pkg update (%s/%s): lazy-mode(%b), composite-changes(%b), pack-changes(%b), fs-changes(%b) -> first-build(%s)"
+	  pkgname branch lazy_mode have_composite_changes have_pack_changes have_fs_changes (Tag.mk tag));
+      build tag
+    end

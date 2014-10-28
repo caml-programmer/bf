@@ -62,10 +62,10 @@ let load ?snapshot ?(interactive=false) ?(ignore_last=false) file =
 				      branch
 				  in
 				  pkg_ver := Some (sprintf "%s-%d.%s" ver
-				    (snd (Package.release ~version:ver specdir))
+				    (snd (Release.read ~version:ver specdir))
 				    (string_of_platform platform))))			
 			  with exn ->
-			    log_message (sprintf "Warning: %s -> try using local pkg archive for search last pkg revision" (Package.string_of_pkgexn exn));
+			    log_message (sprintf "Warning: %s -> try using local pkg archive for search last pkg revision" (Printexc.to_string exn));
 			    pkg_ver := Some (sprintf "%s-%d.%s" ver
 			      (Pkgsearch.revision ~interactive (match !pkg_name with Some s -> s | None -> raise Not_found) ver)
 			      (string_of_platform platform))))

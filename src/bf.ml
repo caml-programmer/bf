@@ -226,7 +226,7 @@ let main () =
 	      in
 	      if Sys.file_exists version && Sys.file_exists composite then
 		with_lock (fun () ->
-		  ignore (Pack.package_update ~specdir ~lazy_mode ~ver ~rev ()))
+		  ignore (Package.update ~specdir ~lazy_mode ~ver ~rev ()))
 	      else
 		analyze ()
 	    else
@@ -274,10 +274,10 @@ let main () =
 	    else
 	      begin
 		if len = 4 then
-		  with_lock (fun () -> Pack.clone_by_pkgfile Sys.argv.(2) Sys.argv.(3) "default")
+		  with_lock (fun () -> Clone.by_pkgfile Sys.argv.(2) Sys.argv.(3) "default")
 		else
 		  if len = 5 then
-		    with_lock (fun () -> Pack.clone_by_pkgfile Sys.argv.(2) Sys.argv.(3) Sys.argv.(4))
+		    with_lock (fun () -> Clone.by_pkgfile Sys.argv.(2) Sys.argv.(3) Sys.argv.(4))
 		  else
 		    usage ()
 	      end
@@ -369,10 +369,10 @@ let main () =
 	    else usage ()
 	| "link" ->
 	    if len = 3 then
-	      Pack.link ~hard:true Sys.argv.(2)
+	      Link.make ~hard:true Sys.argv.(2)
 	    else
 	      if len = 4 && Sys.argv.(3) = "symlink" then
-		Pack.link ~hard:false Sys.argv.(1)
+		Link.make ~hard:false Sys.argv.(1)
 	      else usage ()
 	| "snapshot" ->
 	    (match len with

@@ -65,66 +65,6 @@ let log_viewer () =
   exit (Sys.command
     (sprintf "tail -f %s" (Params.get_param "session-log")))
 
-
-(* Pack update support *)
-
-
-
-let pkgname_of_tag tag =
-  try
-    Some (String.sub tag 0 (String.index tag '/'))
-  with Not_found -> None
-
-let mk_tag (pkgname,ver,rev) =
-  sprintf "%s/%s-%d" pkgname ver rev
-
-let tag_of_specdir specdir =
-  try
-    let pkgname = Specdir.pkgname specdir in
-    let (ver,rev) = Package.release specdir in
-    Some (mk_tag (pkgname, ver, rev))
-  with exn -> log_message
-    (sprintf "Warning: cannot parse release file from %s by error (%s)" specdir
-      (Printexc.to_string exn));
-    None
-
-exception Pack_current_branch_is_not_set
-
-let pack_changes specdir component =
-  let is_release s =
-    let x = "release" in
-    let sl = String.length s in
-    let xl = String.length x in
-    sl > xl && String.sub s (sl - xl) xl = x      
-  in  
-  let tag' = tag_of_specdir specdir in
-  System.with_dir component.name
-    (fun () ->
-      match git_current_branch () with
-	| Some cur ->
-	    (match tag' with
-		Some tag ->
-		  let rex = Pcre.regexp
-		    (sprintf "%s/%s/"
-		      (Specdir.pkgname specdir)
-		      (Specdir.branch specdir))
-		  in
-		  (try
-		    List.exists (fun s ->
-		      let changed =
-			(Pcre.pmatch ~rex s) && not (is_release s) in
-		      if changed then
-			log_message (sprintf "%s is changed" s);
-		      changed)
-		      (git_changes tag cur)
-		  with Key_not_found key ->
-		    log_message (sprintf "Warning: git-key (%s) is not found in pack" key);
-		    true)
-	      | None -> 
-		  log_message (sprintf "Warning: cannot find current tag by specdir(%s)" specdir);
-		  true)
-	| None -> raise Pack_current_branch_is_not_set)
-
 let path_concat args =
   let rec concat acc = function
       [] -> acc

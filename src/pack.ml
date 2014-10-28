@@ -11,783 +11,14 @@ open Platform
 open Printf
 open Spectype
 
-exception Bad_specdir of string
-
-let check_specdir specdir =
-  try
-    ignore(Specdir.pkgname specdir);
-    ignore(Specdir.branch specdir);
-    let p =
-      Filename.basename
-	(Filename.dirname 
-	  (Filename.dirname specdir)) in
-    if p <> "pack" && p <> "pack.git" then
-      raise (Bad_specdir specdir)
-  with _ ->
-    raise (Bad_specdir specdir)
-
-let check_pack_component () =
-  let component = 
-    Component.make ~label:(Branch "master") "pack" in
-  ignore(Component.update_pack component);
-  ignore
-    (System.with_dir component.name
-      (fun () ->
-	(match Git.git_current_branch () with
-	  | Some "master" -> ()
-	  | _ -> Git.git_checkout ~force:true ~key:"master" ())))
-
-
-let reinstalled_components = (* for update and upgrade actions *)
-  Hashtbl.create 32;;
-
-exception Cannot_build_package of string
-
-let package_build (specdir,ver,rev,spec) =
-  let specdir =
-    System.path_strip_directory specdir in
-  let pkgname = Specdir.pkgname specdir in
-  let tag = (pkgname,ver,rev) in
-  
-  check_specdir specdir;
-    
-  let components =
-    if Params.get_param "use-external" = "true" then
-      spec.components
-    else
-      Components.only_local spec.components in
-  
-  List.iter Component.fetch_tags components;
-
-  if not (Components.tag_ready ~tag:(mk_tag tag) components) then
-    raise (Cannot_build_package (mk_tag tag));
-  ignore
-    (install (Components.with_tag (Some (mk_tag tag))
-      (* выкидываем pack-компонент, чтобы не было ненужных checkout'ов в pack'e *)
-      (List.filter (fun c -> c.name <> "pack") components)));
-  (try
-    Pkgbuild.build_package_file ~ready_spec:(Some spec) (specdir,ver,string_of_int rev);
-  with
-    | Permanent_error s -> log_error s;
-    | exn -> log_error (Printexc.to_string exn));
-  true
-
-exception Revision_must_be_digital of string
-
-let package_update ~specdir
-  ?(check_pack=true)
-  ?(check_fs=false)
-  ?(lazy_mode=false)
-  ?(interactive=false)
-  ?(ver=None) ?(rev=None) () =
-  let specdir = System.path_strip_directory specdir in
-  check_specdir specdir;
-  if check_pack then
-    check_pack_component ();
-
-  let pkgname = Specdir.pkgname specdir in
-  let branch = Specdir.branch specdir in
-
-  let have_pack_changes =
-    pack_changes specdir (Component.make ~label:(Branch "master") "pack") in
-
-  let conv_revision r =
-    try int_of_string r with _ -> raise (Revision_must_be_digital r) in
-
-  let custom_revision = ref false in
-  
-  let (version,revision) =
-    (try
-      (match ver with
-	| Some v ->
-	    custom_revision := true;
-	    v, (match rev with Some r -> conv_revision r | None -> log_error (sprintf "cannot update %s: revision does not set" pkgname))
-	| None ->
-	    Package.release ~next:true specdir)
-    with Package.Release_not_found _ ->
-      log_message (sprintf "Warning: Try using local pkg archive for search next package (%s %s) release" pkgname branch);
-      let ver' =
-	match ver with
-	  | Some v -> v
-	  | None -> Pkgsearch.version ~interactive pkgname
-      in
-      let rev' =
-	match rev with
-	  | Some r -> conv_revision r
-	  | None -> succ (Pkgsearch.revision ~interactive pkgname ver')
-      in (ver',rev'))
-  in
-
-  let have_fs_changes =
-    if check_fs then
-      begin
-	let pat = 
-	  sprintf "%s-%s-%d" pkgname version (pred revision) in
-	let rex = Pcre.regexp pat in
-	not (List.exists (Pcre.pmatch ~rex) (System.list_of_directory "."))
-      end
-    else false in
-
-  let tag =
-    (pkgname,version,revision) in
-  
-  let prev_tag =
-    if revision > 0 then
-      Some (pkgname,version,(pred revision))
-    else None in
-  
-  let components =    
-    let l =
-      Composite.components
-	(Filename.concat specdir "composite") in
-    if Params.get_param "use-external" = "true" 
-    then l else Components.only_local l in
-  
-  let have_composite_changes =
-    update components in
-  
-  let have_external_components_changes =
-    List.exists
-      (fun component -> 
-	Hashtbl.mem reinstalled_components component.name)
-      (Components.only_external components) in
-
-  let add_reinstall c =
-    Hashtbl.replace reinstalled_components c.name false in
-
-  let force_rebuild c =
-    log_message
-      (sprintf "force %s rebuilding by external components changes" c.name);
-    System.with_dir c.name
-      (fun () ->
-	if Sys.file_exists (Component.with_rules ".bf-build" c) then
-	  Unix.unlink (Component.with_rules ".bf-build" c);
-	if Sys.file_exists (Component.with_rules ".bf-install" c) then
-	  Unix.unlink (Component.with_rules ".bf-install" c))
-  in
-  
-  let build ?(prev=false) tag =
-    let (pkgname,version,revision) = tag in
-
-    if have_external_components_changes then
-      List.iter force_rebuild (Components.only_local components);
-    
-    if not (Components.tag_ready ~tag:(mk_tag tag) components) then
-      begin
-	List.iter add_reinstall (install components);
-	Components.make_tag (mk_tag tag) (Components.only_local components)
-      end;
-    
-    List.iter add_reinstall
-      (install (with_tag (Some (mk_tag tag))
-	(* выкидываем pack-компонент, чтобы не было ненужных checkout'ов в pack'e *)
-	(List.filter (fun c -> c.name <> "pack") components)));
-    
-    (try
-      Pkgbuild.build_package_file (specdir,version,string_of_int revision);
-      if not !custom_revision && not prev then
-	ignore(Release.reg_pkg_release specdir version revision)
-    with
-      | Permanent_error s ->
-	  if not !custom_revision && not prev then
-	    ignore(Release.reg_pkg_release specdir version revision);
-	  log_error s;
-      | exn -> log_error (Printexc.to_string exn));
-    
-    (match prev_tag with
-      | Some old ->
-	  (try
-	    Components.changelog components (mk_tag old) (mk_tag tag)
-	  with exn ->
-	    log_message (Printexc.to_string exn))
-      | None -> ());
-    true
-  in
-  if lazy_mode && not have_composite_changes && not have_pack_changes then
-    begin
-      if have_fs_changes then
-	match prev_tag with
-	  | Some tag ->
-	      log_message 
-		(sprintf "pkg update (%s/%s): lazy-mode(%b), composite-changes(%b), pack-changes(%b), fs-changes(%b) -> previous-build(%s)"
-		  pkgname branch lazy_mode have_composite_changes have_pack_changes have_fs_changes (mk_tag tag));
-	      build ~prev:true tag
-	  | None ->
-	      (log_message (sprintf "pkg update (%s/%s): nothing to do" pkgname branch);
-	      false)
-      else
-	(log_message (sprintf "pkg update (%s/%s): nothing to do" pkgname branch);	
-	false)
-    end
-  else
-    begin    
-      log_message 
-	(sprintf "pkg update (%s/%s): lazy-mode(%b), composite-changes(%b), pack-changes(%b), fs-changes(%b) -> first-build(%s)"
-	  pkgname branch lazy_mode have_composite_changes have_pack_changes have_fs_changes (mk_tag tag));
-      build tag
-    end
-
-(* Depend tree support *)
-
-type 'a deptree =
-  | Dep_val of 'a * 'a deptree
-  | Dep_list of 'a deptree list
-
-type 'a graph = ('a * 'a list) list
-
-exception Not_found_vertex
-
-let create_graph () = []
-
-let insert_vtx g v =
-  if List.mem_assoc v g then g
-  else (v,[])::g
-
-let insert_edge g a b =
-  if not (List.mem_assoc a g) then
-    raise Not_found_vertex;
-  if not (List.mem_assoc b g) then
-    raise Not_found_vertex;
-  List.map 
-    (fun (k,l) ->
-      if k = a then
-	if List.mem b l then
-	  (k,l)
-	else
-	  (k,b::l)
-      else
-	(k,l)) g
-
-let remove_vtx g v =
-  if List.mem_assoc v g then
-    List.map (fun (k,vl) -> k,(List.filter (fun x -> x <> v) vl))
-      (List.filter (fun (k,_) -> k <> v) g)
-  else g
-
-let has_edges_to g v =
-  if List.mem_assoc v g then
-    List.assoc v g
-  else raise Not_found_vertex
-
-let has_edges_from g v =
-  if List.mem_assoc v g then
-    begin
-      List.fold_left 
-	(fun acc (k,vl) ->
-	  if List.mem v vl then
-	    k::acc
-	  else acc) [] g
-    end
-  else raise Not_found_vertex
-  
-let find_finish_vtx g =
-  List.map fst (List.filter (fun (k,vl) -> vl = []) g)
-    
-exception Cannot_unwind_depends_graph
-
-let unwind g =
-  let acc = ref [] in
-  let work = ref g in
-  let remove g v =
-    acc := v :: !acc;
-    work := remove_vtx !work v;
-  in
-  let counter = ref 0 in
-  while !work <> [] do
-    incr counter;
-    if !counter > 1000000000 then
-      raise Cannot_unwind_depends_graph
-    else
-      List.iter (remove !work)
-	(find_finish_vtx !work)
-  done;
-  (List.rev !acc)
-
-let deplist_of_deptree tree =
-  let rec make depth = function
-    | Dep_val (x, Dep_list l) -> (List.flatten (List.map (make (succ depth)) l)) @ [x,depth]
-    | _ -> assert false
-  in make 0 tree
-
-let list_of_deptree tree =
-  let g = ref (create_graph ()) in
-  let rec fill_graph parent = function
-    | Dep_val (x, Dep_list l) ->
-	(match parent with
-	  | Some p ->
-	      g := insert_vtx !g p;
-	      g := insert_vtx !g x;
-	      g := insert_edge !g p x;
-	  | None -> ());
-	List.iter (fill_graph (Some x)) l
-    | _ -> assert false
-  in fill_graph None tree;
-  unwind !g
-
-let rec map_deptree f = function
-  | Dep_val (x, tree) -> Dep_val (f x, map_deptree f tree)
-  | Dep_list l -> Dep_list (List.map (map_deptree f) l)
-
-(* Clone suport *)
-
-type pack_branch = string
-
-type pkg_path = {
-  pkg_path : string;
-  pkg_dir : string;
-  pkg_name : string;
-  pkg_fullname : string;
-  pkg_platform : platform;
-  pkg_extension : string;
-  pkg_arch : string;
-  pkg_version : Types.version;
-  pkg_revision : Types.revision;
-  pkg_branch: pack_branch;
-}
+open Deptree
 
 type top_val = string * Types.version * Types.revision
-type clone_val = string * Types.version * Types.revision * spec
-
-type pkg_clone_tree =
-    pkg_path deptree
-
 type top_tree =
     top_val deptree
 
-type clone_tree =
-    clone_val deptree
-
 type pack_tree =
     (string * (Types.version * Types.revision option) option) deptree
-     
-exception Cannot_extract_arch of string
-exception Cannot_extract_platform of string
-exception Cannot_resolve_dependes of string
-exception Cannot_resolve_soft_dependes of string
-exception Cannot_extract_revision of string
-exception Cannot_extract_version of string
-exception Cannot_extract_extension of string
-exception Cannot_extract_pkgname of string
-
-let extract_extension pkg_name =
-  try
-    let pos = String.rindex pkg_name '.' in
-    String.sub pkg_name (succ pos) (String.length pkg_name - pos - 1)
-  with _ ->
-    raise (Cannot_extract_extension pkg_name)
-
-let extract_arch pkg_name =
-  try
-    let pos1 = String.rindex pkg_name '.' in
-    let pos2 = String.rindex_from pkg_name (pred pos1) '.' in
-    String.sub pkg_name (succ pos2) (pos1 - pos2 - 1)
-  with _ ->
-    raise (Cannot_extract_arch pkg_name)
-
-let extract_platform pkg_name =
-  try
-    let pos0 = String.rindex pkg_name '.' in
-    let pos1 = String.rindex_from pkg_name (pred pos0) '.' in
-    let pos2 = String.rindex_from pkg_name (pred pos1) '.' in
-    platform_of_string 
-      (String.sub pkg_name (succ pos2) (pos1 - pos2 - 1))
-  with _ ->
-    raise (Cannot_extract_platform pkg_name)
-
-let extract_revision rest pkg_name =
-  try
-    let rest_len = String.length rest in
-    let s = 
-      String.sub pkg_name 0
-	(String.length pkg_name - rest_len) in
-    let pos = String.rindex s '-' in
-    int_of_string 
-      (String.sub s (succ pos)
-	(String.length s - pos - 1))
-  with _ ->
-    raise (Cannot_extract_revision pkg_name)
-
-let extract_version rest pkg_name =
-  try
-    let rest_len = String.length rest in
-    let s = 
-      String.sub pkg_name 0
-	(String.length pkg_name - rest_len) in
-    let pos = String.rindex s '-' in
-    String.sub s (succ pos)
-      (String.length s - pos - 1)
-  with _ ->
-    raise (Cannot_extract_version pkg_name)
-
-let extract_name rest pkg =
-  try
-    String.sub pkg 0 (String.length pkg - String.length rest)
-  with _ -> raise (Cannot_extract_pkgname pkg)
-
-let new_only e =
-  with_platform
-    (fun os platform ->
-      let pkg =
-	sprintf "%s-%s-%d.%s.%s.%s"
-	  e.pkg_name e.pkg_version e.pkg_revision
-	  (string_of_platform platform)
-	  (System.arch ())
-	  e.pkg_extension
-      in
-      if Sys.file_exists pkg then
-	begin
-	  log_message (sprintf "\tpackage %s/%s already exists" (Sys.getcwd ()) pkg);
-	  false
-	end
-      else true)
-
-let with_overwrite ow l =
-  if ow then l else List.filter new_only l
-
-let full_require =
-  Pcre.regexp "([^\\ ]+)\\s+([<>]?=)\\s+([^-]+)-(\\d+)\\."
-
-let without_rev_require =
-  Pcre.regexp "([^\\ ]+)\\s+([<>]?=)\\s+(.+)"
-
-let without_ver_require =
-  Pcre.regexp "(.+)"
-  
-let extract_depend_list ~userhost pkg_path =
-  List.rev
-    (List.fold_left
-      (fun acc s ->
-	try
-	  let a = Pcre.extract ~rex:full_require s in
-	  let pkg_name = a.(1) in
-	  if Params.home_made_package pkg_name then
-	    begin
-	      let operand = a.(2) in
-	      let ver = a.(3) in
-	      let rev = try int_of_string a.(4) with _ -> raise (Cannot_extract_revision pkg_path) in
-	      (pkg_name,Some ver,Some rev, Some operand)::acc
-	    end
-	  else acc
-	with Not_found ->
-	  (try
-	    let a = Pcre.extract ~rex:without_rev_require s in	    
-	    let pkg_name = a.(1) in
-	    if Params.home_made_package pkg_name then
-	      begin
-		let operand = a.(2) in
-		let ver = a.(3) in
-		(pkg_name,Some ver,None, Some operand)::acc
-	      end
-	    else acc
-	  with Not_found ->
-	    (try 
-	      let a = Pcre.extract ~rex:without_ver_require s in
-	      let pkg_name = a.(1) in
-	      if Params.home_made_package pkg_name then
-		(pkg_name,None,None, None)::acc
-	      else acc
-	    with Not_found -> acc))) []
-      (System.read_lines
-	~filter:Params.home_made_package
-	(match userhost with
-	  | Some auth ->
-	      (sprintf "ssh %s rpm -qRp %s" auth pkg_path)
-	  | None -> 
-	      (sprintf "rpm -qRp %s" pkg_path))))
-
-let name_of_pkg_path pkg_path =  
-  let pkg = Filename.basename pkg_path in
-  let platform = extract_platform pkg in
-  let extension = extract_extension pkg in
-  let arch = extract_arch pkg in
-  let revision = extract_revision (sprintf ".%s.%s.%s" (string_of_platform platform) arch extension) pkg in
-  let version = extract_version (sprintf "-%d.%s.%s.%s" revision (string_of_platform platform) arch extension) pkg in
-  extract_name (sprintf "-%s-%d.%s.%s.%s" version revision (string_of_platform platform) arch extension) pkg  
-
-let parse_pkg_path pkg_path =
-  let pkg_dir = Filename.dirname pkg_path in
-  let pkg = Filename.basename pkg_path in
-  let platform = extract_platform pkg in
-  let extension = extract_extension pkg in
-  let arch = extract_arch pkg in
-  let revision =
-	extract_revision (sprintf ".%s.%s.%s" (string_of_platform platform) arch extension) pkg in
-  let version = 
-    extract_version (sprintf "-%d.%s.%s.%s" revision (string_of_platform platform) arch extension) pkg in
-  let pkg_name =
-    extract_name (sprintf "-%s-%d.%s.%s.%s" version revision (string_of_platform platform) arch extension) pkg in
-  (pkg_dir,pkg_name,pkg,platform,extension,arch,version,revision)
-
-let make_pkg_record ~userhost pkg_path =
-  let (pkg_dir,pkg_name,pkg,platform,extension,arch,version,revision) = parse_pkg_path pkg_path in
-  let pack_branch =
-    Pkgbuild.extract_packbranch ~userhost pkg_path in
-  { 
-    pkg_path = pkg_path;
-    pkg_dir = pkg_dir;
-    pkg_name = pkg_name;
-    pkg_fullname = pkg;
-    pkg_platform = platform;
-    pkg_extension = extension;
-    pkg_arch = arch;
-    pkg_version = version;
-    pkg_revision = revision;
-    pkg_branch = pack_branch;
-  }
-
-let optint_of_string s =
-  try
-    Some (int_of_string s)
-  with Failure(int_of_string) ->
-    None
-
-let compare_pkg_versions ver1 ver2 =
-  let rex = Str.regexp ".-" in
-  Version.compare 
-    ~retype:optint_of_string
-    (Str.split rex ver1)
-    (Str.split rex ver2)
-
-let soft_dep pkg_name pkg_path ver =
-  let rex =
-    Pcre.regexp (sprintf "%s-%s" pkg_name ver) in
-  let dist_path =
-    Filename.dirname pkg_path in
-  let files =
-    List.filter
-      (Pcre.pmatch ~rex)
-      (System.list_of_directory dist_path) in
-  let dep_package = 
-    List.fold_left
-      (fun acc file ->
-	match acc with
-	  | None -> Some file
-	  | Some acc_file ->
-	      if compare_pkg_versions acc_file file > 0 then
-		acc
-	      else
-		Some file) None files in
-  match dep_package with
-    | None   -> raise (Cannot_resolve_soft_dependes pkg_name)
-    | Some p ->
-	sprintf "%s/%s" dist_path p
-
-let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
-  let pre_table = Hashtbl.create 32 in
-  let operand_table = Hashtbl.create 32 in
-  
-  let rec scan pkg_path =
-    log_message (sprintf "scanning %s" pkg_path);
-    let e = make_pkg_record ~userhost pkg_path in
-    let deps = extract_depend_list ~userhost pkg_path in
-    Hashtbl.add pre_table e.pkg_name (e,deps);
-
-    List.iter 
-      (fun (pkg_name,ver_opt,rev_opt,operand_opt) ->
-        (match ver_opt, rev_opt with
-	  | Some ver, Some rev ->
-	      if Hashtbl.mem pre_table pkg_name then
-		begin
-		  let (e,_) = Hashtbl.find pre_table pkg_name in
-		  if ver <> e.pkg_version || rev <> e.pkg_revision then
-		    begin
-		      try
-			let operand = Hashtbl.find operand_table pkg_name in
-			let verrev_old = sprintf "%s-%d" e.pkg_version e.pkg_revision in
-			let verrev_new = sprintf "%s-%d" ver rev in
-			if 
-			  (operand = ">=" && compare_pkg_versions verrev_new verrev_old > 0) ||
-			  (operand =  "=" && ver <> e.pkg_version)
-			then
-			  begin
-			    Hashtbl.remove pre_table pkg_name;
-			    Hashtbl.remove operand_table pkg_name;
-			  end
-			else
-			  log_message (sprintf "Soft dependency failed for pkg(%s): ver(%s)/rev(%d) should be %s than ver(%s)/rev(%d)."
-			    pkg_name ver rev operand e.pkg_version e.pkg_revision);
-			  raise (Cannot_resolve_dependes pkg_path)
-		      with Not_found ->
-			begin
-			  log_message (sprintf "Already registered: pkg(%s) ver(%s)/rev(%d) and next found: ver(%s)/rev(%d) not equivalent."
-			    pkg_name e.pkg_version e.pkg_revision ver rev);
-			  raise (Cannot_resolve_dependes pkg_path)
-			end
-		    end
-		end;
-	      let new_path =
-		sprintf "%s/%s-%s-%d.%s.%s.%s" e.pkg_dir pkg_name ver rev (string_of_platform e.pkg_platform) e.pkg_arch e.pkg_extension in
-	      if not (Hashtbl.mem pre_table pkg_name) then
-		scan new_path
-	  | _ ->
-	      match operand_opt with
-		| Some op when op = "=" || op = ">=" ->
-		    let new_path =
-		      soft_dep pkg_name pkg_path "" in
-		    Hashtbl.add operand_table pkg_name op;
-		    scan new_path
-		| _ -> ()))
-    deps
-  in
-  scan pkg_path;
-
-  let table = Hashtbl.create 32 in
-  let warning depth s =
-    log_message (sprintf "%s warning: %s already scanned" (String.make depth ' ') s) in
-  let resolve depth s =
-    log_message (sprintf "%s resolve %s" (String.make depth ' ') s) in
-  let rec make depth pkg_path =
-    if Hashtbl.mem table pkg_path then
-      begin
-	warning depth pkg_path;
-	Dep_val (fst (Hashtbl.find pre_table (name_of_pkg_path pkg_path)), Dep_list [])
-      end
-    else
-      let pkg_name = name_of_pkg_path pkg_path in
-      let (e,deps) = Hashtbl.find pre_table pkg_name in
-      Hashtbl.add table pkg_path (e.pkg_version,e.pkg_revision);
-
-      let depend_paths =
-	List.map
-	  (fun (pkg_name,ver_opt,rev_opt,operand_opt) ->
-	    let extract_version ver_opt = 
-	      match ver_opt with
-		| Some v -> v
-		| None ->
-		    try
-		      let (e,_) =
-			Hashtbl.find pre_table pkg_name in
-		      e.pkg_version
-		    with Not_found ->
-		      log_error (sprintf "cannot resolve version for %s" pkg_name)
-	    in
-	    match operand_opt with
-	      | Some ">=" -> soft_dep pkg_name pkg_path ""
-	      | Some "="  -> soft_dep pkg_name pkg_path (extract_version ver_opt)
-	      | _ ->
-		  let ver = extract_version ver_opt in
-		  let rev =
-		    match rev_opt with
-		      | Some r -> r
-		      | None ->
-			  try
-			    let (e,_) =
-			      Hashtbl.find pre_table pkg_name in
-			    e.pkg_revision
-			  with Not_found -> 
-			    log_error (sprintf "cannot resolve revision for %s" pkg_name)
-		  in sprintf "%s/%s-%s-%d.%s.%s.%s" e.pkg_dir pkg_name ver rev
-		       (string_of_platform e.pkg_platform) e.pkg_arch e.pkg_extension)
-	  deps
-      in
-      resolve depth pkg_path;
-      Dep_val (e, Dep_list
-	(List.fold_left
-	  (fun acc path -> (try acc @ [make (succ depth) path] with Exit -> acc)) [] depend_paths))
-  in 
-
-  make 0 pkg_path
-       
-let rec print_depends depth = function
-  | Dep_list l ->
-      List.iter (fun v -> print_depends (succ depth) v) l
-  | Dep_val (e, tree) ->
-      let step = String.make depth ' ' in
-      printf "%s%s %s %s %d\n" step e.pkg_name e.pkg_branch e.pkg_version e.pkg_revision;
-      print_depends (succ depth) tree
-
-let print_dep_val e =
-  printf "%s-%s-%d.%s.%s %s\n"
-    e.pkg_name e.pkg_version e.pkg_revision e.pkg_arch e.pkg_extension e.pkg_branch
-    
-let clone_packages l =
-  List.iter (fun e ->
-    let specdir =
-      sprintf "./pack/%s/%s" e.pkg_name e.pkg_branch in
-    ignore (package_update ~specdir ~ver:(Some e.pkg_version) ~rev:(Some (string_of_int e.pkg_revision)) ())) l
-
-let rec download_packages userhost l =
-  List.iter 
-    (fun e ->
-      let src =
-	sprintf "%s:%s" userhost e.pkg_path in
-      Commands.send_file_over_ssh src ".") l
-
-let clone_by_pkgfile userhost pkg_path mode =
-  let overwrite = mode <> "default" in
-  let depends =
-    deptree_of_package ~userhost pkg_path in
-
-  print_endline "Depends Tree:";
-  print_depends 0 depends;
-  match mode with
-    | "overwrite" -> clone_packages (list_of_deptree depends)
-    | "depends"   ->
-	print_endline "After Resort Order:";
-	List.iter print_dep_val (list_of_deptree depends)
-    | "packages"  -> download_packages userhost (list_of_deptree depends)
-    | _           -> clone_packages (with_overwrite overwrite (list_of_deptree depends))
-
-let link ~hard pkg_path =
-  let depends =
-    deptree_of_package pkg_path in
-  let pkg_dir = Filename.dirname pkg_path in
-  List.iter (fun e ->
-    let name = 
-      sprintf "%s-%s-%d.%s.%s.%s"
-	e.pkg_name e.pkg_version 
-	e.pkg_revision (string_of_platform e.pkg_platform) e.pkg_arch
-	e.pkg_extension
-    in
-    let file =
-      Filename.concat pkg_dir name in
-    let do_symlink () =
-      Unix.symlink file name in
-    let do_hardlink () =
-      log_command "ln" ["-f";file;name];
-    in
-    if hard then
-      begin
-	try
-	  do_hardlink ()
-	with exn ->
-	  log_message (sprintf "warning: cannot create hardlink: %s by %s\n" name (Printexc.to_string exn));
-	  do_symlink ();
-      end
-    else
-      do_symlink ())
-  (list_of_deptree depends)
-  
-let pack_branches pkgdir =
-  List.filter (fun s -> s <> "hooks.scm")
-    (System.list_of_directory pkgdir)
-
-let select_branch ~default_branch pkgdir pkg =
-  match pack_branches (Filename.concat pkgdir pkg) with
-    | [] -> raise (Pack_branch_is_not_found pkg)
-    | hd::tl as branches ->
-	(match tl with
-	  | [] -> hd
-	  | _ ->
-	      begin
-		let select () =
-		  printf "Select pack-branch for %s\n%!" pkg;
-		  let pack_branch_variants =
-		    Array.of_list branches in
-		  Array.iteri (printf "%d) %s\n%!") pack_branch_variants;
-		  let n = Interactive.read_number (pred (List.length branches)) in
-		  pack_branch_variants.(n)
-		in
-		match default_branch with
-		  | Some b ->
-		      if List.mem b branches then b
-		      else raise
-			(Pack_branch_is_not_found pkg)
-		  | None -> select ()
-	      end)
-
-let specdir_of_pkg ~default_branch pkgdir pkg =
-  sprintf "%s/%s/%s" pkgdir pkg (select_branch ~default_branch pkgdir pkg)
 
 let rec get_pack_depends ~default_branch table acc specdir =
   log_message (sprintf "resolve %s" specdir);
@@ -809,32 +40,7 @@ let rec get_pack_depends ~default_branch table acc specdir =
   with
     | [] -> specdir::acc
     | l  ->
-	(specdir::(List.flatten (List.map (fun pkg -> (get_pack_depends ~default_branch table [] (specdir_of_pkg ~default_branch pkgdir pkg))) l)))
-
-let parse_vr_opt vr_opt =
-  let make_ver v =
-    try
-      let pos = String.index v '-' in
-      let len =
-	try
-	  String.index_from v pos '.'
-	with Not_found -> String.length v
-		      in
-      String.sub v 0 pos,
-      Some (int_of_string (String.sub v (succ pos) (len - pos - 1)))
-    with Not_found -> v,None
-  in
-  (match vr_opt with
-    | Some (op,ver) -> Some (make_ver ver)
-    | None          -> None)
-    
-let have_revision vr_opt =
-  match vr_opt with
-    | None -> false
-    | Some (ver,rev_opt) ->
-	(match rev_opt with
-	  | Some _ -> true
-	  | None -> false)
+	(specdir::(List.flatten (List.map (fun pkg -> (get_pack_depends ~default_branch table [] (Specdir.of_pkg ~default_branch pkgdir pkg))) l)))
 
 let deptree_of_pack ~default_branch specdir : pack_tree =
   let table = Hashtbl.create 32 in
@@ -863,9 +69,9 @@ let deptree_of_pack ~default_branch specdir : pack_tree =
 	      try
 		if Params.home_made_package pkg then
 		  let new_specdir =
-		    specdir_of_pkg ~default_branch pkgdir pkg in
+		    Specdir.of_pkg ~default_branch pkgdir pkg in
 		  let new_value =
-		    new_specdir, (parse_vr_opt vr_opt) in
+		    new_specdir, (Version.parse_vr_opt vr_opt) in
 		  acc @ [new_value] (* add value/specdir for post-processing *)
 		else
 		  begin
@@ -914,9 +120,9 @@ let toptree_of_specdir ?(log=true) specdir : top_tree =
 	
 	let (ver,rev) =
 	  try
-	    Package.release specdir 
+	    Release.read specdir 
 	  with 
-	      Package.Release_not_found (pkg,exn) ->
+	      Release.Not_found (pkg,exn) ->
 		if log then
 		  log_message (sprintf "%s fake-version %s by %s" (String.make depth ' ') specdir (Printexc.to_string exn));
 		"0.0",0
@@ -928,7 +134,7 @@ let toptree_of_specdir ?(log=true) specdir : top_tree =
 	    List.fold_left (fun acc (pkg,_,_) ->
 	      try
 		let new_specdir = 
-		  specdir_of_pkg ~default_branch:(Some (Specdir.branch specdir)) pkgdir pkg in
+		  Specdir.of_pkg ~default_branch:(Some (Specdir.branch specdir)) pkgdir pkg in
 		if Hashtbl.mem table new_specdir then
 		  begin
 		    acc @ [new_specdir] (* add specdir for post-processing *)
@@ -950,114 +156,6 @@ let toptree_of_specdir ?(log=true) specdir : top_tree =
       else raise Exit
   in make 0 specdir
 
-exception Tree_error of string
-
-let deptree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
-  let table = Hashtbl.create 32 in
-  let pkgdir =
-    match packdir with
-      | Some p -> p
-      | None ->
-	  Filename.dirname (Filename.dirname specdir) in
-  let warning depth specdir ver rev iver irev =
-    if log then
-      log_message (sprintf "%s warning: %s %s %d already scanned, ignore %s %d" (String.make depth ' ') specdir ver rev iver irev) in
-  let replace depth specdir ver rev iver irev =
-    if log then
-      log_message (sprintf "%s warning: %s %s %d already scanned, replaced %s %d" (String.make depth ' ') specdir ver rev iver irev) in
-  let resolve depth specdir ver rev =
-    if log then
-      log_message (sprintf "%s resolve %s %s %d" (String.make depth ' ') specdir ver rev) in
-  let checkout_pack key =
-    System.with_dir pkgdir
-      (Git.git_checkout ~low:true ~key) in
-
-  let (ver,rev) =
-    match vr with
-	Some x -> x | None -> Package.release specdir in
-  
-  let rec make depth (specdir,ver,rev,mode) =
-    if Hashtbl.mem table specdir then
-      begin
-	let (ver',rev',_) =
-	  Hashtbl.find table specdir in	
-	if mode then
-	  begin	    
-	    checkout_pack 
-	      (mk_tag ((Specdir.pkgname specdir), ver, rev));
-	    let spec =
-	      Specload.v2
-		~version:ver
-		~revision:(string_of_int rev) specdir in
-	    Hashtbl.replace table specdir (ver,rev,spec);
-	    replace depth specdir ver' rev' ver rev;
-	  end
-	else
-	  warning depth specdir ver' rev' ver rev;
-	Dep_val (specdir, Dep_list [])
-      end
-    else
-      begin
-	checkout_pack 
-	  (mk_tag ((Specdir.pkgname specdir), ver, rev));
-	
-	if Sys.file_exists specdir then
-	  let spec = 
-	    Specload.v2
-	      ~version:ver
-	      ~revision:(string_of_int rev) specdir in
-	  
-	  Hashtbl.add table specdir (ver,rev,spec);
-	  
-	  let depfile = 
-	    Filename.concat specdir "depends" in
-	  if Sys.file_exists depfile then
-	    let depends =
-	      List.fold_left (fun acc (pkg,vr_opt,_) ->
-		try
-		  if Params.home_made_package pkg then
-		    begin
-		      let new_specdir =
-			specdir_of_pkg ~default_branch:(Some (Specdir.branch specdir)) pkgdir pkg in
-		      let (ver,rev) = 
-			Package.release new_specdir in
-		      acc @ [new_specdir,ver,rev,(have_revision (parse_vr_opt vr_opt))] (* add specdir for post-processing *)
-		    end
-		  else acc
-		with _ -> acc)
-		[] (Depends.load ~ignore_last:false depfile)
-	    in
-	    resolve depth specdir ver rev;
-	    Dep_val (specdir, Dep_list
-	      (List.fold_left
-		(fun acc (specdir,ver,rev,mode) ->
-		  (try acc @ [make (succ depth) (specdir,ver,rev,mode)] with Exit -> acc)) [] depends))
-	  else
-	    begin
-	      resolve depth specdir ver rev;
-	      Dep_val (specdir, Dep_list [])
-	    end
-	else raise Exit
-      end
-  in
-  
-  let tree =
-    try
-      make 0 (specdir,ver,rev,true)
-    with Exit -> checkout_pack "master";
-      raise (Tree_error (sprintf "not found specdir (%s) for pack state: %s/%s-%d\n%!" specdir (Specdir.pkgname specdir) ver rev));
-  in
-
-  checkout_pack "master";
-  
-  (map_deptree (fun specdir -> 
-    let (ver,rev,spec) =
-      try
-	Hashtbl.find table specdir 
-      with Not_found -> assert false
-    in (specdir,ver,rev,spec)) 
-    tree)
-
 type dep_path = string list
 
 exception Found_specdir of dep_path
@@ -1075,8 +173,8 @@ let stop_delay n =
 let upgrade specdir upgrade_mode default_branch =
   let specdir = System.path_strip_directory specdir in
 
-  check_specdir specdir;
-  check_pack_component ();
+  Check.specdir specdir;
+  Check.pack_component ();
 
   let deptree =
     log_message "make depends tree...";
@@ -1128,7 +226,7 @@ let upgrade specdir upgrade_mode default_branch =
 	log_message (sprintf "lazy-mode is %b for %s, dep-paths:" lazy_mode specdir);
 	List.iter log_message dep_paths;
 	let updated =
-	  package_update
+	  Package.update
 	    ~specdir
 	    ~lazy_mode
 	    ~check_pack:false
@@ -1146,12 +244,12 @@ let upgrade specdir upgrade_mode default_branch =
     | Upgrade_full ->
 	List.iter
 	  (fun specdir ->
-	    ignore(package_update ~specdir ~check_pack:false ~lazy_mode:false ~interactive:true ()))
+	    ignore(Package.update ~specdir ~check_pack:false ~lazy_mode:false ~interactive:true ()))
 	  depends
     | Upgrade_lazy ->
 	List.iter
 	  (fun specdir ->
-	    ignore(package_update ~specdir ~check_pack:false ~lazy_mode:true ~interactive:true ()))
+	    ignore(Package.update ~specdir ~check_pack:false ~lazy_mode:true ~interactive:true ()))
 	  depends
     | Upgrade_complete ->
 	complete_impl false;
@@ -1161,8 +259,8 @@ let upgrade specdir upgrade_mode default_branch =
 let top ?(replace_composite=None) ?depends specdir =
   let specdir =
     System.path_strip_directory specdir in
-  check_specdir specdir;
-  check_pack_component ();
+  Check.specdir specdir;
+  Check.pack_component ();
   let depends =
     match depends with
       | Some deps -> deps
@@ -1206,12 +304,12 @@ let top ?(replace_composite=None) ?depends specdir =
 let clone ?(vr=None) ~recursive ~overwrite specdir =
   let specdir = System.path_strip_directory specdir in
 
-  check_specdir specdir;
-  check_pack_component ();
+  Check.specdir specdir;
+  Check.pack_component ();
   let deptree =
     if recursive then
       log_message "make depends tree...";
-    deptree_of_specdir ~vr specdir in
+    Clone.deptree_of_specdir ~vr specdir in
 
   let depends =
     list_of_deptree deptree in
@@ -1233,7 +331,7 @@ let clone ?(vr=None) ~recursive ~overwrite specdir =
   List.iter
     (fun ((specdir,ver,rev,spec) as build_arg) ->
       if not (pkg_exists specdir ver rev) || overwrite then
-	ignore(package_build build_arg))
+	ignore(Package.build build_arg))
     (with_rec depends)
 
 
@@ -1256,7 +354,7 @@ let write_release file l =
 
 let change_release mode dst_capacity capacity_reduction depth local_depth specdir =
   let (ver,rev) =
-    Package.release specdir in
+    Release.read specdir in
   let ver = capacity_reduction ver in
   match mode with
     | Trunk ->
@@ -1330,7 +428,7 @@ let parse_fork_branch specdir =
     if Version.is s then
       ("skvt",s)
     else
-      s, (fst (Package.release ~next:false specdir))
+      s, (fst (Release.read ~next:false specdir))
      
 let fork_type specdir dst =
   let src = Specdir.branch specdir in
@@ -1420,8 +518,8 @@ let fork ?(depth=0) top_specdir dst =
   let dir = Filename.dirname in
   let packdir = dir (dir top_specdir) in
 
-  check_specdir top_specdir;
-  check_pack_component ();
+  Check.specdir top_specdir;
+  Check.pack_component ();
   check_destination_branch packdir dst;
 
   let src = Specdir.branch top_specdir in
@@ -1437,7 +535,7 @@ let fork ?(depth=0) top_specdir dst =
 
   let src_capacity =
     if mode = Trunk then
-      Version.capacity (fst (Package.release ~next:false top_specdir))
+      Version.capacity (fst (Release.read ~next:false top_specdir))
     else
       Version.capacity (snd (parse_fork_branch src))
   in
@@ -1669,7 +767,7 @@ let graph ?ver ?rev specdir =
       | _ -> None
   in
 
-  let tree = deptree_of_specdir ~vr specdir in
+  let tree = Clone.deptree_of_specdir ~vr specdir in
   let depends =  
     list_of_deptree tree in
   
@@ -1757,7 +855,7 @@ let basegraph specdir mode =
 	(match parent with
 	  | Some p ->
 	      let (pn,pvr_opt) = p in
-	      if have_revision evr_opt then
+	      if Version.have_revision evr_opt then
 		if mode = "full" || mode = "hard" then
 		  out (sprintf "\"%s\" -> \"%s\" [label=\"%s\", color=\"black\"]\n"
 		    (Specdir.pkgname pn)
@@ -1807,10 +905,10 @@ let vr_of_rev s =
 
 let diff_packages ?(changelog=false) specdir rev_a rev_b =
   let tree_a =
-    deptree_of_specdir ~vr:(Some (vr_of_rev rev_a)) specdir in
+    Clone.deptree_of_specdir ~vr:(Some (vr_of_rev rev_a)) specdir in
   let tree_b =
-    deptree_of_specdir ~vr:(Some (vr_of_rev rev_b)) specdir in
-  check_pack_component ();
+    Clone.deptree_of_specdir ~vr:(Some (vr_of_rev rev_b)) specdir in
+  Check.pack_component ();
   let depends_a =
     List.map (fun (p,v,r,s) -> p,(v,r))
       (list_of_deptree tree_a) in
@@ -2155,7 +1253,7 @@ let search commit_id =
 		    begin
 		      (*printf "checkout pack to state: %s for read %s/release\n%!" tag specdir;*)
 		      Git.git_checkout ~low:true ~key:tag ();
-		      let (v,r) = Package.release ~next:false specdir in
+		      let (v,r) = Release.read ~next:false specdir in
 		      (*printf "read release %s-%d from specdir (%s)\n%!" v r specdir;*)
 		      let rec find (v',r') =
 			let key = mktag (v',r') in
@@ -2168,7 +1266,7 @@ let search commit_id =
 			if Hashtbl.mem pack_tag_list key then
 			  (try
 			    let tree =
-			      deptree_of_specdir ~log:false ~vr:(Some (v',r')) ~packdir specdir in
+			      Clone.deptree_of_specdir ~log:false ~vr:(Some (v',r')) ~packdir specdir in
 			    if
 			      List.exists 
 				(fun (p',v',r',_) ->
@@ -2264,7 +1362,7 @@ let clean () =
       (List.fold_left
 	(fun acc s ->
 	  try
-	    (s,parse_pkg_path s)::acc
+	    (s,Pkgpath.parse s)::acc
 	  with _ -> acc)
 	[] (System.list_of_directory ".")));
   let droplist = ref [] in
@@ -2327,8 +1425,8 @@ let snapshot ?(composite=None) specdir =
     System.path_strip_directory specdir in
   let (ver,rev) =
     make_snapshot_id () in
-  check_specdir specdir;
-  check_pack_component ();
+  Check.specdir specdir;
+  Check.pack_component ();
   let toptree =
     log_message "make depends tree...";
     toptree_of_specdir specdir in

@@ -101,3 +101,28 @@ let minor_increment base ver =
   increment (pred base) ver
 
 let extend ver = ver ^ ".1"
+
+let have_revision vr_opt =
+  match vr_opt with
+    | None -> false
+    | Some (ver,rev_opt) ->
+	(match rev_opt with
+	  | Some _ -> true
+	  | None -> false)
+
+let parse_vr_opt vr_opt =
+  let make_ver v =
+    try
+      let pos = String.index v '-' in
+      let len =
+	try
+	  String.index_from v pos '.'
+	with Not_found -> String.length v
+		      in
+      String.sub v 0 pos,
+      Some (int_of_string (String.sub v (succ pos) (len - pos - 1)))
+    with Not_found -> v,None
+  in
+  (match vr_opt with
+    | Some (op,ver) -> Some (make_ver ver)
+    | None          -> None)

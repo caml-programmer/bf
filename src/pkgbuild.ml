@@ -171,7 +171,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 			(sprintf "bf list for (%s) is not found -> need installing" name);
 		      let tag =
 			let k =
-			  Commands.mk_tag ((Specdir.pkgname abs_specdir), version, (int_of_string release)) in
+			  Tag.mk ((Specdir.pkgname abs_specdir), version, (int_of_string release)) in
 			let tag_exists = ref false in
 			ignore(Component.with_component_dir ~strict:false c
 			  (fun () -> 
