@@ -2062,34 +2062,12 @@ let optint_of_string s =
   with Failure(int_of_string) ->
     None
 
-let rec compare_version_lists l1 l2 =
-  match l1, l2 with
-    | [], [] -> 0
-    | [], _ -> -1
-    | _, [] ->  1
-    | hd1::tl1, hd2::tl2 ->
-	let hd1_hyp = Strings.split '-' hd1 in
-	let hd2_hyp = Strings.split '-' hd2 in
-	(match hd1_hyp, hd2_hyp with
-	  | _::_, _
-	  | _, _::_ ->
-	      (match compare_version_lists hd1_hyp hd2_hyp with
-		| 0 -> compare_version_lists tl1 tl2
-		| r -> r)
-	  | _, _ ->
-	      match optint_of_string hd1, optint_of_string hd2 with
-		| None, None       -> compare_version_lists tl1 tl2
-		| None, Some n2    -> -1
-		| Some n1, None    ->  1
-		| Some n1, Some n2 ->
-		    match compare n1 n2 with
-		      | 0 -> compare_version_lists tl1 tl2
-		      | r -> r)
-
-let comape_versions ver1 ver2 =
-  compare_version_lists
-    (Strings.split '.' ver1)
-    (Strings.split '.' ver2)
+let compare_pkg_versions ver1 ver2 =
+  let rex = Str.regexp ".-" in
+  Version.compare 
+    ~retype:optint_of_string
+    (Str.split rex ver1)
+    (Str.split rex ver2)
 
 let soft_dep pkg_name pkg_path ver =
   let rex =
@@ -2106,7 +2084,7 @@ let soft_dep pkg_name pkg_path ver =
 	match acc with
 	  | None -> Some file
 	  | Some acc_file ->
-	      if comape_versions acc_file file > 0 then
+	      if compare_pkg_versions acc_file file > 0 then
 		acc
 	      else
 		Some file) None files in
@@ -2139,7 +2117,7 @@ let deptree_of_package ?userhost pkg_path : pkg_clone_tree =
 			let verrev_old = sprintf "%s-%d" e.pkg_version e.pkg_revision in
 			let verrev_new = sprintf "%s-%d" ver rev in
 			if 
-			  (operand = ">=" && comape_versions verrev_new verrev_old > 0) ||
+			  (operand = ">=" && compare_pkg_versions verrev_new verrev_old > 0) ||
 			  (operand =  "=" && ver <> e.pkg_version)
 			then
 			  begin
@@ -3441,7 +3419,7 @@ let last_versions pkgdir =
 	else	  
 	  t := (k,v)::!t
       in
-      let comapre a b =
+      let compare a b =
 	compare (snd (fst a)) (snd (fst b)) in
       List.iter	update
 	(List.fold_left
@@ -3463,7 +3441,7 @@ let last_versions pkgdir =
 	  [] (Git.git_tag_list ()));
       List.iter 
 	(fun ((p,v),r) ->
-	  printf "- %s/%s-%d\n%!" p v r) (List.sort comapre !t))
+	  printf "- %s/%s-%d\n%!" p v r) (List.sort compare !t))
 
 
 (* Search *)

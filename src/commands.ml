@@ -139,7 +139,7 @@ let pack_changes specdir component =
 	| Some cur ->
 	    (match tag' with
 		Some tag ->
-		  let rex = Pcre.regexp 
+		  let rex = Pcre.regexp
 		    (sprintf "%s/%s/"
 		      (Specdir.pkgname specdir)
 		      (Specdir.branch specdir))
@@ -159,8 +159,18 @@ let pack_changes specdir component =
 		  log_message (sprintf "Warning: cannot find current tag by specdir(%s)" specdir);
 		  true)
 	| None -> raise Pack_current_branch_is_not_set)
-       
 
+let path_concat args =
+  let rec concat acc = function
+      [] -> acc
+    | hd::tl -> concat (Filename.concat acc hd) tl
+  in concat "" args
+
+let string_concat args =  
+  let rec concat acc = function
+      [] -> acc
+    | hd::tl -> concat (acc ^ hd) tl
+  in concat "" args
 
 ;;
 
@@ -223,10 +233,10 @@ let scm_make v =
   Rules.make (Scheme.make_params_of_sval v); Snull
 
 let scm_path_concat v =
-  Sstring (Rules.path_concat (Scheme.string_list_of_sval_array v))
+  Sstring (path_concat (Scheme.string_list_of_sval_array v))
 
 let scm_string_concat v =  
-  Sstring (Rules.string_concat 
+  Sstring (string_concat 
     (Scheme.string_list_of_sval_array v))
 
 let scm_log_command v =

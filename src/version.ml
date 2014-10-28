@@ -22,18 +22,21 @@ let parse x =
 let capacity x =
   List.length (parse x)
 
-let compare a b =
+let compare ?(retype=fun _ -> None) a b =
   let rec cmp acc = function
     | [],_ -> acc
     | _,[] -> acc
     | hd1::tl1, hd2::tl2 ->
-	let r = compare hd1 hd2 in
+	let r =
+	  match retype hd1, retype hd2 with
+	    | Some hd1, Some hd2 -> compare hd1 hd2
+	    | _, _               -> compare hd1 hd2 in
 	if r = 0 then
 	  cmp acc (tl1,tl2)
 	else r in
   let init =
     compare (List.length a) (List.length b) in
-  cmp init (a,b)
+  cmp init (a,b)  
 
 let exists x =
   let n = ref false in

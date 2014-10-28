@@ -117,18 +117,6 @@ let ac_configure args =
 	  | None   -> prepare (("--"^key)::acc) tl
   in log_command "./configure" (prepare [] args)
 
-let path_concat args =
-  let rec concat acc = function
-      [] -> acc
-    | hd::tl -> concat (Filename.concat acc hd) tl
-  in concat "" args
-
-let string_concat args =  
-  let rec concat acc = function
-      [] -> acc
-    | hd::tl -> concat (acc ^ hd) tl
-  in concat "" args
-
 let install_file file dir =
   with_logger
     (fun logger ->
