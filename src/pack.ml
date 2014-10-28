@@ -10,136 +10,6 @@ open Ocs_types
 open Platform
 open Printf
 
-exception Invalid_specdir_format
-exception Unsupported_specdir_version of string
-
-let get_version file =
-  let s = System.read_file file in
-  try
-    String.sub s 0 (String.index s '\n')
-  with Not_found -> s
-
-let spec_from_v1 specdir =
-  let flist = ["rh.spec";"rh.files";"rh.req"] in
-  if System.is_directory specdir &&
-    List.for_all
-    (fun s ->
-      Sys.file_exists (Filename.concat specdir s))
-    flist
-  then
-    List.map (Filename.concat specdir) flist
-  else raise Invalid_specdir_format
-
-(* Pkg search *)
-   
-exception Broken_pkg_iteration of string
-exception Cannot_find_pkgver of string
-exception Cannot_find_pkgrev of string
-exception Revision_must_be_digital of string
-
-let pkgtrans_name_format s =
-  try
-    let pos = String.index s '-' in
-    let r = String.sub s 0 (String.length s) in
-    r.[pos] <- 'D';
-    for i=0 to pos do
-      r.[i] <- Char.uppercase r.[i]
-    done; r
-  with Not_found -> s
-
-let fix_debian_arch = function
-  | "i686" -> "i386"
-  | "i586" -> "i386"
-  | s -> s
-
-let tag_extraction_rex pkgname = function
-  | Debian ->
-      Pcre.regexp
-	(pkgname ^ "-([^-]+)-(\\d+)\\." ^ (fix_debian_arch (System.arch ())) ^ "\\.deb")
-  | platform ->
-      Pcre.regexp
-	(pkgname ^ "-([^-]+)-(\\d+)\\." ^ (string_of_platform platform) ^ "\\." ^ (System.arch ()) ^ "\\.")
-
-let map_pkg f pkgname =
-  try
-    with_platform
-      (fun os platform ->
-	let pkgname =
-	  match engine_of_platform platform with
-	    | Rpm_build 
-	    | Deb_pkg   -> pkgname
-	    | Pkg_trans -> pkgtrans_name_format pkgname
-	in
-	let rex = tag_extraction_rex pkgname platform in
-	let ff acc s =
-	  if Pcre.pmatch ~rex s then
-	    let a = Pcre.extract ~rex s in
-	    if Array.length a > 2 then
-	      (a.(1),int_of_string a.(2))::acc
-	    else acc
-	  else acc
-	in
-	List.map f
-	  (List.fold_left ff []
-	    (System.list_of_directory (Sys.getcwd ()))))
-  with exn ->
-    raise (Broken_pkg_iteration (Printexc.to_string exn))
-
-let filter_pkg f pkgname =
-  List.filter f
-    (map_pkg (fun x -> x) pkgname)
-
-let rec read_number max =
-  print_string "> "; flush stdout;
-  try
-    let s = input_line stdin in
-    let n = int_of_string s in
-    if max <> 0 && n > max then
-      raise Not_found
-    else n
-  with _ ->
-    read_number max
-
-let read_string () =
-  print_string "> "; flush stdout;
-  input_line stdin
-
-let find_pkg_version ?(interactive=false) pkgname =
-  try
-    (match
-      List.sort 
-	(fun a b -> compare b a)
-	(map_pkg fst pkgname)
-    with [] -> raise Not_found
-      | hd::tl -> hd)
-  with exn ->
-    if interactive then
-      begin
-	log_message (sprintf "Enter package version for %s" pkgname);
-	read_string ()
-      end
-    else
-      raise (Cannot_find_pkgver (Printexc.to_string exn))
-
-let find_pkg_revision ?(interactive=false) pkgname version =
-  try
-    (match
-      List.sort
-	(fun a b -> compare b a)
-	(List.map snd
-	  (filter_pkg
-	    (fun (ver,_) -> ver = version) pkgname))
-    with [] -> raise Not_found
-      | hd::tl -> hd)
-  with exn ->
-    if interactive then
-      begin
-	log_message (sprintf "Enter package revision for %s-%s" pkgname version);
-	read_number 0	
-      end
-    else
-      raise (Cannot_find_pkgrev (Printexc.to_string exn))
-
 type pkg_name = string
 type pkg_desc = string
 type pkg_ver = string
@@ -264,7 +134,7 @@ let make_depends ?snapshot ?(interactive=false) ?(ignore_last=false) file =
 			  with exn ->
 			    log_message (sprintf "Warning: %s -> try using local pkg archive for search last pkg revision" (string_of_pkgexn exn));
 			    pkg_ver := Some (sprintf "%s-%d.%s" ver
-			      (find_pkg_revision ~interactive (match !pkg_name with Some s -> s | None -> raise Not_found) ver)
+			      (Pkgsearch.revision ~interactive (match !pkg_name with Some s -> s | None -> raise Not_found) ver)
 			      (string_of_platform platform))))
 		| _ ->
 		    pkg_ver := Some ver))
@@ -663,9 +533,9 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
     f (output_string ch);
     close_out ch; n
   in
-  (match get_version (with_specdir "version") with
+  (match Specdir.get_version (with_specdir "version") with
     | "1.0" ->
-	(match spec_from_v1 abs_specdir with
+	(match Specdir.v1 abs_specdir with
 	    [spec;files;findreq] ->
 	      let pkgname = 
 		Filename.basename specdir in
@@ -887,10 +757,10 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		call_before_build ~snapshot
 		  ~pkgname:spec.pkgname ~version ~revision:release ~platform spec.hooks in
 	      
-	      let pkgtrans_key_format = String.uppercase in
 	      let find_value = function
 		| "topdir" -> Params.get_param "top-dir"
-		| "pkg" -> pkgtrans_name_format spec.pkgname
+		| "pkg" -> 
+		    Pkgtrans.name_format spec.pkgname
 		| "arch" -> System.arch ()
 		| "version" -> sprintf "%s-%s" version release
 		| "category" -> Hashtbl.find spec.params "group"
@@ -902,7 +772,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		  (fun out -> 
 		    let gen_param k =
 		      (try
-			out (sprintf "%s=%s\n" (pkgtrans_key_format k) (find_value k))
+			out (sprintf "%s=%s\n" (Pkgtrans.key_format k) (find_value k))
 		      with Not_found -> ())
 		    in
 		    gen_param "pkg";
@@ -947,7 +817,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 			    match pkg_desc_opt with
 			      | None -> pkg_name
 			      | Some s -> s
-			  in out (sprintf "P %s %s\n" (pkgtrans_name_format pkg_name) pkg_desc))
+			  in out (sprintf "P %s %s\n" (Pkgtrans.name_format pkg_name) pkg_desc))
 			depends;
 		      Buffer.contents b
 		    in
@@ -1042,7 +912,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		| "package" -> spec.pkgname
 		| "priority" -> "optional"
 		| "maintainer" -> Hashtbl.find spec.params "email"
-		| "architecture" -> fix_debian_arch (System.arch ())
+		| "architecture" -> Debian.fix_arch (System.arch ())
 		| "version" -> sprintf "%s-%s" version release
 		| "section" -> Hashtbl.find spec.params "group"
 		| "description" -> Hashtbl.find spec.params "summary"
@@ -1198,11 +1068,11 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 	      
 	      let pkgfile =
 		sprintf "%s-%s-%s.%s.deb" 
-		  spec.pkgname version release (fix_debian_arch (System.arch ())) in
+		  spec.pkgname version release (Debian.fix_arch (System.arch ())) in
 	      log_command
 		"mv" [(Filename.concat abs_specdir "debian.deb");pkgfile])
     | version ->
-	raise (Unsupported_specdir_version version))
+	raise (Specdir.Unsupported_specdir_version version))
 
 let build_package_file ?(snapshot=false) ?(ready_spec=None) args =
   with_platform
@@ -1270,6 +1140,8 @@ let package_build (specdir,ver,rev,spec) =
     | exn -> log_error (Printexc.to_string exn));
   true
 
+exception Revision_must_be_digital of string
+
 let package_update ~specdir
   ?(check_pack=true)
   ?(check_fs=false)
@@ -1305,12 +1177,12 @@ let package_update ~specdir
       let ver' =
 	match ver with
 	  | Some v -> v
-	  | None -> find_pkg_version ~interactive pkgname
+	  | None -> Pkgsearch.version ~interactive pkgname
       in
       let rev' =
 	match rev with
 	  | Some r -> conv_revision r
-	  | None -> succ (find_pkg_revision ~interactive pkgname ver')
+	  | None -> succ (Pkgsearch.revision ~interactive pkgname ver')
       in (ver',rev'))
   in
 
@@ -1972,7 +1844,7 @@ let select_branch ~default_branch pkgdir pkg =
 		  let pack_branch_variants =
 		    Array.of_list branches in
 		  Array.iteri (printf "%d) %s\n%!") pack_branch_variants;
-		  let n = read_number (pred (List.length branches)) in
+		  let n = Interactive.read_number (pred (List.length branches)) in
 		  pack_branch_variants.(n)
 		in
 		match default_branch with
