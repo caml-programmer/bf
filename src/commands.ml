@@ -68,49 +68,12 @@ let log_viewer () =
 
 (* Pack update support *)
 
-exception Pack_current_branch_is_not_set
+
 
 let pkgname_of_tag tag =
   try
     Some (String.sub tag 0 (String.index tag '/'))
   with Not_found -> None
-
-exception Pkg_release_not_found of (string * exn)
-
-let vr_compare a b =
-  let r = compare (fst b) (fst a) in
-  if r = 0 then
-    compare (snd b) (snd a)
-  else r
-
-let max_vr l =
-  List.hd (List.sort vr_compare l)
-     
-let read_pkg_release ?(next=false) ?version specdir =
-  let with_next n = if next then succ n else n in
-  let make s =
-    let (ver,rev) =
-      let pos = String.index s ' ' in
-      String.sub s 0 pos,
-      (with_next
-	(int_of_string
-	  (String.sub s (succ pos) (String.length s - pos - 1))))
-    in (ver,rev)
-  in
-  let filter (v,r) =
-    match version with
-      | Some v' -> v' = v
-      | None -> true
-  in
-  let file = Filename.concat specdir "release" in
-  (try
-    if Sys.file_exists file then
-      let ch = open_in file in
-      max_vr (List.filter filter
-	(List.map make (System.list_of_channel ch)))
-    else raise Exit
-  with exn -> 
-    raise (Pkg_release_not_found (specdir,exn)))
 
 let mk_tag (pkgname,ver,rev) =
   sprintf "%s/%s-%d" pkgname ver rev
@@ -118,12 +81,14 @@ let mk_tag (pkgname,ver,rev) =
 let tag_of_specdir specdir =
   try
     let pkgname = Specdir.pkgname specdir in
-    let (ver,rev) = read_pkg_release specdir in
+    let (ver,rev) = Package.release specdir in
     Some (mk_tag (pkgname, ver, rev))
   with exn -> log_message
     (sprintf "Warning: cannot parse release file from %s by error (%s)" specdir
       (Printexc.to_string exn));
     None
+
+exception Pack_current_branch_is_not_set
 
 let pack_changes specdir component =
   let is_release s =

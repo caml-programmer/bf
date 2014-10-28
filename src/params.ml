@@ -133,3 +133,12 @@ let dest_dir () =
   if dest_dir <> "" then
     Some dest_dir
   else None
+
+let home_made_package pkg =
+  let exclude =
+    try
+      let ex_prefix_str = get_param "pkg-prefix-exclude" in
+      let ex_prefix_list = Str.split (Str.regexp "[ ]+") ex_prefix_str in
+      List.exists (fun ex_prefix -> String.length ex_prefix <> 0 && Strings.have_prefix ex_prefix pkg) ex_prefix_list
+    with Unknown_parameter _ -> false in
+  (Strings.have_prefix (get_param "pkg-prefix") pkg) && not exclude
