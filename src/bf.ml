@@ -269,7 +269,7 @@ let main () =
 		      | _ -> usage ())
 		  else
 		    usage ()
-		in with_lock (fun () -> Pack.clone ~vr ~recursive ~overwrite Sys.argv.(2))
+		in with_lock (fun () -> Clone.make ~vr ~recursive ~overwrite Sys.argv.(2))
 	      end
 	    else
 	      begin
@@ -283,34 +283,34 @@ let main () =
 	      end
 	| "top" ->
 	    if Sys.file_exists Sys.argv.(2) then
-	      Pack.top Sys.argv.(2)
+	      Top.make Sys.argv.(2)
 	    else usage ()
 	| "upgrade" ->
 	    let (upgrade_mode,default_branch) =
 	      match len with
-		| 3 -> Upgrade_default, None
+		| 3 -> Upgrade.Default, None
 		| 4 ->
 		    (match Sys.argv.(3) with
-		      | "lazy"     -> (Upgrade_lazy,None)
-		      | "complete" -> (Upgrade_complete,None)
-		      | "full"     -> (Upgrade_full,None)
-		      | _          -> (Upgrade_default,Some Sys.argv.(3)))
+		      | "lazy"     -> (Upgrade.Lazy,None)
+		      | "complete" -> (Upgrade.Complete,None)
+		      | "full"     -> (Upgrade.Full,None)
+		      | _          -> (Upgrade.Default,Some Sys.argv.(3)))
 		| 5 ->
 		    (match Sys.argv.(3) with
-		      | "lazy"     -> (Upgrade_lazy,Some Sys.argv.(4))
-		      | "complete" -> (Upgrade_complete,Some Sys.argv.(4))
-		      | "full"     -> (Upgrade_full,Some Sys.argv.(4))
+		      | "lazy"     -> (Upgrade.Lazy,Some Sys.argv.(4))
+		      | "complete" -> (Upgrade.Complete,Some Sys.argv.(4))
+		      | "full"     -> (Upgrade.Full,Some Sys.argv.(4))
 		      | _          ->
 			  (match Sys.argv.(4) with
-			    | "lazy"     -> (Upgrade_lazy,Some Sys.argv.(3))
-			    | "complete" -> (Upgrade_complete,Some Sys.argv.(3))
-			    | "full"     -> (Upgrade_full,Some Sys.argv.(3))
+			    | "lazy"     -> (Upgrade.Lazy,Some Sys.argv.(3))
+			    | "complete" -> (Upgrade.Complete,Some Sys.argv.(3))
+			    | "full"     -> (Upgrade.Full,Some Sys.argv.(3))
 			    | _ -> usage ()))
 		| _ -> usage ()
 	    in
 	    with_lock
 	      (fun () ->
-		Pack.upgrade Sys.argv.(2) upgrade_mode default_branch)
+		Upgrade.make Sys.argv.(2) upgrade_mode default_branch)
 	| "fork" ->
 	    if len <> 4 then
 	      if len <> 5 then

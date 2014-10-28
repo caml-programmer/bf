@@ -38,9 +38,3 @@ type tag_status =
 
 type version = string
 type revision = int
-
-type upgrade_mode =
-  | Upgrade_full
-  | Upgrade_lazy
-  | Upgrade_complete
-  | Upgrade_default

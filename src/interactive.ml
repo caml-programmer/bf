@@ -1,3 +1,5 @@
+open Printf
+
 let rec read_number max =
   print_string "> "; flush stdout;
   try
@@ -12,3 +14,13 @@ let rec read_number max =
 let read_string () =
   print_string "> "; flush stdout;
   input_line stdin
+
+let stop_delay n =
+  printf "wait %d second>%!" n;
+  for i = 1 to n do
+    Unix.sleep 1;
+    print_char ' ';
+    print_int i;
+    flush stdout;
+  done;
+  print_endline " go"

@@ -98,7 +98,8 @@ let list_of_deptree tree =
   unwind !g
 
 let rec map_deptree f = function
-  | Dep_val (x, tree) -> Dep_val (f x, map_deptree f tree)
-  | Dep_list l -> Dep_list (List.map (map_deptree f) l)
-
+  | Dep_val (x, tree) ->
+      Dep_val (f x, map_deptree f tree)
+  | Dep_list l ->
+      Dep_list (List.map (map_deptree f) l)
 
