@@ -317,19 +317,19 @@ let main () =
 		usage ()
 	      else
 		with_lock (fun () ->
-		  Pack.fork ~depth:(make_int Sys.argv.(4)) Sys.argv.(2) Sys.argv.(3))
+		  Fork.make ~depth:(make_int Sys.argv.(4)) Sys.argv.(2) Sys.argv.(3))
 	    else
 	      with_lock (fun () ->
-		Pack.fork Sys.argv.(2) Sys.argv.(3))
+		Fork.make Sys.argv.(2) Sys.argv.(3))
 	| "graph" ->
 	    if len <> 3 then
 	      if len <> 5 then
 		usage ()
 	      else
 		with_lock (fun () ->
-		  Pack.graph ~ver:Sys.argv.(3) ~rev:(make_int Sys.argv.(4)) Sys.argv.(2))
+		  Graph.monograph ~ver:Sys.argv.(3) ~rev:(make_int Sys.argv.(4)) Sys.argv.(2))
 	    else
-	      with_lock (fun () -> Pack.graph Sys.argv.(2))
+	      with_lock (fun () -> Graph.monograph Sys.argv.(2))
 	| "basegraph" ->
 	    let check_mode = function
 	      | "soft" -> "soft"
@@ -340,9 +340,9 @@ let main () =
 	      if len <> 4 then
 		usage ()
 	      else
-		with_lock (fun () -> Pack.basegraph Sys.argv.(2) (check_mode Sys.argv.(3)))
+		with_lock (fun () -> Graph.basegraph Sys.argv.(2) (check_mode Sys.argv.(3)))
 	    else
-	      with_lock (fun () -> Pack.basegraph Sys.argv.(2) "full")
+	      with_lock (fun () -> Graph.basegraph Sys.argv.(2) "full")
 	| "tag" ->
 	    if len = 4 then
 	      with_lock (fun () ->
@@ -357,7 +357,7 @@ let main () =
 	      if Filename.basename Sys.argv.(2) = "composite" then
 		Composite.diff Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	      else
-		Pack.diff_packages Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
+		Pack.diff Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	    else usage ()
 	| "changelog" ->
 	    if len = 5 || len = 6 then
@@ -365,7 +365,7 @@ let main () =
 		Composite.changelog ~interactive:true
 		  ~compact:(len=6) Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	      else
-		Pack.changelog_packages Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
+		Pack.changelog Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	    else usage ()
 	| "link" ->
 	    if len = 3 then
@@ -376,16 +376,16 @@ let main () =
 	      else usage ()
 	| "snapshot" ->
 	    (match len with
-	      | 3 -> Pack.snapshot Sys.argv.(2)
+	      | 3 -> Snapshot.make Sys.argv.(2)
 	      | 4 -> 
 		  if Sys.file_exists Sys.argv.(3) then
-		    Pack.snapshot ~composite:(Some Sys.argv.(3)) Sys.argv.(2)
+		    Snapshot.make ~composite:(Some Sys.argv.(3)) Sys.argv.(2)
 		  else usage ()
 	      | _ -> usage ())
 	| "shell" ->
 	    Scheme.shell ()
 	| "clean" ->
-	    Pack.clean ()
+	    Clean.packages ()
 	| "make" ->
 	    with_teleport Goto_bf_rules
 	      (fun () ->
@@ -413,15 +413,15 @@ let main () =
 	    if len <> 3 then
 	      usage ()
 	    else
-	      with_lock (fun () -> Pack.last_versions Sys.argv.(2))
+	      with_lock (fun () -> Versions.last Sys.argv.(2))
 	| "search" ->
 	    if len = 3 then
 	      with_lock (fun () ->
-		Pack.search Sys.argv.(2))
+		Search.commit_id Sys.argv.(2))
 	    else usage ()
 	| "droptags" ->
 	    if len > 2 then
-	      Pack.droptags Sys.argv.(2)
+	      Clean.droptags Sys.argv.(2)
 	    else usage ()
 	| "tests" ->
 	    Tests.run ()
