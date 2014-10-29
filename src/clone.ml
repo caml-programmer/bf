@@ -75,7 +75,6 @@ let soft_dep pkg_name pkg_path ver =
 
 let tree_of_package ?userhost pkg_path : pkg_clone_tree =
   let pre_table = Hashtbl.create 32 in
-  let operand_table = Hashtbl.create 32 in
   
   let rec scan pkg_path =
     log_message (sprintf "scanning %s" pkg_path);
@@ -92,28 +91,9 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
 		  let (e,_) = Hashtbl.find pre_table pkg_name in
 		  if ver <> e.pkg_version || rev <> e.pkg_revision then
 		    begin
-		      try
-			let operand = Hashtbl.find operand_table pkg_name in
-			let verrev_old = sprintf "%s-%d" e.pkg_version e.pkg_revision in
-			let verrev_new = sprintf "%s-%d" ver rev in
-			if 
-			  (operand = ">=" && compare_pkg_versions verrev_new verrev_old > 0) ||
-			  (operand =  "=" && ver <> e.pkg_version)
-			then
-			  begin
-			    Hashtbl.remove pre_table pkg_name;
-			    Hashtbl.remove operand_table pkg_name;
-			  end
-			else
-			  log_message (sprintf "Soft dependency failed for pkg(%s): ver(%s)/rev(%d) should be %s than ver(%s)/rev(%d)."
-			    pkg_name ver rev operand e.pkg_version e.pkg_revision);
-			  raise (Cannot_resolve_dependes pkg_path)
-		      with Not_found ->
-			begin
-			  log_message (sprintf "Already registered: pkg(%s) ver(%s)/rev(%d) and next found: ver(%s)/rev(%d) not equivalent."
-			    pkg_name e.pkg_version e.pkg_revision ver rev);
-			  raise (Cannot_resolve_dependes pkg_path)
-			end
+		      log_message (sprintf "Already registered: pkg(%s) ver(%s)/rev(%d) and next found: ver(%s)/rev(%d) not equivalent."
+		      pkg_name e.pkg_version e.pkg_revision ver rev);
+		      raise (Cannot_resolve_dependes pkg_path)
 		    end
 		end;
 	      let new_path =
@@ -121,13 +101,7 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
 	      if not (Hashtbl.mem pre_table pkg_name) then
 		scan new_path
 	  | _ ->
-	      match operand_opt with
-		| Some op when op = "=" || op = ">=" ->
-		    let new_path =
-		      soft_dep pkg_name pkg_path "" in
-		    Hashtbl.add operand_table pkg_name op;
-		    scan new_path
-		| _ -> ()))
+	      ()))
     deps
   in
   scan pkg_path;
@@ -163,8 +137,6 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
 		      log_error (sprintf "cannot resolve version for %s" pkg_name)
 	    in
 	    match operand_opt with
-	      | Some ">=" -> soft_dep pkg_name pkg_path ""
-	      | Some "="  -> soft_dep pkg_name pkg_path (extract_version ver_opt)
 	      | _ ->
 		  let ver = extract_version ver_opt in
 		  let rev =
