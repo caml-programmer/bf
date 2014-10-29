@@ -21,9 +21,21 @@ let unlock () =
   Unix.close (Lazy.force fd_lock);
   print_endline "ok"
 
-let with_lock f =
-  lock (); f (); unlock ()
+(* No lock *)
 
+let do_lock =
+  try
+    ignore(Sys.getenv "BF_NO_LOCK");
+    false
+  with Not_found -> true
+
+let with_lock f =
+  if do_lock then
+    begin
+      lock (); f (); unlock ()
+    end
+  else
+    f ()
 
 type analyze_result =
   | Is_components of component list
