@@ -31,7 +31,7 @@ let tree_of_specdir ?(log=true) specdir : top_tree =
 	
 	let (ver,rev) =
 	  try
-	    Release.read specdir 
+	    Release.get specdir 
 	  with 
 	      Release.Not_found (pkg,exn) ->
 		if log then

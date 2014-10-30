@@ -102,6 +102,9 @@ let minor_increment base ver =
 
 let extend ver = ver ^ ".1"
 
+let write file version =
+  System.write (version ^ "\n") file
+
 let have_revision vr_opt =
   match vr_opt with
     | None -> false

@@ -7,7 +7,7 @@ all: build test
 build:
 	./compile
 
-install: test
+install:
 	install -m 755 -d $(PREFIX) $(PREFIX)/bin
 	install -m 755 _build/src/bf.native $(PREFIX)/bin/bf
 	install -m 755 tools/make-autologin $(PREFIX)/bin/make-autologin

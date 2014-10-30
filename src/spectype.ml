@@ -12,7 +12,7 @@ type pkg_op =
   | Pkg_gt
   | Pkg_last
     
-type depend = 
+type platform_depend =
     pkg_name * (pkg_op * pkg_ver) option * pkg_desc option
 
 type reject =
@@ -23,7 +23,7 @@ type provide =
 
 type spec = {
   pkgname : pkg_name;
-  depends : depend list;
+  depends : platform_depend list;
   provides : provide list;
   obsoletes : provide list;
   rejects : reject list;

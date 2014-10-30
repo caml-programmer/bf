@@ -223,7 +223,7 @@ let tree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
 
   let (ver,rev) =
     match vr with
-	Some x -> x | None -> Release.read specdir in
+	Some x -> x | None -> Release.get specdir in
   
   let rec make depth (specdir,ver,rev,mode) =
     if Hashtbl.mem table specdir then
@@ -269,7 +269,7 @@ let tree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
 		      let new_specdir =
 			Specdir.of_pkg ~default_branch:(Some (Specdir.branch specdir)) pkgdir pkg in
 		      let (ver,rev) = 
-			Release.read new_specdir in
+			Release.get new_specdir in
 		      acc @ [new_specdir,ver,rev,(Version.have_revision (Version.parse_vr_opt vr_opt))] (* add specdir for post-processing *)
 		    end
 		  else acc

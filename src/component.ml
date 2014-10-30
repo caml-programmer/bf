@@ -10,7 +10,7 @@ let with_rules s c =
     | None -> s
 
 let make ?(label=Current) ?(pkg=None) ?(rules=None) ?(nopack=false) s =
-  { name = s; label = Current; pkg = pkg; rules = rules; nopack = nopack }
+  { name = s; label = label; pkg = pkg; rules = rules; nopack = nopack }
 
 let checkout ?(low=false) component =
   match component.label with

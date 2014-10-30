@@ -294,6 +294,18 @@ let write_string ~file ~string =
   output_string ch string;
   close_out ch
 
+let write data file =
+  let ch = open_out file in
+  output_string ch data;
+  close_out ch
+
+let safewrite file output =
+  let safe = file ^ ".safe" in
+  let ch = open_out safe in
+  output ch;
+  close_out ch;
+  Unix.rename safe file
+
 let read_file ~file =
   if Sys.file_exists file then
     let ch = open_in file in

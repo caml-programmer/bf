@@ -20,7 +20,7 @@ let write file components =
     if not !first then
       out "\n  ";
     out "(";
-    out c.Types.name;
+    out c.Types.name;    
     (match c.Types.label with
       | Types.Current -> ()
       | Types.Branch s ->

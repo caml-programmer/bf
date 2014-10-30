@@ -235,7 +235,7 @@ let commit_id commit_id =
 		    begin
 		      (*printf "checkout pack to state: %s for read %s/release\n%!" tag specdir;*)
 		      Git.git_checkout ~low:true ~key:tag ();
-		      let (v,r) = Release.read ~next:false specdir in
+		      let (v,r) = Release.get ~next:false specdir in
 		      (*printf "read release %s-%d from specdir (%s)\n%!" v r specdir;*)
 		      let rec find (v',r') =
 			let key = mktag (v',r') in

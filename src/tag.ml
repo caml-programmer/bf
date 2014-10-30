@@ -12,7 +12,7 @@ let pkgname tag =
 let of_specdir specdir =
   try
     let pkgname = Specdir.pkgname specdir in
-    let (ver,rev) = Release.read specdir in
+    let (ver,rev) = Release.get specdir in
     Some (mk (pkgname, ver, rev))
   with exn -> log_message
     (sprintf "Warning: cannot parse release file from %s by error (%s)" specdir

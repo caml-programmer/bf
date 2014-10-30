@@ -1,6 +1,38 @@
 open Types
 open Printf
 
+exception Bad_format of string
+
+let read file =
+  let rex = Str.regexp "\\s+" in
+  List.map (fun x ->
+    try
+      match Str.split rex x with
+	| [ver;rev] -> (ver,int_of_string rev)
+	| _ -> raise (Bad_format x)
+    with _  -> raise (Bad_format x))
+    (System.list_of_channel (open_in file))
+
+let write file data =
+  System.safewrite file
+    (fun ch ->
+      List.iter 
+      (fun (ver,rev) ->
+	output_string ch
+	(sprintf "%s %d\n" ver rev)) data)
+    
+let update file ver rev =
+  let new_rels =
+    List.rev
+      (List.fold_left
+	(fun acc (ver',rev') ->
+	  if ver = ver' && rev > rev' then
+	    (ver',rev')::acc
+	  else 
+	    (ver,rev)::acc) []
+	(read file)) in
+  write file new_rels
+
 let reg_pkg_release specdir ver rev =
   let name = "release" in
   Component.with_component_dir ~strict:true (Component.make ~label:(Branch "master") "pack")
@@ -8,6 +40,7 @@ let reg_pkg_release specdir ver rev =
       let file = 
 	sprintf "%s/%s/%s" (Specdir.pkgname specdir) (Specdir.branch specdir) name in
       System.append_write ~file (sprintf "%s %d\n" ver rev);
+      update file ver rev;
       Git.git_add file;
       Git.git_commit ~empty:true
 	(sprintf "reg pkg release %s %s %s %d" 
@@ -27,7 +60,7 @@ let vr_compare a b =
 let max_vr l =
   List.hd (List.sort vr_compare l)
      
-let read ?(next=false) ?version specdir =
+let get ?(next=false) ?version specdir =
   let with_next n = if next then succ n else n in
   let make s =
     let (ver,rev) =

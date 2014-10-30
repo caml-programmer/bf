@@ -4,9 +4,13 @@ open Ocs_types
 open Printf
 open Logger
 
-let load ?snapshot ?(interactive=false) ?(ignore_last=false) file =
+type os = string
+type depend = os * Spectype.platform_depend list
+type depends = depend list
+
+let load ?snapshot ?(interactive=false) ?(ignore_last=false) file : platform_depend list =
   let packdir = Filename.dirname (Filename.dirname (Filename.dirname file)) in
-  let acc = ref ([] : depend list) in
+  let acc = ref ([] : platform_depend list) in
   let add_depend v = acc := v::!acc in
   let add_package v =
     let v2 = Scheme.map (fun v -> v) v in
@@ -33,7 +37,7 @@ let load ?snapshot ?(interactive=false) ?(ignore_last=false) file =
 			pkg_ver := Some (sprintf "%s-%s.%s" ver' rev' (string_of_platform platform)))
 		| _ ->
 		    (match !pkg_name with
-		      | Some pkg ->			  
+		      | Some pkg ->
 			  if Strings.have_prefix (Params.get_param "pkg-prefix") pkg then
 			    pkg_ver := Some ver'
 			  else 
@@ -62,7 +66,7 @@ let load ?snapshot ?(interactive=false) ?(ignore_last=false) file =
 				      branch
 				  in
 				  pkg_ver := Some (sprintf "%s-%d.%s" ver
-				    (snd (Release.read ~version:ver specdir))
+				    (snd (Release.get ~version:ver specdir))
 				    (string_of_platform platform))))			
 			  with exn ->
 			    log_message (sprintf "Warning: %s -> try using local pkg archive for search last pkg revision" (Printexc.to_string exn));
@@ -146,7 +150,7 @@ let load ?snapshot ?(interactive=false) ?(ignore_last=false) file =
     end
   else []
 
-let parse file =
+let parse file : depends  =
   let make_dep v =
     let v2 = Scheme.map (fun v -> v) v in
     try
@@ -219,7 +223,7 @@ let parse file =
     end
   else []
 
-let write file depends =
+let write file (depends : depends) =
   let ch = open_out file in
   let out = output_string ch in
   out "(depends\n";
@@ -245,7 +249,7 @@ let write file depends =
   out ")\n";
   close_out ch
 
-let print depends =
+let print (depends : platform_depend list) =
   print_endline "Use depends:";
   List.iter
     (fun (pkg_name, ov_opt, pkg_desc) ->

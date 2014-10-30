@@ -22,7 +22,7 @@ let write_release file l =
 
 let change_release mode dst_capacity capacity_reduction depth local_depth specdir =
   let (ver,rev) =
-    Release.read specdir in
+    Release.get specdir in
   let ver = capacity_reduction ver in
   match mode with
     | Trunk ->
@@ -96,7 +96,7 @@ let parse_fork_branch specdir =
     if Version.is s then
       ("skvt",s)
     else
-      s, (fst (Release.read ~next:false specdir))
+      s, (fst (Release.get ~next:false specdir))
      
 let fork_type specdir dst =
   let src = Specdir.branch specdir in
@@ -203,7 +203,7 @@ let make ?(depth=0) top_specdir dst =
 
   let src_capacity =
     if mode = Trunk then
-      Version.capacity (fst (Release.read ~next:false top_specdir))
+      Version.capacity (fst (Release.get ~next:false top_specdir))
     else
       Version.capacity (snd (parse_fork_branch src))
   in
