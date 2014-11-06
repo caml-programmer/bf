@@ -5,6 +5,9 @@ open Printf
 
 let env = Env.system ();;
 
+let git_init () =
+  log_command ~env "git" ["init"]
+
 let git_clone url name =
   log_command ~env "git" ["clone";"-n";"-q";url;name]
 

@@ -1,5 +1,6 @@
 open Test
 open Types
+open Spectype
 open Printf
 
 type package_info = {
@@ -50,8 +51,21 @@ let create_package_info pi =
       Release.write "release" pi.release;
       Depends.write "depends" pi.depends)
 
+let create_component name =
+  System.with_dir "../projects"
+    (fun () ->
+      printf "Create component(%s): %s\n%!" (Sys.getcwd ()) name;
+      Unix.mkdir name 0o755;
+      System.with_dir name
+	(fun () ->
+	  Git.git_init ();
+	  System.write "abc\n" "test";
+	  Git.git_add "test";
+	  Git.git_commit "init"))
+
 let create_pack_packages () =
   let mkc name =
+    create_component name;
     Component.make
       ~label:(Branch "master")
       ~rules:None
@@ -67,7 +81,12 @@ let create_pack_packages () =
       ]
     in
     let depends = [
-      "linux", []
+      "linux", [
+	"vendor-package-level-two-a", Some (Pkg_last, "1.0"),   Some "vendor package level two a";
+	"vendor-package-level-two-b", Some (Pkg_last, "2.2.2"), Some "vendor package level two b";
+	"vendor-package-level-two-c", Some (Pkg_eq, "3.0"),     Some "vendor package level two c";
+	"vendor-package-level-two-d", Some (Pkg_ge, "4.0.1"),   Some "vendor package level two d";
+      ]
     ] in
     let release = [
       "1.0",0;
@@ -81,14 +100,12 @@ let create_pack_packages () =
       depends = depends;
       version = "2.0";
       release = release
-    }
-  in
-
-  List.iter create_package_info
-    [p1]
+    } in
+  List.iter create_package_info [p1]
 
 let create_pack () =
   Unix.mkdir "pack" 0o755;
+  Unix.mkdir "projects" 0o755;
   System.with_dir "pack"
     create_pack_packages
     
