@@ -4,7 +4,7 @@ open Printf
 exception Bad_format of string
 
 let read file =
-  let rex = Str.regexp "\\s+" in
+  let rex = Str.regexp "\\ +" in
   List.map (fun x ->
     try
       match Str.split rex x with
