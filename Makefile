@@ -13,7 +13,7 @@ install:
 	install -m 755 tools/make-autologin $(PREFIX)/bin/make-autologin
 
 test:
-	./_build/src/bf.native tests
+	mkdir -p .tests && cd .tests && ../_build/src/bf.native tests
 
 uninstall:
 	rm -f $(PREFIX)/bin/bf

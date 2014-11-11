@@ -182,7 +182,7 @@ let check_destination_branch packdir dst =
       raise (Destination_branch_already_used branch_path))
   (System.list_of_directory packdir) 
 
-let make ?(depth=0) top_specdir dst =
+let make ?(interactive=true) ?(depth=0) top_specdir dst =
   let dir = Filename.dirname in
   let packdir = dir (dir top_specdir) in
 
@@ -411,13 +411,20 @@ let make ?(depth=0) top_specdir dst =
 
   List.iter (fun x ->
     log_message (sprintf "Need branching %s" (fst x))) !branch_jobs;
-  log_message "Delay before components branching...";
-  Interactive.stop_delay 10;
+
+  if interactive then
+    begin
+      log_message "Delay before components branching...";
+      Interactive.stop_delay 10;
+    end;
   List.iter
     (fun (loc,f) -> 
       log_message (sprintf "Branching %s" loc);
       System.with_dir loc f)
     !branch_jobs;
-  log_message "Delay before commit pack changes...";
-  Interactive.stop_delay 10;
+  if interactive then
+    begin
+      log_message "Delay before commit pack changes...";
+      Interactive.stop_delay 10;
+    end;
   commit_pack_changes (src,dst) pack_dir
