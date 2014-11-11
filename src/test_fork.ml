@@ -40,6 +40,7 @@ let create_bf_params () =
       "plugins-dir pack";
       "autopkg true";
       "use-external false";
+      "pkg-prefix vendor";
       (*out "content-owner root";*)
     ]
 
@@ -83,15 +84,14 @@ let create_pack_packages () =
       [
 	mkc "pack";
 	mkc "component_a";
-	mkc "component_b";
-	mkc "component_c";
+	(*mkc "component_b";
+	mkc "component_c";*)
       ]
     in
     let depends = [
       "linux", [
-(*
 	"vendor-project-package-level-two-a", Some (Pkg_last, "1.0"),   Some "vendor package level two a";
-	"vendor-project-package-level-two-b", Some (Pkg_last, "2.2.2"), Some "vendor package level two b";
+(*	"vendor-project-package-level-two-b", Some (Pkg_last, "2.2.2"), Some "vendor package level two b";
 	"vendor-project-package-level-two-c", Some (Pkg_eq, "3.0"),     Some "vendor package level two c";
 	"vendor-project-package-level-two-d", Some (Pkg_ge, "4.0.1"),
   Some "vendor package level two d";
@@ -113,7 +113,24 @@ let create_pack_packages () =
       release = release
     } in
 
-  List.iter create_package_info [p1]
+  let p2 = 
+    let composite =
+      [
+	mkc "pack";
+	mkc "component_b";
+      ]
+    in
+    let depends = [ "linux", [] ] in
+    let release = [ "1.0",0 ] in
+    {
+      name = "vendor-project-package-level-two-a";
+      branch = "devel";
+      composite = composite;
+      depends = depends;
+      version = "2.0";
+      release = release
+    } in
+  List.iter create_package_info [p1;p2]
 
 let create_pack () =
   Unix.mkdir "projects" 0o755;
