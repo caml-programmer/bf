@@ -253,7 +253,7 @@ let make ?(interactive=true) ?(depth=0) top_specdir dst =
 	  else s ^ ".git"
 	in
 	let make_new_branch ?(start=None) () =
-	  Git.git_pull "origin";
+	  (* Git.git_pull "origin"; *)
 	  if not (List.mem (Branch.origin dst) (Git.git_branch ~remote:true ())) then
 	    if List.mem dst (Git.git_branch ()) then
 	      Git.git_push ~refspec:dst "origin"

@@ -84,8 +84,7 @@ let create_pack_packages () =
       [
 	mkc "pack";
 	mkc "component_a";
-	(*mkc "component_b";
-	mkc "component_c";*)
+	(*mkc "component_b"; mkc "component_c";*)
       ]
     in
     let depends = [
@@ -93,8 +92,7 @@ let create_pack_packages () =
 	"vendor-project-package-level-two-a", Some (Pkg_last, "1.0"),   Some "vendor package level two a";
 (*	"vendor-project-package-level-two-b", Some (Pkg_last, "2.2.2"), Some "vendor package level two b";
 	"vendor-project-package-level-two-c", Some (Pkg_eq, "3.0"),     Some "vendor package level two c";
-	"vendor-project-package-level-two-d", Some (Pkg_ge, "4.0.1"),
-  Some "vendor package level two d";
+	"vendor-project-package-level-two-d", Some (Pkg_ge, "4.0.1"),	Some "vendor package level two d";
 *)
       ]
     ] in
@@ -164,23 +162,57 @@ let create_infrastructure () =
       create_bf_params ();
       create_pack ())
 
-let do_fork () =
+let do_fork forkmap =
   with_home
-    (fun () -> 
+    (fun () ->
       ignore(Params.reread_params ());
       printf "Current directory: %s\n" (Sys.getcwd ());
-      Fork.make 
-	~interactive:false 
-	"./pack/vendor-project-package-level-one/devel" 
-	"project-1.0")
+      List.iter
+	(fun (p,b) ->
+	  Fork.make ~interactive:false ("./pack/" ^ p) b)
+	forkmap)
 
 let check_result () =
-  true
+  with_home
+    (fun () ->
+      System.with_dir "pack"
+      (fun () ->
+	List.iter
+	(fun package ->
+	  if (System.is_directory package) then
+	    begin
+	      System.with_dir package 
+		(fun () ->
+		  List.iter
+		  (fun branch ->
+		    if System.is_directory branch then
+		      System.with_dir branch 
+			(fun () ->
+			  let file =
+			    sprintf "%s/%s" (Sys.getcwd ()) "release" in
+			if System.is_regular file then
+			  List.iter
+			    (fun (ver,rev) -> printf "%s - %s %d\n%!" file ver rev)
+			    (Release.read file)))
+		  (System.list_of_directory "."))
+	    end)
+	(System.list_of_directory "."));
+      true)
 
-let fork () = 
+let fork () =
   create_infrastructure ();
-  do_fork ();
+  
+  let forkmap = [
+    "vendor-project-package-level-one/devel",         "project-1.0";
+    "vendor-project-package-level-one/project-1.0",   "project-1.1";
+    "vendor-project-package-level-one/project-1.1",   "project-1.2";
+    "vendor-project-package-level-one/project-1.2",   "project-1.2.1";
+    "vendor-project-package-level-one/project-1.2.1", "project-2.0.0";    
+  ] in
+  
+  do_fork forkmap;
   check_result ()
 
 let run () =
   test "fork" fork
+
