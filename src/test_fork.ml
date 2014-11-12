@@ -198,6 +198,7 @@ let do_fork forkmap =
     (fun () ->
       ignore(Params.reread_params ());
       printf "Current directory: %s\n" (Sys.getcwd ());
+      Component.prepare (Component.make "pack");
       List.iter
 	(fun (p,b) ->
 	  check_result "before";
