@@ -162,26 +162,18 @@ let create_infrastructure () =
       create_bf_params ();
       create_pack ())
 
-let do_fork forkmap =
-  with_home
-    (fun () ->
-      ignore(Params.reread_params ());
-      printf "Current directory: %s\n" (Sys.getcwd ());
-      List.iter
-	(fun (p,b) ->
-	  Fork.make ~interactive:false ("./pack/" ^ p) b)
-	forkmap)
+let stage = ref 0;;
 
-let check_result () =
-  with_home
-    (fun () ->
-      System.with_dir "pack"
+let check_result label =
+  printf "\n* [%s] %d **************************************\n" label !stage;
+  if System.is_directory "pack" then
+    System.with_dir "pack"
       (fun () ->
 	List.iter
 	(fun package ->
 	  if (System.is_directory package) then
 	    begin
-	      System.with_dir package 
+	      System.with_dir package
 		(fun () ->
 		  List.iter
 		  (fun branch ->
@@ -190,14 +182,29 @@ let check_result () =
 			(fun () ->
 			  let file =
 			    sprintf "%s/%s" (Sys.getcwd ()) "release" in
-			if System.is_regular file then
-			  List.iter
-			    (fun (ver,rev) -> printf "%s - %s %d\n%!" file ver rev)
-			    (Release.read file)))
+			  if System.is_regular file then
+			    List.iter
+			      (fun (ver,rev) -> printf "%s - %s %d\n%!" file ver rev)
+			      (Release.read file)))
 		  (System.list_of_directory "."))
 	    end)
 	(System.list_of_directory "."));
-      true)
+  printf "* [%s] %d **************************************\n\n%!" label !stage;
+  if label = "after" then
+    incr stage
+
+let do_fork forkmap =
+  with_home
+    (fun () ->
+      ignore(Params.reread_params ());
+      printf "Current directory: %s\n" (Sys.getcwd ());
+      List.iter
+	(fun (p,b) ->
+	  check_result "before";
+	  Fork.make ~interactive:false ("./pack/" ^ p) b;
+	  check_result "after")
+	forkmap);
+  true
 
 let fork () =
   create_infrastructure ();
@@ -207,11 +214,10 @@ let fork () =
     "vendor-project-package-level-one/project-1.0",   "project-1.1";
     "vendor-project-package-level-one/project-1.1",   "project-1.2";
     "vendor-project-package-level-one/project-1.2",   "project-1.2.1";
-    "vendor-project-package-level-one/project-1.2.1", "project-2.0.0";    
+    "vendor-project-package-level-one/project-1.2.1", "project-2.0.0";
   ] in
   
-  do_fork forkmap;
-  check_result ()
+  do_fork forkmap
 
 let run () =
   test "fork" fork
