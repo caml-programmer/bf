@@ -123,35 +123,38 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
       Hashtbl.add table pkg_path (e.pkg_version,e.pkg_revision);
 
       let depend_paths =
-	List.map
-	  (fun (pkg_name,ver_opt,rev_opt,operand_opt) ->
-	    let extract_version ver_opt = 
-	      match ver_opt with
-		| Some v -> v
-		| None ->
-		    try
-		      let (e,_) =
-			Hashtbl.find pre_table pkg_name in
-		      e.pkg_version
-		    with Not_found ->
-		      log_error (sprintf "cannot resolve version for %s" pkg_name)
-	    in
-	    match operand_opt with
-	      | _ ->
-		  let ver = extract_version ver_opt in
-		  let rev =
-		    match rev_opt with
-		      | Some r -> r
-		      | None ->
-			  try
+	List.fold_left
+	  (fun acc (pkg_name,ver_opt,rev_opt,operand_opt) ->
+	    try
+	      let extract_version ver_opt = 
+		match ver_opt with
+		  | Some v -> v
+		  | None ->
+		      try
+			let (e,_) =
+			  Hashtbl.find pre_table pkg_name in
+			e.pkg_version
+		      with Not_found ->
+			log_error (sprintf "cannot resolve version for %s" pkg_name)
+	      in
+	      match operand_opt with
+		| _ ->
+		    let ver = extract_version ver_opt in
+		    let rev =
+		      match rev_opt with
+			| Some r -> r
+			| None ->
 			    let (e,_) =
-			      Hashtbl.find pre_table pkg_name in
+			      try
+				Hashtbl.find pre_table pkg_name
+			      with Not_found ->
+				log_message (sprintf "warning: cannot resolve revision for %s" pkg_name);
+				raise Not_found in
 			    e.pkg_revision
-			  with Not_found -> 
-			    log_error (sprintf "cannot resolve revision for %s" pkg_name)
-		  in sprintf "%s/%s-%s-%d.%s.%s.%s" e.pkg_dir pkg_name ver rev
-		       (string_of_platform e.pkg_platform) e.pkg_arch e.pkg_extension)
-	  deps
+		    in
+		    (sprintf "%s/%s-%s-%d.%s.%s.%s" e.pkg_dir pkg_name ver rev
+		      (string_of_platform e.pkg_platform) e.pkg_arch e.pkg_extension)::acc
+	    with Not_found -> acc) [] deps
       in
       resolve depth pkg_path;
       Dep_val (e, Dep_list
