@@ -7,7 +7,6 @@ open Logger
 let make ~hard pkg_path =
   let depends =
     Clone.tree_of_package pkg_path in
-  let () = List.iter (fun e -> sprintf "%s" e) (list_of_deptree depends) in
   let pkg_dir = Filename.dirname pkg_path in
   List.iter (fun e ->
     let name = 
