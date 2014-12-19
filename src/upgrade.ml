@@ -18,7 +18,9 @@ let make specdir upgrade_mode default_branch =
     log_message "make depends tree...";
     Packtree.create ~default_branch specdir in
   
-  let depends = list_of_deptree (map_deptree fst deptree) in
+  let depends = 
+    list_of_deptree 
+      ~add_parent:true (map_deptree fst deptree) in
   log_message "depend list...";
   List.iter print_endline depends;
   

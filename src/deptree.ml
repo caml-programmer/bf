@@ -102,7 +102,7 @@ let list_of_deptree ?(add_parent=false) tree =
 	| Dep_val (x, _) ->
 	    if List.mem x l then
 	      l
-	    else x::l	    
+	    else x::l
 	| _ -> raise Not_found)
     with _ -> l)
   else l
