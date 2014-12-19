@@ -82,7 +82,7 @@ let deplist_of_deptree tree =
     | _ -> assert false
   in make 0 tree
 
-let list_of_deptree tree =
+let list_of_deptree ?(add_parent=false) tree =
   let g = ref (create_graph ()) in
   let rec fill_graph parent = function
     | Dep_val (x, Dep_list l) ->
@@ -95,7 +95,17 @@ let list_of_deptree tree =
 	List.iter (fill_graph (Some x)) l
     | _ -> assert false
   in fill_graph None tree;
-  unwind !g
+  let l = unwind !g in
+  if add_parent then
+    (try
+      (match tree with
+	| Dep_val (x, _) ->
+	    if List.mem x l then
+	      l
+	    else x::l	    
+	| _ -> raise Not_found)
+    with _ -> l)
+  else l
 
 let rec map_deptree f = function
   | Dep_val (x, tree) ->
