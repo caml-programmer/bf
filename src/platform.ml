@@ -18,6 +18,7 @@ type platform =
   | Cent4
   | Cent5
   | Cent6
+  | Cent7
   | Fedora10
   | Alt
   | Arch
@@ -42,6 +43,7 @@ let engine_of_platform = function
   | Cent4     -> Rpm_build
   | Cent5     -> Rpm_build
   | Cent6     -> Rpm_build
+  | Cent7     -> Rpm_build
   | Fedora10  -> Rpm_build
   | Alt       -> Rpm_build
   | Arch      -> Rpm_build
@@ -60,6 +62,7 @@ let string_of_platform = function
   | Cent4     -> "cent4"
   | Cent5     -> "cent5"
   | Cent6     -> "cent6"
+  | Cent7     -> "cent7"
   | Fedora10  -> "f10"
   | Alt       -> "alt"
   | Arch      -> "arch"
@@ -78,6 +81,7 @@ let platform_of_string = function
   | "cent4" -> Cent4
   | "cent5" -> Cent5
   | "cent6" -> Cent6
+  | "cent7" -> Cent7
   | "f10"   -> Fedora10
   | "alt"   -> Alt
   | "arch"  -> Arch
@@ -110,6 +114,7 @@ let linux_platform_mapping =
       "^CentOS.*?release 4",Cent4;
       "^CentOS.*?release 5",Cent5;
       "^CentOS.*?release 6",Cent6;
+      "^CentOS.*?release 7",Cent7;
       "^Fedora.*?release 10",Fedora10;
       "^ALT Linux",Alt
     ];
