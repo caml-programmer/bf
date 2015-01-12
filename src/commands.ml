@@ -296,6 +296,17 @@ let scm_send_message subj msg rcpts =
     recipients;
   Snull
 
+let scm_send_html_message subj msg rcpts =
+  let subject = Scheme.string_of_sval subj in
+  let contents = [Scheme.string_of_sval msg] in
+  let recipients =
+    List.map Scheme.string_of_sval
+      (Scheme.list_of_sval rcpts) in
+  List.iter
+    (Notify.send_message ~subject ~contents ~mimetype:"text/html; charset=UTF-8")
+    recipients;
+  Snull
+  
 let scm_write_file src dst =
   System.write_string
     ~file:(Scheme.string_of_sval src)
@@ -402,6 +413,7 @@ Ocs_env.set_pf1 Scheme.env scm_is_directory "is-directory";;
 Ocs_env.set_pf2 Scheme.env scm_send_file_over_ssh "send-file-over-ssh";;
 Ocs_env.set_pfn Scheme.env scm_package_build_message "package-build-message";;
 Ocs_env.set_pf3 Scheme.env scm_send_message "send-message";;
+Ocs_env.set_pf3 Scheme.env scm_send_html_message "send-html-message";;
 Ocs_env.set_pf2 Scheme.env scm_write_file "write-file";;
 Ocs_env.set_pf2 Scheme.env scm_write_scheme_value "write-scheme-value";;
 Ocs_env.set_pf2 Scheme.env scm_substring "substring?";;

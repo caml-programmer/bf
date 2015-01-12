@@ -62,7 +62,7 @@ let send_message
   ?(from_name=(Params.get_param "smtp-from-name"))
   ?(from_mail=(Params.get_param "smtp-from-mail"))
   ?(subject=(Params.get_param "smtp-subject"))
-  ?(mimetype="text/html; charset=UTF-8")
+  ?(mimetype="text/plain; charset=UTF-8")
   ~contents to_mail =
   message (sprintf "Connect to %s:%d" smtp_server smtp_port);
   message (sprintf "Subject: %s" subject);
