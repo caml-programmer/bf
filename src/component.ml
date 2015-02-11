@@ -338,6 +338,9 @@ let update_pack component =
        (install component); (* need for create .bf-build and .bf-install *)
   (local_changes || !remote_changes)
 
+let infostring component =
+  sprintf "%s (%s) (%s)" component.name (string_of_label_type component.label) (string_of_label component.label)
+
 let diff tag_a tag_b component =
   ignore (with_component_dir ~strict:false component
     (fun () ->
