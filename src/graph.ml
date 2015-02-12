@@ -152,47 +152,109 @@ let list_of_table table =
     Hashtbl.fold
       (fun k v acc ->
 	(k,v)::acc) table [] in
-  let sum =
+  (*
+  let commit_sum =
     List.fold_left
       (fun acc v ->
-	v + acc) 0 (List.map snd l) in
+	(fst v) + acc) 0 (List.map snd l) in
+  let loc_sum =
+    List.fold_left
+      (fun acc v ->
+	(snd v) + acc) 0 (List.map snd l) in
+  *)
   List.map
-    (fun (k,v) ->
-      k, (100.0 *. (float_of_int v /. float_of_int sum)))
-    (List.sort (fun a b -> compare (snd b) (snd a)) l)
+    (fun (k,(commits,loc)) ->
+      k,
+      (*(100.0 *. (float_of_int (fst v) /. float_of_int commit_sum)),*)
+      commits,
+      loc)
+    (List.sort (fun a b -> compare (snd (snd b)) (snd (snd a))) l)
 
-let synonims =
-  Synonims.load ()
+let synonyms =
+  Synonyms.load ()
 
-let resolve_synonims x =
+let resolve_synonyms x =
   List.fold_left
     (fun acc (k,l) ->
       if List.mem x l then
 	k
       else
 	acc)
-    x synonims
+    x synonyms
+
+let extract_email s =
+  let rex = Pcre.regexp "<([^>]*)>" in
+  if Pcre.pmatch ~rex s then
+    Some (Pcre.extract ~rex s).(1)
+  else None
+
+let loc_split s =
+  let rex = Pcre.regexp "\\s+" in
+  match Pcre.split ~rex s with
+    | [count; commiter]
+    | [_ ;count; commiter]
+    | [_ ;count; commiter; _] ->
+	begin
+	  match extract_email commiter with
+	    | Some commiter ->
+		Some (commiter, int_of_string count)
+	    | None -> None
+	end
+    | _ -> None
+
+let loc_count () =
+  let code_exts =
+    (*".ml|.mli|types|values|.cc|.c|.h|.hh|.cpp|.scala|.java|.rkt|.ss|.erl|.scm|.py|.pl|.js|Makefile|.bf-rules"*)
+    ".png|.jpeg|.html|.htm|.css" in
+  
+  List.fold_left
+    (fun acc line ->
+      match loc_split line with
+	| Some (commiter, loc) -> 
+	    (commiter,loc)::acc
+	| None -> acc) [] 
+    (System.read_lines
+      (sprintf "git ls-files | grep -i -v -E '(%s)$' | xargs -n1 git blame -e -w | perl -ne '/^.*?\\((.*?)\\s+[\\d]{4}/; print $1,\"\\n\"' | sort -f | uniq -c" code_exts))
 
 let commiters component =
   let table = Hashtbl.create 32 in
-  let drop_label s =
-    let len = String.length s in
-    if len > 8 then
-      String.sub s 8 (len - 8)
-    else s
-  in
+
   let search () =
+    let ignored = ref false in
+    let loctable =
+      match component.Types.name with
+	| "boost" | "icu" | "samba" | "squid" | "apache" | "ant" | "maven" -> 
+	    ignored := true;
+	    []
+	| _ -> loc_count ()
+    in
+    let search_loc commiter =
+      try
+	Some (List.assoc commiter loctable)
+      with Not_found -> 
+	if !ignored then	  
+	  None 
+	else Some 0 in
+    
+    let commiters =
+      List.fold_left 
+	(fun acc commiter ->
+	  match extract_email commiter with
+	    | Some email -> email::acc
+	    | None -> acc)
+	[] (System.read_lines
+	  ~filter:(Strings.substring_exists "Author: ")
+	  "git log") in
+
     List.iter
-      (fun key -> 
-	if Hashtbl.mem table key then
-	  Hashtbl.replace table key (succ (Hashtbl.find table key))
+      (fun commiter' ->
+	let commiter = resolve_synonyms commiter' in
+	if Hashtbl.mem table commiter then
+	  let (cur,loc) = Hashtbl.find table commiter in
+	  Hashtbl.replace table commiter ((succ cur), loc)
 	else
-	  Hashtbl.add table key 1)
-      (List.map resolve_synonims
-	(List.map drop_label
-	  (System.read_lines
-	    ~filter:(Strings.substring_exists "Author: ")
-	    "git log")))
+	  Hashtbl.add table commiter (1, (search_loc commiter')))
+      commiters
   in
   ignore(Component.with_component_dir
     ~strict:false component search);
@@ -244,16 +306,20 @@ let usergraph specdir =
     (fun n ->
       let label = Buffer.create 32 in
       let add = Buffer.add_string label in
-      add "<table><tr><td colspan=\"2\">";
+      add "<table><tr><td colspan=\"3\">";
       add (Specdir.pkgname n);
       add "</td></tr>";
       let data = composite n in
       List.iter
 	(fun (component,commiters) ->
-	  add (sprintf "<tr><td colspan=\"2\" bgcolor=\"white\">%s</td></tr>" (Component.infostring component));
+	  add (sprintf "<tr><td colspan=\"3\" bgcolor=\"white\">%s</td></tr>" (Component.infostring component));
 	  List.iter
-	    (fun (k,v) ->
-	      add (sprintf "<tr><td>%s</td><td>%0.2f</td></tr>" (html_quoting k) v))
+	    (fun (k,commits,loc_opt) ->
+	      let loc =
+		match loc_opt with
+		  | None -> "unknown"
+		  | Some loc -> string_of_int loc in
+	      add (sprintf "<tr><td>%s</td><td>%s</td><td>%d</td></tr>" (html_quoting k) loc commits))
 	    commiters)
 	data;
       add "</table>";
