@@ -4,11 +4,35 @@ open Printf
 exception Cannot_create_image of string
 exception Cannot_view_image of string
 
+let make_image dotfile pngfile =
+  if Sys.command (sprintf "dot -Tpng %s > %s" dotfile pngfile) <> 0 then
+    raise (Cannot_create_image pngfile)
+
+let view_image pngfile =
+  let ignore_view_image =
+    try
+      ignore(Sys.getenv "IGNORE_VIEW_IMAGE");
+      true
+    with Not_found -> false in
+
+  if not ignore_view_image then
+    if Sys.command (sprintf "qiv -f %s" pngfile) <> 0 then
+      if Sys.command (sprintf "gqview %s" pngfile) <> 0 then
+	raise (Cannot_view_image pngfile)
+
+let make_id typ specdir =
+  let rex = Pcre.regexp "/" in
+  match List.rev (Pcre.split ~rex specdir) with
+    | branch::pkgname::_ ->
+	sprintf "%s-%s-%s" typ pkgname branch
+    | _ -> "graph"  
+  
+
 (* Monograph *)
 
 let monograph ?ver ?rev specdir =
-  let dotfile = "graph.dot" in
-  let pngfile = "graph.png" in
+  let dotfile = sprintf "%s.dot" (make_id "monograph" specdir) in
+  let pngfile = sprintf "%s.png" (make_id "monograph" specdir) in
 
   let vr =
     match ver,rev with
@@ -51,30 +75,21 @@ let monograph ?ver ?rev specdir =
     | Dep_list l ->
 	List.iter (write_links parent) l
   in
-
-  let make_image () =
-    if Sys.command (sprintf "dot -Tpng %s > %s" dotfile pngfile) <> 0 then
-      raise (Cannot_create_image pngfile)
-  in
   
-  let view_image () =
-    if Sys.command (sprintf "qiv -f %s" pngfile) <> 0 then
-      if Sys.command (sprintf "gqview %s" pngfile) <> 0 then
-	raise (Cannot_view_image pngfile)
-  in
+  
 
   write_links None tree;
   
   out "}\n";
   close_out ch;
-  make_image ();
-  view_image ()
+  make_image dotfile pngfile;
+  view_image pngfile
 
 (* Basegraph *)
 
 let basegraph specdir mode =
-  let dotfile = "graph.dot" in
-  let pngfile = "graph.png" in
+  let dotfile = sprintf "%s.dot" (make_id "basegraph" specdir) in
+  let pngfile = sprintf "%s.png" (make_id "basegraph" specdir) in
 
   let tree = Packtree.create ~default_branch:(Some (Specdir.branch specdir)) specdir in
   let depends =
@@ -127,23 +142,13 @@ let basegraph specdir mode =
 	List.iter (write_links parent) l
   in
 
-  let make_image () =
-    if Sys.command (sprintf "dot -Tpng %s > %s" dotfile pngfile) <> 0 then
-      raise (Cannot_create_image pngfile)
-  in
-  
-  let view_image () =
-    if Sys.command (sprintf "qiv -f %s" pngfile) <> 0 then
-      if Sys.command (sprintf "gqview %s" pngfile) <> 0 then
-	raise (Cannot_view_image pngfile)
-  in
 
   write_links None tree;
   
   out "}\n";
   close_out ch;
-  make_image ();
-  view_image ()
+  make_image dotfile pngfile;
+  view_image pngfile
 
 (* Usergraph *)
 
@@ -279,8 +284,8 @@ let html_quoting s =
   Buffer.contents b
 
 let usergraph specdir =
-  let dotfile = "graph.dot" in
-  let pngfile = "graph.png" in
+  let dotfile = sprintf "%s.dot" (make_id "usergraph" specdir) in
+  let pngfile = sprintf "%s.png" (make_id "usergraph" specdir) in
 
   let tree = Packtree.create ~default_branch:(Some (Specdir.branch specdir)) specdir in
   let depends =
@@ -350,20 +355,9 @@ let usergraph specdir =
 	List.iter (write_links parent) l
   in
 
-  let make_image () =
-    if Sys.command (sprintf "dot -Tpng %s > %s" dotfile pngfile) <> 0 then
-      raise (Cannot_create_image pngfile)
-  in
-  
-  let view_image () =
-    if Sys.command (sprintf "qiv -f %s" pngfile) <> 0 then
-      if Sys.command (sprintf "gqview %s" pngfile) <> 0 then
-	raise (Cannot_view_image pngfile)
-  in
-
   write_links None tree;
   
   out "}\n";
   close_out ch;
-  make_image ();
-  view_image ()
+  make_image dotfile pngfile;
+  view_image pngfile
