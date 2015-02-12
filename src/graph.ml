@@ -20,11 +20,19 @@ let view_image pngfile =
       if Sys.command (sprintf "gqview %s" pngfile) <> 0 then
 	raise (Cannot_view_image pngfile)
 
+let graph_home =
+  let get () =
+    let dir = Params.get_param "graph-home" in
+    if dir <> "" && (not (Sys.file_exists dir)) then
+      System.make_directory_r dir;
+    dir in
+  lazy (get ())
+
 let make_id typ specdir =
   let rex = Pcre.regexp "/" in
   match List.rev (Pcre.split ~rex specdir) with
     | branch::pkgname::_ ->
-	sprintf "%s-%s-%s" typ pkgname branch
+	Filename.concat (Lazy.force graph_home) (sprintf "%s-%s-%s" typ pkgname branch)
     | _ -> "graph"  
   
 
