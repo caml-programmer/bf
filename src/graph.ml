@@ -186,14 +186,34 @@ let list_of_table table =
 let synonyms =
   Synonyms.load ()
 
+let synonyms_patterns =
+  List.map
+    (fun (k,l) ->
+      k, List.map
+	(fun s ->
+	  (try
+	    Some (Pcre.regexp s)
+	  with _ -> None)) l)
+    synonyms
+
+let rematch x l =
+  try
+    List.exists 
+      (fun p_opt ->
+	(match p_opt with
+	  | Some rex ->
+	      Pcre.pmatch ~rex x
+	  | None -> false)) l
+  with _ -> false
+
 let resolve_synonyms x =
-  List.fold_left
-    (fun acc (k,l) ->
-      if List.mem x l then
+  List.fold_left2
+    (fun acc (k,l) (_,pl) ->
+      if List.mem x l || rematch x pl then
 	k
       else
 	acc)
-    x synonyms
+    x synonyms synonyms_patterns
 
 let extract_email s =
   let rex = Pcre.regexp "<([^>]*)>" in
