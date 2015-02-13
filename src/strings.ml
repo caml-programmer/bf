@@ -72,3 +72,27 @@ let have_suffix suffix s =
   let len = String.length s in
   let slen = String.length suffix in
   len >= slen && suffix = String.sub s (len - slen) slen
+
+let drop_first_spaces s =
+  let b = Buffer.create 32 in
+  let state = ref 0 in
+  String.iter
+    (function
+      | ' '
+      | '\t' as c ->
+	  if !state = 1 then
+	    Buffer.add_char b c
+      | c ->
+	  state := 1;
+	  Buffer.add_char b c) s;
+  Buffer.contents b
+
+let drop_second_spaces s =
+  let len = ref (String.length s) in
+  while !len > 0 && s.[pred !len] = ' ' || s.[pred !len] = '\t' do
+    decr len
+  done;
+  String.sub s 0 !len
+
+let drop_spaces s =
+  drop_second_spaces (drop_first_spaces s)

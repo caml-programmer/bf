@@ -1,32 +1,18 @@
 open Logger
 open Printf
 
-let rex = Pcre.regexp "\\s+"
+let key_rex = Pcre.regexp ":"
+let space_rex = Pcre.regexp "\\s+"
 
-let is_email s =
-  try
-    ignore(String.index s '@');
-    true
-  with Not_found -> false
-
-let email_splitter l =
-  let rec split (name,emails) = function
-    | [] -> (name,emails)
-    | hd::tl ->
-	if is_email hd then
-	  split ([],hd::emails) tl
-	else
-	  split (hd::name,emails) tl in
-  let x = split ([],[]) (List.rev l) in
-  String.concat " " (fst x), (snd x)
+let non_empty l =
+  List.filter ((<>) "") l
 
 let parse add s =
-  match Pcre.split ~rex s with
-    | name::emails when name <> "" ->
-	add (email_splitter (name::emails))
-    | _::name::emails ->
-	add (email_splitter (name::emails))
-    | _ -> ()
+  match Pcre.split ~rex:key_rex s with
+    | [key;values] ->
+	add ((Strings.drop_spaces key), (non_empty (Pcre.split ~rex:space_rex values)))
+    | l ->
+	List.iter print_endline l
 
 let load () =
   let file = ".bf-synonyms" in

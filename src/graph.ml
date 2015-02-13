@@ -33,7 +33,7 @@ let make_id typ specdir =
   match List.rev (Pcre.split ~rex specdir) with
     | branch::pkgname::_ ->
 	Filename.concat (Lazy.force graph_home) (sprintf "%s-%s-%s" typ pkgname branch)
-    | _ -> "graph"  
+    | _ -> "graph"
   
 
 (* Monograph *)
@@ -83,8 +83,6 @@ let monograph ?ver ?rev specdir =
     | Dep_list l ->
 	List.iter (write_links parent) l
   in
-  
-  
 
   write_links None tree;
   
@@ -160,6 +158,12 @@ let basegraph specdir mode =
 
 (* Usergraph *)
 
+let use_loc =
+  try
+    ignore (Sys.getenv "NOT_EVAL_LOC");
+    false
+  with _ -> true
+
 let list_of_table table =
   let l =
     Hashtbl.fold
@@ -181,7 +185,11 @@ let list_of_table table =
       (*(100.0 *. (float_of_int (fst v) /. float_of_int commit_sum)),*)
       commits,
       loc)
-    (List.sort (fun a b -> compare (snd (snd b)) (snd (snd a))) l)
+    (List.sort (fun a b -> 
+      if use_loc then
+	compare (snd (snd b)) (snd (snd a))
+      else 
+	compare (fst (snd b)) (fst (snd a))) l)
 
 let synonyms =
   Synonyms.load ()
@@ -254,18 +262,21 @@ let commiters component =
 
   let search () =
     let ignored = ref false in
-    let loctable =
+    let loctable =      
       match component.Types.name with
 	| "boost" | "icu" | "samba" | "squid" | "apache" | "ant" | "maven" -> 
 	    ignored := true;
 	    []
-	| _ -> loc_count ()
+	| _ -> 
+	    if use_loc then
+	      loc_count ()
+	    else []
     in
     let search_loc commiter =
       try
 	Some (List.assoc commiter loctable)
       with Not_found -> 
-	if !ignored then	  
+	if !ignored then
 	  None 
 	else Some 0 in
     
@@ -339,20 +350,24 @@ let usergraph specdir =
     (fun n ->
       let label = Buffer.create 32 in
       let add = Buffer.add_string label in
-      add "<table><tr><td colspan=\"3\">";
+      let colspan = if use_loc then 3 else 2 in
+      add (sprintf "<table><tr><td colspan=\"%d\">" colspan);
       add (Specdir.pkgname n);
       add "</td></tr>";
       let data = composite n in
       List.iter
 	(fun (component,commiters) ->
-	  add (sprintf "<tr><td colspan=\"3\" bgcolor=\"white\">%s</td></tr>" (Component.infostring component));
+	  add (sprintf "<tr><td colspan=\"%d\" bgcolor=\"white\">%s</td></tr>" colspan (Component.infostring component));
 	  List.iter
 	    (fun (k,commits,loc_opt) ->
-	      let loc =
-		match loc_opt with
-		  | None -> "unknown"
-		  | Some loc -> string_of_int loc in
-	      add (sprintf "<tr><td>%s</td><td>%s</td><td>%d</td></tr>" (html_quoting k) loc commits))
+	      if use_loc then
+		let loc =
+		  match loc_opt with
+		    | None -> "unknown"
+		    | Some loc -> string_of_int loc in
+		add (sprintf "<tr><td>%s</td><td>%s</td><td>%d</td></tr>" (html_quoting k) loc commits)
+	      else
+		add (sprintf "<tr><td>%s</td><td>%d</td></tr>" (html_quoting k) commits))
 	    commiters)
 	data;
       add "</table>";
