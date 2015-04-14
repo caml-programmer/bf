@@ -62,6 +62,7 @@ let usage () =
   print_endline "   or: bf graph <specdir> [<ver> <rev>]";
   print_endline "   or: bf basegraph <specdir> [hard|soft]";
   print_endline "   or: bf usergraph <specdir>";
+  print_endline "   or: bf info <specdir>";
   print_endline "   or: bf tag <composite> <tag>";
   print_endline "   or: bf make (build|install) [<name>]";
   print_endline "   or: bf versions <pkgdir>";
@@ -359,6 +360,10 @@ let main () =
 	| "usergraph" ->
 	    if len = 3 then
 	      with_lock (fun () -> Graph.usergraph Sys.argv.(2))
+	    else usage ()
+	| "info" ->
+	    if len = 3 then
+	      with_lock (fun () -> Graph.make_info_table Sys.argv.(2))
 	    else usage ()
 	| "tag" ->
 	    if len = 4 then

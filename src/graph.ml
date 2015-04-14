@@ -404,3 +404,108 @@ let usergraph specdir =
   close_out ch;
   make_image dotfile pngfile;
   view_image pngfile
+
+let normcc n =
+  if n > 1000 * 1000 * 1000 then
+    sprintf "%dGb" (n / 1000 / 1000 / 1000)
+  else
+    if n > 1000 * 1000 then
+      sprintf "%dMb" (n / 1000 / 1000)
+    else
+      if n > 1000 then
+	sprintf "%dKb" (n / 1000)
+      else 
+	sprintf "%dB" n
+	
+let extract_langs component =
+  let langs = Hashtbl.create 32 in
+  let update k cc =
+    if Hashtbl.mem langs k then
+      let cur = Hashtbl.find langs k in
+      Hashtbl.replace langs k (cur + cc)
+    else
+      Hashtbl.add langs k cc in
+  let count_cc file =
+    let count = ref 0 in
+    let ch = open_in file in
+    try
+      while true do
+	ignore(input_char ch);
+	incr count;
+      done; 0
+    with
+	End_of_file ->
+	  close_in ch;
+	  !count
+  in  
+  let code_analyze x =
+    try
+      let name = Filename.basename x in
+      let pos = String.rindex name '.' in
+      let ext =
+	String.lowercase
+	  (String.sub name (succ pos) (String.length name - pos - 1)) in
+      update ext (count_cc x)
+    with Not_found ->
+      (* Обработка исходных файлов без расширений, вещь специфичная, 
+	 но пока поживет здесь *)
+      let ext = Filename.basename x in
+      match ext with
+	| "types"
+	| "values"
+	| "optimizator" -> update ext (count_cc x)
+	| _ -> ()
+  in  
+  let mk_result () =
+    let l = ref [] in
+    Hashtbl.iter 
+      (fun k v ->
+	l := (k,v)::!l) langs;
+    List.sort
+      (fun a b -> compare (snd b) (snd a)) !l
+  in
+
+  ignore(Component.with_component_dir component
+    (fun () ->
+      System.scandir
+      (fun x ->
+	if System.is_regular x then
+	  begin
+	    if Strings.substring_exists ".git" x then
+	      ()
+	    else
+	      code_analyze x 
+	  end) "."));
+  mk_result ()
+
+let langinfo langs =
+  String.concat ","
+    (List.map
+      (fun (l,n) ->
+	sprintf "%s:%s" l (normcc n))
+      langs)
+
+let make_info_table specdir =
+  let tree = Packtree.create ~default_branch:(Some (Specdir.branch specdir)) specdir in
+  let depends = list_of_deptree ~add_parent:true (map_deptree fst tree) in
+  let b = Buffer.create 32 in
+  let add = Buffer.add_string b in
+  List.iter
+    (fun n ->
+      printf "package: %s\n" (Specdir.pkgname n);
+      let data = composite n in
+      List.iter
+	(fun (component,commiters) ->
+	  add (sprintf "\t%s %s\n%!" (Component.infostring component) (langinfo (extract_langs component)));
+	  List.iter
+	    (fun (k,commits,loc_opt) ->
+	      let loc =
+		match loc_opt with
+		  | None -> 0
+		  | Some loc -> loc in
+	      add (sprintf "\t\t- %s (commits %d) (line-of-code %d)\n%!" (html_quoting k) commits loc))
+	    commiters)
+	data)
+    depends;
+  Buffer.output_buffer stdout b
+

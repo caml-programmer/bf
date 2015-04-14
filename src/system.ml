@@ -400,3 +400,26 @@ let make_directory_r ?(mode=0o755) s =
     else
       make (s::rest) dir
   in make [] (path_strip_directory s)
+
+let readdir dir =
+  let dh = Unix.opendir dir in
+  let n = ref [] in
+  try
+    while true do
+      let s = Unix.readdir dh in
+      if s <> "." && s <> ".." then
+	n := s::!n
+    done; []
+  with End_of_file ->
+    Unix.closedir dh;
+    List.rev !n
+
+let rec scandir f resource =
+  if is_directory resource then
+    begin f resource;
+      List.iter (scandir f)
+	(List.map
+	  (Filename.concat resource) (readdir resource))
+    end
+  else f resource
+
