@@ -41,7 +41,7 @@ let engine_of_platform = function
   | Rhel4     -> Rpm_build
   | Rhel5     -> Rpm_build
   | Rhel6     -> Rpm_build
-  | Rhel7     -> "rhel7"
+  | Rhel7     -> Rpm_build
   | Cent4     -> Rpm_build
   | Cent5     -> Rpm_build
   | Cent6     -> Rpm_build
