@@ -15,6 +15,7 @@ type platform =
   | Rhel4
   | Rhel5
   | Rhel6
+  | Rhel7
   | Cent4
   | Cent5
   | Cent6
@@ -40,6 +41,7 @@ let engine_of_platform = function
   | Rhel4     -> Rpm_build
   | Rhel5     -> Rpm_build
   | Rhel6     -> Rpm_build
+  | Rhel7     -> "rhel7"
   | Cent4     -> Rpm_build
   | Cent5     -> Rpm_build
   | Cent6     -> Rpm_build
@@ -59,6 +61,7 @@ let string_of_platform = function
   | Rhel4     -> "rhel4"
   | Rhel5     -> "rhel5"
   | Rhel6     -> "rhel6"
+  | Rhel7     -> "rhel7"
   | Cent4     -> "cent4"
   | Cent5     -> "cent5"
   | Cent6     -> "cent6"
@@ -78,6 +81,7 @@ let platform_of_string = function
   | "rhel4" -> Rhel4
   | "rhel5" -> Rhel5
   | "rhel6" -> Rhel6
+  | "rhel7" -> Rhel7
   | "cent4" -> Cent4
   | "cent5" -> Cent5
   | "cent6" -> Cent6
