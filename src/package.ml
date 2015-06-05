@@ -82,7 +82,7 @@ let update ~specdir
 	  | None -> succ (Pkgsearch.revision ~interactive pkgname ver')
       in (ver',rev'))
   in
-  let () = log_message (sprintf "[Debug] version is %s revision is %d" version revision); in
+  let () = log_message (sprintf "[Debug] version is %s revision is %d" version revision) in
 
   let have_fs_changes =
     if check_fs then
@@ -93,7 +93,7 @@ let update ~specdir
 	not (List.exists (Pcre.pmatch ~rex) (System.list_of_directory "."))
       end
     else false in
-  let () = log_message (sprintf "[Debug] have_fs_changes is %b" have_fs_changes); in
+  let () = log_message (sprintf "[Debug] have_fs_changes is %b" have_fs_changes) in
 
   let tag =
     (pkgname,version,revision) in
