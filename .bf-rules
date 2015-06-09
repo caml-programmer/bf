@@ -1,5 +1,5 @@
 (define (build args)
-        (log-command "./configure")
+        (log-command "./configure" (path-concat dest-dir top-dir))
 	(make))
 (define (install args)
-       (log-command "sudo" "make" "install"))
+       (log-command "make" "install"))
