@@ -353,6 +353,11 @@ let scm_git_push_cycle url depth =
     ~refspec:None
     (Scheme.string_of_sval url)
     (Scheme.make_int depth);
+  Git.git_push_cycle
+    ~tags:false
+    ~refspec:None
+    (Scheme.string_of_sval url)
+    (Scheme.make_int depth);
   Snull
 
 let scm_git_push_tag_cycle url tag depth =
