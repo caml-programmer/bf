@@ -2,7 +2,11 @@ open Printf
 
 (* global variables *)
 
-let path_list = ["/bin";"/sbin";"/usr/bin";"/usr/sbin"];;
+let path_from_env =
+  Str.split (Str.regexp ":") (Sys.getenv "PATH")
+    
+let path_list =
+  ["/bin";"/sbin";"/usr/bin";"/usr/sbin"] @ path_from_env
 
 (* new *)
 
