@@ -187,6 +187,8 @@ let rec download_packages userhost l =
       Commands.send_file_over_ssh src ".") l
 
 let by_pkgfile userhost pkg_path mode =
+  Params.update_param "clone-mode" "true";
+
   let overwrite = mode <> "default" in
   let depends =
     tree_of_package ~userhost pkg_path in
@@ -308,6 +310,8 @@ let tree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
     tree)
 
 let make ?(vr=None) ~recursive ~overwrite specdir =
+  Params.update_param "clone-mode" "true";
+
   let specdir = System.path_strip_directory specdir in
 
   Check.specdir specdir;

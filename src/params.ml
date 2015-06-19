@@ -116,7 +116,9 @@ let reread_params () =
   set_param ~default:"bf.lock" "lock-file";
   set_param ~default:"true" "use-external"; (* components in external packages *)
   set_param ~default:"false" "single-pack-fetch"; (* for upgrade action *)
-  set_param ~default:"graphs" "graph-home"; (* for *graph actions *)
+  set_param ~default:"graphs" "graph-home"; (* for *graph actions *)  
+
+  set_param ~default:"false" "clone-mode"; (* for hooks *)
 
   read_params ()
 
