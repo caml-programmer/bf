@@ -118,11 +118,13 @@ let build_native ?(snapshot=false) component =
       Params.update_param "install-dir" (Params.make_install_dir ());
       Rules.build_rules ~snapshot component.rules;
       log_message (component.name ^ " built");
+      let t1 = Unix.gettimeofday () in
       let ch = open_out (with_rules ".bf-build" component) in
       output_string ch (string_of_float (Unix.gettimeofday ()));
       output_string ch "\n";
+      output_string ch (string_of_float (t1 -. t0));
+      output_string ch "\n";
       close_out ch;
-      let t1 = Unix.gettimeofday () in
       log_message (sprintf "build %s finished (%f seconds)" (with_rules component.name component) (t1 -. t0));
     end
 
@@ -184,6 +186,8 @@ let install ?(snapshot=false) component =
 		  log_message ("install " ^ component.name ^ (sprintf " finished (%f seconds)" (t1 -. t0)));
 		  let ch = open_out (with_rules ".bf-install" component) in
 		  output_string ch (string_of_float (Unix.gettimeofday ()));
+		  output_string ch "\n";
+		  output_string ch (string_of_float (t1 -. t0));
 		  output_string ch "\n";
 		  close_out ch;
 		  result := true;
