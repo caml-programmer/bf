@@ -104,7 +104,7 @@ let reread_params () =
   set_param ~default:"bf message" "smtp-subject";
   set_param ~default:"bf" "smtp-from-name";
   set_param ~default:"bf@notify" "smtp-from-mail";
-  set_param ~default:"bf@notify" "smtp-notify-email"; (* used by changelog action *)
+  set_param ~default:"" "smtp-notify-email"; (* used by changelog action *)
   set_param ~default:"true" "autopkg";
   set_param ~default:"microball.lpr.jet.msk.su" "pkg-storage";
   set_param ~default:"jet-vas" "pkg-branch";

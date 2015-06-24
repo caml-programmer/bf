@@ -164,7 +164,8 @@ let update ~specdir
     (match prev_tag with
       | Some old ->
 	  (try
-	    Components.changelog components (Tag.mk old) (Tag.mk tag)
+	    if Params.get_param "smtp-notify-email" <> "" then
+	      Components.changelog components (Tag.mk old) (Tag.mk tag)
 	  with exn ->
 	    log_message (Printexc.to_string exn))
       | None -> ());
