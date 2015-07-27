@@ -7,7 +7,6 @@ open Types
 let env = Ocs_top.make_env ();;
 let thread = Ocs_top.make_thread ();;
 
-
 let output_scheme_value ch v =
   let port = Ocs_port.output_port ch in
   Ocs_print.print port false v;
@@ -243,7 +242,7 @@ let string_handler_of_sval v =
 	      th_depth = Array.length disp }
 	  in	  
 	  Ocs_eval.eval th handler
-	    (Capply1 ((Cval (Sproc (p,disp))),Cval (Sstring file)));	  	  
+	    (Capply1 ((Cval (Sproc (p,disp))),Cval (Sstring file)));
 	  (match !res with
 	    | None -> error v
 	    | Some sval -> ())

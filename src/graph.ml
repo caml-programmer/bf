@@ -114,7 +114,7 @@ let basegraph specdir mode =
 	sprintf "%s%s" ver (match rev_opt with Some rev -> sprintf "-%d" rev  | None -> "")
     | None -> "any"
   in
-  
+
   List.iter
     (fun n ->
       out (sprintf "\"%s\" 
@@ -258,51 +258,61 @@ let loc_count () =
       (sprintf "git ls-files | grep -i -v -E '(%s)$' | xargs -n1 git blame -e -w | perl -ne '/^.*?\\((.*?)\\s+[\\d]{4}/; print $1,\"\\n\"' | sort -f | uniq -c" code_exts))
 
 let commiters component =
-  let table = Hashtbl.create 32 in
-
-  let search () =
-    let ignored = ref false in
-    let loctable =      
-      match component.Types.name with
-	| "boost" | "icu" | "samba" | "squid" | "apache" | "ant" | "maven" -> 
-	    ignored := true;
-	    []
-	| _ -> 
-	    if use_loc then
-	      loc_count ()
+  let view_commiters =
+    try
+      ignore(Sys.getenv "NO_COMMITERS");
+      false
+    with Not_found -> true
+  in
+  if view_commiters then
+    begin
+      let table = Hashtbl.create 32 in
+      
+      let search () =
+	let ignored = ref false in
+	let loctable =      
+	  match component.Types.name with
+	    | "boost" | "icu" | "samba" | "squid" | "apache" | "ant" | "maven" -> 
+		ignored := true;
+		[]
+	    | _ -> 
+		if use_loc then
+		  loc_count ()
 	    else []
-    in
-    let search_loc commiter =
-      try
+	in
+	let search_loc commiter =
+	  try
 	Some (List.assoc commiter loctable)
-      with Not_found -> 
+	  with Not_found -> 
 	if !ignored then
 	  None 
 	else Some 0 in
-    
-    let commiters =
-      List.fold_left 
-	(fun acc commiter ->
-	  match extract_email commiter with
+	
+	let commiters =
+	  List.fold_left 
+	    (fun acc commiter ->
+	      match extract_email commiter with
 	    | Some email -> email::acc
 	    | None -> acc)
-	[] (System.read_lines
-	  ~filter:(Strings.substring_exists "Author: ")
-	  "git log") in
-
-    List.iter
-      (fun commiter' ->
-	let commiter = resolve_synonyms commiter' in
-	if Hashtbl.mem table commiter then
-	  let (cur,loc) = Hashtbl.find table commiter in
-	  Hashtbl.replace table commiter ((succ cur), loc)
-	else
-	  Hashtbl.add table commiter (1, (search_loc commiter')))
-      commiters
-  in
-  ignore(Component.with_component_dir
-    ~strict:false component search);
-  list_of_table table
+	    [] (System.read_lines
+	      ~filter:(Strings.substring_exists "Author: ")
+	      "git log") in
+	
+	List.iter
+	  (fun commiter' ->
+	    let commiter = resolve_synonyms commiter' in
+	    if Hashtbl.mem table commiter then
+	      let (cur,loc) = Hashtbl.find table commiter in
+	      Hashtbl.replace table commiter ((succ cur), loc)
+	    else
+	      Hashtbl.add table commiter (1, (search_loc commiter')))
+	  commiters
+      in
+      ignore(Component.with_component_dir
+	~strict:false component search);
+      list_of_table table
+    end
+  else []
 
 let composite specdir =
   List.map

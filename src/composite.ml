@@ -2,16 +2,58 @@ open Ocs_types
 open Printf
 open Logger
 
-let load file =
-  let composite = ref None in
-  Env.prepare ();
-  Scheme.eval_file file;
-  Scheme.eval_code (fun v -> composite := Some v) "(composite)";
-  match !composite with
-    | None -> log_error "composite handler is not called"
-    | Some v -> 
-	(Scheme.map Scheme.component_of_sval v)
+exception Load_error of string
 
+let std_load file =
+  try
+    let composite = ref None in
+    Env.prepare ();
+    Scheme.eval_file file;
+    Scheme.eval_code (fun v -> composite := Some v) "(composite)";
+    match !composite with
+      | None -> log_error "composite handler is not called"
+      | Some v ->
+	  (Scheme.map Scheme.component_of_sval v)
+  with exn ->
+    raise (Load_error (sprintf "%s: %s\n%!" file (Printexc.to_string exn)))
+
+let short_load file =
+  let ch = open_in file in
+  let port =
+    Ocs_port.input_port ch in
+  let rec load acc =
+      match Ocs_read.read_from_port port with
+	| Seof -> 
+	    Ocs_port.close port;
+	    List.map Scheme.component_of_sval (List.rev acc)
+	| value ->
+	    load (value::acc)
+  in
+  try
+    load []
+  with exn ->
+    raise (Load_error (sprintf "%s: %s\n%!" file (Printexc.to_string exn)))
+
+let load ?(short_composite=false) file =
+  if short_composite then
+    short_load file
+  else
+    begin
+      let loc = Filename.dirname file in
+      let ver = Filename.concat loc "version" in
+      let ch = open_in ver in
+      let res =
+	match input_line ch with
+	  | "3.0" ->
+	      printf "SHORTLOAD\n%!";
+	      short_load file
+	  | _ ->
+	      printf "STDLOAD\n%!";
+	      std_load file in
+      close_in ch;
+      res
+    end
+      
 let write file components =
   let ch = open_out file in
   let out = output_string ch in
@@ -53,7 +95,7 @@ let write file components =
   out "))\n";
   close_out ch
 
-let components ?(replace_composite=None) composite =
+let components ?(short_composite=false) ?(replace_composite=None) composite =
   let replace =
     match replace_composite with
       | None -> []
@@ -71,8 +113,7 @@ let components ?(replace_composite=None) composite =
 		r.Types.name (Types.string_of_label r.Types.label) (Types.string_of_rules r.Types.rules);
 	      r
 	  | [] -> c)
-    (load composite)
-
+    (load ~short_composite composite)
 
 let prepare ?tag composite =
   log_message ("=> prepare-composite " ^ composite);

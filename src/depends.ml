@@ -8,6 +8,8 @@ type os = string
 type depend = os * Spectype.platform_depend list
 type depends = depend list
 
+exception Load_error of string
+
 let load ?snapshot ?(interactive=false) ?(ignore_last=false) file : platform_depend list =
   let packdir = Filename.dirname (Filename.dirname (Filename.dirname file)) in
   let acc = ref ([] : platform_depend list) in
@@ -142,11 +144,14 @@ let load ?snapshot ?(interactive=false) ?(ignore_last=false) file : platform_dep
   in
   if Sys.file_exists file then
     begin
-      Scheme.parse
-	["depends",(Scheme.iter add_os)]
-	(Ocs_read.read_from_port
-	  (Ocs_port.open_input_port file));
-      !acc
+      try
+	Scheme.parse
+	  ["depends",(Scheme.iter add_os)]
+	  (Ocs_read.read_from_port
+	    (Ocs_port.open_input_port file));
+	!acc
+      with exn ->
+	raise (Load_error (sprintf "%s: %s\n" file (Printexc.to_string exn)))
     end
   else []
 

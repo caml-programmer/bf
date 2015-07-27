@@ -49,7 +49,7 @@ let reg_pkg_release specdir ver rev =
 
 (* Read release *)
    
-exception Not_found of (string * exn)
+exception Not_found of string
 
 let vr_compare a b =
   let r = compare (fst b) (fst a) in
@@ -58,28 +58,42 @@ let vr_compare a b =
   else r
 
 let max_vr l =
-  List.hd (List.sort vr_compare l)
-     
+  try
+    Some (List.hd (List.sort vr_compare l))
+  with _ -> None
+
 let get ?(next=false) ?version specdir =
   let with_next n = if next then succ n else n in
   let make s =
     let (ver,rev) =
       let pos = String.index s ' ' in
       String.sub s 0 pos,
-      (with_next
+      with_next
 	(int_of_string
-	  (String.sub s (succ pos) (String.length s - pos - 1))))
+	  (String.sub s (succ pos) (String.length s - pos - 1)))
     in (ver,rev) in
   let filter (v,r) =
     match version with
       | Some v' -> v' = v
       | None -> true in
   let file = Filename.concat specdir "release" in
-  (try
-    if Sys.file_exists file then
-      let ch = open_in file in
-      max_vr (List.filter filter
-	(List.map make (System.list_of_channel ch)))
-    else raise Exit
-  with exn -> 
-    raise (Not_found (specdir,exn)))
+  if Sys.file_exists file then
+    let ch = open_in file in
+    let versions =
+      List.map make
+	(System.list_of_channel ch) in
+    match max_vr (List.filter filter versions) with
+      | Some vr -> vr
+      | None ->
+	  (match version with
+	    | Some v' ->
+		raise (Not_found (sprintf "%s -> no revision for version %s" file v'))
+	    | None ->
+		raise (Not_found (sprintf "%s -> no revisions" file)))
+  else
+    raise (Not_found (sprintf "release file (%s) not found" file))
+
+
+
+
+

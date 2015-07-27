@@ -135,12 +135,16 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 	      in build_over_rpmbuild ~snapshot
 		   (pkgname,platform,version,release,spec,files,findreq,hooks)
 	  | _-> assert false)
-    | "2.0" ->
+    | "2.0" 
+    | "3.0" as specver ->
 	let spec =
 	  match ready_spec with
 	    | Some s -> s
 	    | None ->
-		Specload.v2 ~snapshot ~version ~revision:release abs_specdir in
+		if specver = "3.0" then
+		  Specload.v3 ~snapshot ~version ~revision:release abs_specdir
+		else
+		  Specload.v2 ~snapshot ~version ~revision:release abs_specdir in
 	let bf_table = Hashtbl.create 32 in
 	let reg k =
 	  if Hashtbl.mem bf_table k then "" 

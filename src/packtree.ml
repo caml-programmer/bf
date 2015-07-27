@@ -15,7 +15,7 @@ let create ~default_branch specdir : pack_tree =
     log_message (sprintf "%s resolve %s" (String.make depth ' ') specdir) in
   let ignore depth pkg =
     log_message (sprintf "%s ignore %s" (String.make depth ' ') pkg) in
-  let rec make depth value =
+  let rec make depth value =    
     let specdir = fst value in
     if Hashtbl.mem table specdir then
       begin

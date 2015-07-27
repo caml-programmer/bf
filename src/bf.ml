@@ -382,6 +382,7 @@ let main () =
 		Pack.diff Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	    else usage ()
 	| "changelog" ->
+	    Params.disable_display_logs ();
 	    if len = 5 || len = 6 then
 	      if Filename.basename Sys.argv.(2) = "composite" then
 		Composite.changelog ~interactive:true
@@ -468,15 +469,21 @@ let print_current_state () =
   param "log-level";
   Printf.printf "**********************************\n%!"
    
+let string_of_exn = function
+  | Unix.Unix_error (error,name,param) ->
+      let msg = Unix.error_message error in
+      Printf.sprintf "Unix.Unix_error(%s,%s,%s)\n" msg name param
+  | exn ->
+      Printexc.to_string exn
+
 let _ =
   try main () with
     | exn ->
+	let bt = Printexc.get_raw_backtrace () in
 	print_current_state ();
-	(match exn with
-	  | Logger.Error -> exit 2
-	  | Unix.Unix_error (error,name,param) ->
-	      let msg = Unix.error_message error in
-	      Printf.printf "Fatal error: exception Unix.Unix_error(%s,%s,%s)\n" msg name param;
-	      exit 2
-	  | exn -> raise exn)
-	  
+	Printf.printf "Exception: %s (main thread)\nBacktrace:\n%s\n%!"
+	  (string_of_exn exn) (Printexc.raw_backtrace_to_string bt);
+	exit 2
+
+
+

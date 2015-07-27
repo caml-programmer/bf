@@ -64,24 +64,26 @@ let get_param s =
   try
     Hashtbl.find user_params s
   with Not_found -> raise (Unknown_parameter s)
-;;
 
 let update_param name value =
   Ocs_env.set_glob Scheme.env
     (Ssymbol name) (Sstring value);
   Hashtbl.replace user_params name value
-;;
 
 let set_composite_mode () =
   update_param "composite-mode" "true"
-;;
+
+let disable_display_logs () =
+  update_param "log-level" "low"
+
+let enable_display_logs () =
+  update_param "log-level" "high"
 
 let used_composite_mode () =
   match get_param "composite-mode" with
     | "false" -> false
     | "true"  -> true
     | _       -> assert false
-;;
 
 let reread_params () =
   Hashtbl.clear user_params;
@@ -119,6 +121,8 @@ let reread_params () =
   set_param ~default:"graphs" "graph-home"; (* for *graph actions *)  
 
   set_param ~default:"false" "clone-mode"; (* for hooks *)
+  set_param ~default:"pack" "pack";
+  set_param ~default:"link-mode" "hard"; (* or "soft" for external relinking *)
 
   read_params ()
 

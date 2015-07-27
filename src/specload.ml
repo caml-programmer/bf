@@ -16,7 +16,7 @@ let v1 specdir =
     List.map (Filename.concat specdir) flist
   else raise Invalid_specdir_format
 
-let v2 ?(snapshot=false) ~version ~revision specdir =
+let v2 ?(snapshot=false) ?(short_composite=false) ~version ~revision specdir =
   let f = Filename.concat specdir in
   let pkgname = 
     Filename.basename (Filename.dirname specdir) in
@@ -60,7 +60,7 @@ let v2 ?(snapshot=false) ~version ~revision specdir =
     else []
   in
   let components =
-    Composite.components (f "composite") in
+    Composite.components ~short_composite (f "composite") in
   let pre_install =
     load (f "pre-install") in
   let pre_update =
@@ -101,3 +101,6 @@ let v2 ?(snapshot=false) ~version ~revision specdir =
     params = params;
     hooks = hooks;
   }
+
+let v3 ?(snapshot=false) ~version ~revision specdir =
+  v2 ~short_composite:true ~snapshot ~version ~revision specdir
