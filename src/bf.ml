@@ -375,6 +375,7 @@ let main () =
 	      Composite.review Sys.argv.(2) Sys.argv.(3)
 	    else usage ()
 	| "diff" ->
+	    Params.disable_display_logs ();
 	    if len = 5 then
 	      if Filename.basename Sys.argv.(2) = "composite" then
 		Composite.diff Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)

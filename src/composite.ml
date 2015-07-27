@@ -45,10 +45,10 @@ let load ?(short_composite=false) file =
       let res =
 	match input_line ch with
 	  | "3.0" ->
-	      printf "SHORTLOAD\n%!";
+	      (* printf "SHORTLOAD\n%!"; *)
 	      short_load file
 	  | _ ->
-	      printf "STDLOAD\n%!";
+	      (* printf "STDLOAD\n%!"; *)
 	      std_load file in
       close_in ch;
       res

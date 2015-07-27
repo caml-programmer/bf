@@ -121,6 +121,8 @@ let log_command ?(low=false) ?env ?error_handler prog args =
 	  match env with 
 	      Some e -> e 
 	    | None -> Env.component () in
+	let low =
+	  Params.get_param "display-command-logs" = "false" in
 	let log_fd =
 	  if low then
 	    Unix.descr_of_out_channel logger.port

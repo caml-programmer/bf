@@ -138,7 +138,6 @@ let fork_type specdir dst =
       |  _ -> assert false
       
 let check_components =
-  print_endline "check components...";
   List.iter
     (fun c ->
       let component_location =

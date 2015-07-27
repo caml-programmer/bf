@@ -74,9 +74,11 @@ let set_composite_mode () =
   update_param "composite-mode" "true"
 
 let disable_display_logs () =
+  update_param "display-command-logs" "false";
   update_param "log-level" "low"
 
 let enable_display_logs () =
+  update_param "display-command-logs" "true";
   update_param "log-level" "high"
 
 let used_composite_mode () =
@@ -123,6 +125,7 @@ let reread_params () =
   set_param ~default:"false" "clone-mode"; (* for hooks *)
   set_param ~default:"pack" "pack";
   set_param ~default:"link-mode" "hard"; (* or "soft" for external relinking *)
+  set_param ~default:"true" "display-command-logs";
 
   read_params ()
 
