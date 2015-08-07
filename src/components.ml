@@ -129,29 +129,39 @@ let make_review since components =
     (Params.get_param "smtp-notify-email")
 
 let make_changelog ?(interactive=false) ?(compact=false) ?(branch=None) tag_a tag_b components =
-  let chunks = ref [] in
-  let add s = chunks:=s::!chunks in
-  non_empty_iter
-    (fun component -> 
-      List.iter add (Component.changelog ~branch ~diff:false tag_a tag_b component)) components;
-  if not compact then
+  let first_rev =
+    match Tag.parse tag_a with
+      | Some (_,_,0) -> true
+      | _ -> false in
+  if not first_rev then   
     begin
-      add "\n------------------ DIFF -------------------\n";
-      non_empty_iter
-	(fun component ->
-	  List.iter add (Component.changelog ~branch ~diff:true tag_a tag_b component))
-	components;
-    end;
-  if interactive then
-    begin
-      printf "bf@changelog %s -> %s\n" tag_a tag_b;
-      List.iter print_endline (List.rev !chunks)
+      try
+	let chunks = ref [] in
+	let add s = chunks:=s::!chunks in
+	non_empty_iter
+	  (fun component -> 
+	    List.iter add (Component.changelog ~branch ~diff:false tag_a tag_b component)) components;
+	if not compact then
+	  begin
+	    add "\n------------------ DIFF -------------------\n";
+	    non_empty_iter
+	      (fun component ->
+		List.iter add (Component.changelog ~branch ~diff:true tag_a tag_b component))
+	      components;
+	  end;
+	if interactive then
+	  begin
+	    printf "bf@changelog %s -> %s\n" tag_a tag_b;
+	    List.iter print_endline (List.rev !chunks)
+	  end
+	else
+	  Notify.send_message
+	    ~subject:(Printf.sprintf "bf@changelog %s -> %s" tag_a tag_b)
+	    ~contents:(List.rev !chunks)
+	    (Params.get_param "smtp-notify-email")
+      with exn ->
+	log_message (sprintf "=> changelog-failed by %s\n" (Printexc.to_string exn))
     end
-  else
-    Notify.send_message
-      ~subject:(Printf.sprintf "bf@changelog %s -> %s" tag_a tag_b)
-      ~contents:(List.rev !chunks)
-      (Params.get_param "smtp-notify-email")
 
 let changelog components tag_a tag_b =
   log_message ("=> changelog-components " ^ tag_a ^ ":" ^ tag_b);

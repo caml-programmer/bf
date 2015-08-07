@@ -19,3 +19,15 @@ let of_specdir specdir =
       (Printexc.to_string exn));
     None
 
+let parse tag =
+  try
+    let len = String.length tag in
+    let pos = String.index tag '/' in
+    let pkgname = String.sub tag 0 pos in
+    let vr = String.sub tag (succ pos) (len - pos - 1) in
+    let vrl = String.length vr in
+    let pos2 = String.rindex vr '-' in
+    Some (pkgname,
+    (String.sub vr 0 pos2),
+    (int_of_string (String.sub vr (succ pos2) (vrl - pos2 - 1))))
+  with Not_found -> None

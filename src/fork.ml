@@ -181,6 +181,8 @@ let check_destination_branch packdir dst =
       raise (Destination_branch_already_used branch_path))
   (System.list_of_directory packdir) 
 
+exception Not_found_specdir_in_deplist of string
+
 let make ?(interactive=true) ?(depth=0) top_specdir dst =
   let dir = Filename.dirname in
   let packdir = dir (dir top_specdir) in
@@ -286,7 +288,12 @@ let make ?(interactive=true) ?(depth=0) top_specdir dst =
     let change pkgname ov_opt =
       let specdir =
 	sprintf "%s/%s/%s" pack_dir pkgname src in
-      let local_depth = List.assoc specdir deplist in
+      let local_depth = 
+	try
+	  List.assoc specdir deplist 
+	with Not_found ->
+	  raise (Not_found_specdir_in_deplist specdir)
+      in
       match ov_opt with
 	| None -> None
 	| Some (op,ver) ->
