@@ -4,14 +4,15 @@ open Deptree
 open Printf
 open Types
 
+let vr_of_rev s =
+  try
+    let pos = String.index s '-' in
+    let len = String.length s in
+    String.sub s 0 pos,
+    int_of_string (String.sub s (succ pos) (len - pos - 1))
+  with _ -> raise (Invalid_argument s)
+    
 let diff ?(changelog=false) specdir rev_a rev_b =
-  let vr_of_rev s =
-    try
-      let pos = String.index s '-' in
-      let len = String.length s in
-      String.sub s 0 pos,
-      int_of_string (String.sub s (succ pos) (len - pos - 1))
-    with _ -> raise (Invalid_argument s) in  
   let tree_a = Clone.tree_of_specdir ~log:false ~vr:(Some (vr_of_rev rev_a)) specdir in
   let tree_b = Clone.tree_of_specdir ~log:false ~vr:(Some (vr_of_rev rev_b)) specdir in
   Check.pack_component ();
@@ -55,4 +56,13 @@ let diff ?(changelog=false) specdir rev_a rev_b =
     depends_a
 
 let changelog specdir rev_a rev_b =
-  diff ~changelog:true specdir rev_a rev_b
+  let first_rev =
+    snd (vr_of_rev rev_a) = 0 in
+  if not first_rev then
+    begin
+      try
+	diff ~changelog:true specdir rev_a rev_b
+      with exn ->
+	Logger.log_message (sprintf "=> changelog-failed by %s\n" (Printexc.to_string exn))
+    end
+
