@@ -34,25 +34,31 @@ let short_load file =
   with exn ->
     raise (Load_error (sprintf "%s: %s\n%!" file (Printexc.to_string exn)))
 
+let ignore_pack c =
+  c.Types.name <> "pack"
+
 let load ?(short_composite=false) file =
-  if short_composite then
-    short_load file
-  else
-    begin
-      let loc = Filename.dirname file in
-      let ver = Filename.concat loc "version" in
-      let ch = open_in ver in
-      let res =
-	match input_line ch with
-	  | "3.0" ->
-	      (* printf "SHORTLOAD\n%!"; *)
+  let components =
+    if short_composite then
+      short_load file
+    else
+      begin
+	let loc = Filename.dirname file in
+	let ver = Filename.concat loc "version" in
+	let ch = open_in ver in
+	let res =
+	  match input_line ch with
+	    | "3.0" ->
+		(* printf "SHORTLOAD\n%!"; *)
 	      short_load file
-	  | _ ->
-	      (* printf "STDLOAD\n%!"; *)
-	      std_load file in
-      close_in ch;
-      res
-    end
+	    | _ ->
+		(* printf "STDLOAD\n%!"; *)
+		std_load file in
+	close_in ch;
+	res
+      end in
+  List.filter
+    ignore_pack components
       
 let write file components =
   let ch = open_out file in

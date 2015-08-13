@@ -39,6 +39,13 @@ let build (specdir,ver,rev,spec) =
 
 exception Revision_must_be_digital of string
 
+let with_pack components =
+  let pack =
+    Component.make
+      ~label:(Branch "master")
+      ~nopack:true (Params.get_param "pack") in
+  pack::components
+
 let update ~specdir
   ?(check_pack=true)
   ?(check_fs=false)
@@ -135,16 +142,16 @@ let update ~specdir
     if have_external_components_changes then
       List.iter force_rebuild (Components.only_local components);
     
-    if not (Components.tag_ready ~tag:(Tag.mk tag) components) then
+    if not (Components.tag_ready ~tag:(Tag.mk tag) (with_pack components)) then
       begin
 	List.iter add_reinstall (Components.install components);
-	Components.make_tag (Tag.mk tag) (Components.only_local components)
+	Components.make_tag (Tag.mk tag) (Components.only_local (with_pack components))
       end;
     
     List.iter add_reinstall
-      (Components.install (Components.with_tag (Some (Tag.mk tag))
-	(* выкидываем pack-компонент, чтобы не было ненужных checkout'ов в pack'e *)
-	(List.filter (fun c -> c.name <> "pack") components)));
+      (Components.install
+	(Components.with_tag (Some (Tag.mk tag))
+	  components));
     
     (try
       Pkgbuild.build_package_file (specdir,version,string_of_int revision);
