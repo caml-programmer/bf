@@ -240,7 +240,7 @@ let update ?(snapshot=false) component =
 	  | None, _ -> ())
   in 
   if component.name <> "pack" then
-    let () = log_message (sprintf "[Debug] changes in component %s: local_changes(%b), remote_changes(%b), status_changes(%b)" component.name local_changes !remote_changes status_changes) in
+    let () = log_message (sprintf "changes in component %s: local-changes(%b), remote-changes(%b), status-changes(%b)" component.name local_changes !remote_changes status_changes) in
     local_changes || !remote_changes || status_changes
   else false
 
