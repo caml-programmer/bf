@@ -10,14 +10,16 @@ let specdir specdir =
       Filename.basename
 	(Filename.dirname 
 	  (Filename.dirname specdir)) in
-    if p <> "pack" && p <> "pack.git" then
+    let name =
+      Params.get_param "pack" in
+    if p <> name && p <> name ^ ".git" then
       raise (Bad_specdir specdir)
   with _ ->
     raise (Bad_specdir specdir)
 
 let pack_component () =
   let component = 
-    Component.make ~label:(Branch "master") "pack" in
+    Component.make ~label:(Branch "master") (Params.get_param "pack") in
   ignore(Component.update_pack component);
   ignore
     (System.with_dir component.name
