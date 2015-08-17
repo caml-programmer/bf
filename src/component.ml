@@ -239,9 +239,11 @@ let update ?(snapshot=false) component =
 	      git_checkout ~force:true ~key:start_key ()
 	  | None, _ -> ())
   in 
-  if component.name <> "pack" then
-    let () = log_message (sprintf "changes in component %s: local-changes(%b), remote-changes(%b), status-changes(%b)" component.name local_changes !remote_changes status_changes) in
-    local_changes || !remote_changes || status_changes
+  if component.name <> Params.get_param "pack" then
+    begin
+      log_message (sprintf "changes in component %s: local-changes(%b), remote-changes(%b), status-changes(%b)" component.name local_changes !remote_changes status_changes);
+      local_changes || !remote_changes || status_changes
+    end
   else false
 
 let reinstall component =
@@ -359,7 +361,7 @@ let changelog ?(branch=None) ?(diff=false) ?(since=None) tag_a tag_b component =
       Git.git_fetch ~tags:true ();
 
       let pack =
-	if component.name = "pack" then
+	if component.name = Params.get_param "pack" then
 	  match branch with
 	    | None ->
 		Some (Filename.dirname tag_a)
@@ -375,3 +377,30 @@ let changelog ?(branch=None) ?(diff=false) ?(since=None) tag_a tag_b component =
 	  (string_of_label_type component.label)
 	  (string_of_label component.label))::logs));
   !chunks
+
+let extract_tasks s =
+  (* TO-DO *)
+  []
+
+let changelog_tasks ?(branch=None) ?(diff=false) ?(since=None) tag_a tag_b component =
+  let tasks = ref [] in
+  ignore (with_component_dir ~low:true ~strict:false component
+    (fun () ->
+      
+      Git.git_fetch ~tags:true ();
+
+      let pack =
+	if component.name = Params.get_param "pack" then
+	  match branch with
+	    | None ->
+		Some (Filename.dirname tag_a)
+	    | Some b ->
+		Some (Filename.concat (Filename.dirname tag_a) b)
+	else
+	  None
+      in
+      let logs = git_log ~pack ~diff ~since tag_a tag_b in
+      if List.length logs > 0 && String.length (List.nth logs 0) > 2 then
+	tasks := extract_tasks logs));
+  !tasks
+

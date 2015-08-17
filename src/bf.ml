@@ -380,7 +380,7 @@ let main () =
 	      if Filename.basename Sys.argv.(2) = "composite" then
 		Composite.diff Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	      else
-		Pack.diff Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
+		Changelog.diff Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	    else usage ()
 	| "changelog" ->
 	    Params.disable_display_logs ();
@@ -389,7 +389,7 @@ let main () =
 		Composite.changelog ~interactive:true
 		  ~compact:(len=6) Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	      else
-		Pack.changelog Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
+		Changelog.make Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	    else usage ()
 	| "link" ->
 	    if len = 3 then
@@ -414,7 +414,8 @@ let main () =
 	    with_teleport Goto_bf_rules
 	      (fun () ->
 		Params.update_param "log-level" "high";
-		Params.update_param "plugins-dir" "../pack";
+		Params.update_param "display-command-logs" "true";
+		Params.update_param "plugins-dir" (Printf.sprintf "../%s" (Params.get_param "pack"));
 		Params.update_param "orig-top-dir" (Params.get_param "top-dir");
 		Params.update_param "install-dir" (Params.make_install_dir ());
 		match len with

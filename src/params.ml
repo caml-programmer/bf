@@ -6,23 +6,6 @@ exception Unknown_parameter of string
 
 let user_params = Hashtbl.create 32;;
 
-let read_from_file filename =
-  let rex = Re_perl.compile_pat "^([^\\s]+)\\s+(.*)\\s*$" in
-  let ch = open_in filename in
-  List.iter
-    (fun s ->
-      try
-	let res = Re.exec rex s in
-	let key = Re.get res 1 in
-	let value = Re.get res 2 in
-	Hashtbl.replace user_params key value;
-	Ocs_env.set_glob Scheme.env
-	  (Ssymbol key) (Sstring value)
-      with Not_found ->
-	Printf.printf "ignore: %s\n%!" s)
-    (list_of_channel ch);
-  user_params
-
 let up_search ~default name =
   let rec search dir =
     let f = Filename.concat dir name in
@@ -35,6 +18,23 @@ let up_search ~default name =
 	search (Filename.dirname dir)
   in search (Sys.getcwd ())
 
+let read_from_file filename =
+  let rex = Re_perl.compile_pat "^([^\\s]+)\\s+(.*)\\s*$" in
+  let ch = open_in filename in
+  List.iter
+    (fun s ->
+      try
+	let res = Re.exec rex s in
+	let key = Re.get res 1 in
+	let value = Re.get res 2 in	
+	Hashtbl.replace user_params key value;
+	Ocs_env.set_glob Scheme.env
+	  (Ssymbol key) (Sstring value)
+      with Not_found ->
+	Printf.printf "ignore: %s\n%!" s)
+    (list_of_channel ch);
+  user_params
+
 let read_params () =
   let default =
     let def = "/etc/bf-params" in
@@ -43,7 +43,7 @@ let read_params () =
     else
       None in
   match up_search ~default ".bf-params" with
-    | None ->  Hashtbl.create 32
+    | None -> Hashtbl.create 32
     | Some filename ->
 	Printf.printf "loading %s\n%!" filename;
 	read_from_file filename
@@ -126,6 +126,11 @@ let reread_params () =
   set_param ~default:"pack" "pack";
   set_param ~default:"link-mode" "hard"; (* or "soft" for external relinking *)
   set_param ~default:"true" "display-command-logs";
+
+  set_param ~default:"jira.solar.local" "jira-host";
+  set_param ~default:"8080" "jira-port"; (* http *)
+  set_param ~default:"jiraboot" "jira-user";
+  set_param ~default:"ahng6Ije" "jira-pass";
 
   read_params ()
 

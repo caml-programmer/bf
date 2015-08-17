@@ -42,7 +42,7 @@ let diff ?(changelog=false) specdir rev_a rev_b =
 	    if tag_a <> tag_b then
 	      List.iter (List.iter (printf "%s\n%!"))
 		(List.map (Component.changelog tag_a tag_b)
-		  (List.filter (fun c -> c.name <> "pack" && c.pkg = None && (not c.nopack))
+		  (List.filter (fun c -> c.name <> (Params.get_param "pack") && c.pkg = None && (not c.nopack))
 		    (Composite.components composite)))
 	  end
       with Not_found ->
@@ -55,14 +55,58 @@ let diff ?(changelog=false) specdir rev_a rev_b =
 	printf "- %s %s %d\n%!" pkgname_a ver_a rev_a)
     depends_a
 
-let changelog specdir rev_a rev_b =
+let non_first_build (rev_a,rev_b) call =
   let first_rev =
     snd (vr_of_rev rev_a) = 0 in
   if not first_rev then
-    begin
+    call ()
+
+let make specdir rev_a rev_b =
+  non_first_build (rev_a,rev_b)
+    (fun () ->
       try
 	diff ~changelog:true specdir rev_a rev_b
       with exn ->
-	Logger.log_message (sprintf "=> changelog-failed by %s\n" (Printexc.to_string exn))
-    end
+	Logger.log_message (sprintf "=> changelog-failed by %s\n" (Printexc.to_string exn)))
 
+(* Fix build support *)
+
+type pkg = string * version * revision
+type task_id = string
+type fixmap =
+    (pkg * task_id list) list
+
+let make_fix_map specdir rev_a rev_b =
+  let fixmap = ref [] in
+  non_first_build (rev_a,rev_b)
+    (fun () ->
+      try
+	let tree_a = Clone.tree_of_specdir ~log:false ~vr:(Some (vr_of_rev rev_a)) specdir in
+	let tree_b = Clone.tree_of_specdir ~log:false ~vr:(Some (vr_of_rev rev_b)) specdir in
+	let depends_a = List.map (fun (p,v,r,s) -> p,(v,r)) (list_of_deptree tree_a) in
+	let depends_b = List.map (fun (p,v,r,s) -> p,(v,r)) (list_of_deptree tree_b) in
+	List.iter
+	  (fun (pkgname_b,(ver_b,rev_b)) ->
+	    (try
+	      let (ver_a,rev_a) =
+		List.assoc pkgname_b depends_a in
+	      let pkgname = Specdir.pkgname pkgname_b in
+	      let tag_a = sprintf "%s/%s-%d" pkgname ver_a rev_a in
+	      let tag_b = sprintf "%s/%s-%d" pkgname ver_b rev_b in
+	      if tag_a <> tag_b then
+		begin
+		  let composite =
+		    Filename.concat pkgname_b "composite" in
+		  let tasks = 
+		    List.flatten
+		      (List.map 
+			(Component.changelog_tasks tag_a tag_b)
+			(List.filter (fun c -> c.name <> (Params.get_param "pack") && c.pkg = None && (not c.nopack))
+			  (Composite.components composite))) in
+		  fixmap := (((pkgname,ver_b,rev_b), tasks)::!fixmap)		    
+		end
+	    with Not_found -> ()))
+	  depends_b
+      with exn ->
+	Logger.log_message (sprintf "=> make-fix-map by %s\n" (Printexc.to_string exn)));
+  !fixmap

@@ -347,6 +347,14 @@ let scm_env_append v =
 	Snull
     | _ -> Snull
 
+let scm_jira_fix_issue v =
+  match Scheme.string_list_of_sval_array v with
+    | issue::pkg::ver::rev::[] ->
+	let rev = int_of_string rev in
+	Jira.fix_issue issue (pkg,ver,rev);
+	Strue
+    | _ -> Sfalse
+
 let scm_git_push_cycle url depth =
   let _ = Git.git_push_cycle
     ~tags:true
@@ -427,3 +435,5 @@ Ocs_env.set_pfn Scheme.env scm_env_append "env-append";;
 
 Ocs_env.set_pf2 Scheme.env scm_git_push_cycle "git-push-cycle";;
 Ocs_env.set_pf3 Scheme.env scm_git_push_tag_cycle "git-push-tag-cycle";;
+
+Ocs_env.set_pfn Scheme.env scm_jira_fix_issue "jira-fix-issue";;

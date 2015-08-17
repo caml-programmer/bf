@@ -1,2 +1,2 @@
-<*.ml> : package(unix)
-<bf.native> : package(unix,num,str)
+<*.ml> : package(unix,yojson)
+<bf.native> : package(unix,num,str,yojson)
