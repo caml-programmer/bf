@@ -197,27 +197,35 @@ let update ~specdir
 	(sprintf "pkg update (%s/%s): lazy-mode(%b), composite-changes(%b), pack-changes(%b), fs-changes(%b) -> first-build(%s)"
 	  pkgname branch lazy_mode have_composite_changes have_pack_changes have_fs_changes (Tag.mk tag));
       let result = build tag in
+      log_message (sprintf "DEBUG: %s is-top: %b" pkgname top);
       if top then
 	begin
 	  (* Fixbuild support *)
 	  (match prev_tag with
-	    | None -> ()
+	    | None ->
+		log_message "DEBUG: no prev-tag -> ignore fixbuild";
 	    | Some (prev_pkgname, prev_ver, prev_rev) ->
+		log_message "DEBUG: check jira-host";
 		if Params.get_param "jira-host" <> "" then
 		  (try
+		    log_message "DEBUG: jira-host ready";
 		    let (pkgname, ver, rev) = tag in
 		    let rev_a = sprintf "%s-%d" ver rev in
 		    let rev_b = sprintf "%s-%d" ver rev in
 		    List.iter
 		      (fun ((pkg,ver,rev),tasks) ->
+			if tasks = [] then
+			  log_message (sprintf "DEBUG: no tasks found for %s/%s-%d" pkg ver rev);
 			List.iter
-			(fun task_id ->
-			  printf "Fix jira-issue %s, set build -> %s-%s-%d\n%!" task_id pkg ver rev;
-			  Jira.fix_issue task_id (pkg,ver,rev))
-			tasks)
+			  (fun task_id ->
+			    printf "Fix jira-issue %s, set build -> %s-%s-%d\n%!" task_id pkg ver rev;
+			    Jira.fix_issue task_id (pkg,ver,rev))
+			  tasks)
 		      (Fixmap.make specdir rev_a rev_b)
 		  with exn ->
-		    Logger.log_message (sprintf "Fix build error: %s\n%!" (Printexc.to_string exn))))
+		    Logger.log_message (sprintf "Fix build error: %s\n%!" (Printexc.to_string exn)))
+		else
+		  log_message "DEBUG: jira-host empty -> ignore fixbuild")
 	end;
       result
     end;
