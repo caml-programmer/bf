@@ -51,6 +51,7 @@ let update ~specdir
   ?(check_fs=false)
   ?(lazy_mode=false)
   ?(interactive=false)
+  ?(top=false)
   ?(ver=None) ?(rev=None) () =
   let specdir = System.path_strip_directory specdir in
   Check.specdir specdir;
@@ -195,5 +196,30 @@ let update ~specdir
       log_message 
 	(sprintf "pkg update (%s/%s): lazy-mode(%b), composite-changes(%b), pack-changes(%b), fs-changes(%b) -> first-build(%s)"
 	  pkgname branch lazy_mode have_composite_changes have_pack_changes have_fs_changes (Tag.mk tag));
-      build tag
-    end
+      let result = build tag in
+      if top then
+	begin
+	  (* Fixbuild support *)
+	  (match prev_tag with
+	    | None -> ()
+	    | Some (prev_pkgname, prev_ver, prev_rev) ->
+		if Params.get_param "jira-host" <> "" then
+		  (try
+		    let (pkgname, ver, rev) = tag in
+		    let rev_a = sprintf "%s-%d" ver rev in
+		    let rev_b = sprintf "%s-%d" ver rev in
+		    List.iter
+		      (fun ((pkg,ver,rev),tasks) ->
+			List.iter
+			(fun task_id ->
+			  printf "Fix jira-issue %s, set build -> %s-%s-%d\n%!" task_id pkg ver rev;
+			  Jira.fix_issue task_id (pkg,ver,rev))
+			tasks)
+		      (Fixmap.make specdir rev_a rev_b)
+		  with exn ->
+		    Logger.log_message (sprintf "Fix build error: %s\n%!" (Printexc.to_string exn))))
+	end;
+      result
+    end;
+
+

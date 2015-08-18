@@ -10,6 +10,7 @@ type upgrade_mode =
 
 let make specdir upgrade_mode default_branch =
   let specdir = System.path_strip_directory specdir in
+  let pkgname = Specdir.pkgname specdir in
 
   Check.specdir specdir;
   Check.pack_component ();
@@ -69,6 +70,7 @@ let make specdir upgrade_mode default_branch =
 	  Package.update
 	    ~specdir
 	    ~lazy_mode
+	    ~top:(Specdir.pkgname specdir = pkgname)
 	    ~check_pack:false
 	    ~check_fs:check_fs_packages
 	    ~interactive:true ()
@@ -80,7 +82,7 @@ let make specdir upgrade_mode default_branch =
       depends
   in
   
-  match upgrade_mode with
+  (match upgrade_mode with
     | Full ->
 	List.iter
 	  (fun specdir ->
@@ -94,5 +96,5 @@ let make specdir upgrade_mode default_branch =
     | Complete ->
 	complete_impl false;
     | Default ->
-	complete_impl true
-
+	complete_impl true)
+  

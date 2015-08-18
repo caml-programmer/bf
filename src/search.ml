@@ -248,7 +248,7 @@ let commit_id commit_id =
 			if Hashtbl.mem pack_tag_list key then
 			  (try
 			    let tree =
-			      Clone.tree_of_specdir ~log:false ~vr:(Some (v',r')) ~packdir specdir in
+			      Clonetree.tree_of_specdir ~log:false ~vr:(Some (v',r')) ~packdir specdir in
 			    if
 			      List.exists 
 				(fun (p',v',r',_) ->

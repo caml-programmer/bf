@@ -48,7 +48,7 @@ let monograph ?ver ?rev specdir =
       | _ -> None
   in
 
-  let tree = Clone.tree_of_specdir ~vr specdir in
+  let tree = Clonetree.tree_of_specdir ~vr specdir in
   let depends =  
     list_of_deptree tree in
   

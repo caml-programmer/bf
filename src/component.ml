@@ -379,8 +379,16 @@ let changelog ?(branch=None) ?(diff=false) ?(since=None) tag_a tag_b component =
   !chunks
 
 let extract_tasks s =
-  (* TO-DO *)
-  []
+  let comma = Str.regexp "," in
+  let rex =
+    Re_perl.compile_pat "[^A-Z]*([A-Z]+-\\d+)[^0-9]*" in
+  List.fold_left
+    (fun acc s ->
+      let a = Re.get_all (Re.exec rex s) in
+      if Array.length a > 1 then
+	a.(1)::acc
+      else acc)
+    [] (Str.split comma s)
 
 let changelog_tasks ?(branch=None) ?(diff=false) ?(since=None) tag_a tag_b component =
   let tasks = ref [] in
@@ -401,6 +409,11 @@ let changelog_tasks ?(branch=None) ?(diff=false) ?(since=None) tag_a tag_b compo
       in
       let logs = git_log ~pack ~diff ~since tag_a tag_b in
       if List.length logs > 0 && String.length (List.nth logs 0) > 2 then
-	tasks := extract_tasks logs));
+	begin
+	  List.iter 
+	    (fun log ->
+	      tasks := (extract_tasks log) @ !tasks)
+	    logs	    
+	end));
   !tasks
 
