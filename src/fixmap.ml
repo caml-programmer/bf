@@ -48,5 +48,5 @@ let make specdir rev_a rev_b =
 	    with Not_found -> ()))
 	  depends_b
       with exn ->
-	Logger.log_message (sprintf "=> make-fix-map by %s\n" (Printexc.to_string exn)));
+	Logger.log_message (sprintf "=> make-fix-map by %s, (current-dir %s)\n" (Printexc.to_string exn) (Sys.getcwd ())));
   !fixmap

@@ -197,7 +197,6 @@ let update ~specdir
 	(sprintf "pkg update (%s/%s): lazy-mode(%b), composite-changes(%b), pack-changes(%b), fs-changes(%b) -> first-build(%s)"
 	  pkgname branch lazy_mode have_composite_changes have_pack_changes have_fs_changes (Tag.mk tag));
       let result = build tag in
-      log_message (sprintf "DEBUG: %s is-top: %b" pkgname top);
       if top then
 	begin
 	  (* Fixbuild support *)
