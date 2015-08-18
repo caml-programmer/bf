@@ -210,7 +210,7 @@ let update ~specdir
 		  (try
 		    log_message "DEBUG: jira-host ready";
 		    let (pkgname, ver, rev) = tag in
-		    let rev_a = sprintf "%s-%d" ver rev in
+		    let rev_a = sprintf "%s-%d" prev_ver prev_rev in
 		    let rev_b = sprintf "%s-%d" ver rev in
 		    List.iter
 		      (fun ((pkg,ver,rev),tasks) ->
