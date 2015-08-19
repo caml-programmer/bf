@@ -217,14 +217,14 @@ let update ~specdir
 			  log_message (sprintf "[fixbuild]: no tasks found for %s/%s-%d" pkg' ver' rev');
 			List.iter
 			  (fun task_id ->
-			    log_message (sprintf "[fixbuild]: fix %s, set build -> %s-%s-%d\n%!" task_id pkg' ver' rev');
+			    log_message (sprintf "[fixbuild]: fix %s, set build -> %s-%s-%d" task_id pkg' ver' rev');
 			    Jira.fix_issue task_id (pkg',ver',rev');
-			    log_message (sprintf "[fixbuild]: fix %s, set build -> %s-%s-%d\n%!" task_id pkgname ver rev);
+			    log_message (sprintf "[fixbuild]: fix %s, set build -> %s-%s-%d" task_id pkgname ver rev);
 			    Jira.fix_issue task_id (pkgname,ver,rev))
 			  tasks)
 		      (Fixmap.make specdir rev_a rev_b)
 		  with exn ->
-		    Logger.log_message (sprintf "[fixbuild]: error: %s\n%!" (Printexc.to_string exn)))
+		    log_message (sprintf "[fixbuild]: error: %s" (Printexc.to_string exn)))
 		else
 		  log_message "[fixbuild]: jira-host empty -> ignore fixbuild")
 	end;
