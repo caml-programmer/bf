@@ -200,7 +200,11 @@ let update ~specdir
       if top then
 	begin
 	  (* Fixbuild support *)
-	  Sys.chdir (Params.get_param "start-dir");
+	  let start_dir =
+	    Params.get_param "start-dir" in
+	  
+	  log_message (sprintf "DEBUG: chdir %s before fixbuild" start_dir);
+	  Sys.chdir start_dir;
 
 	  (match prev_tag with
 	    | None ->
