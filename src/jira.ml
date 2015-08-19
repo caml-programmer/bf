@@ -43,6 +43,7 @@ let mkput key data =
     key jira_host (String.length data) basic data
 
 let http query =
+  Logger.log_message (sprintf "Connect to %s:%d user=%s pass=%s" jira_host jira_port jira_user jira_pass);
   let io =
     Unix.open_connection
       (Unix.ADDR_INET
