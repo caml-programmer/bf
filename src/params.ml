@@ -129,7 +129,7 @@ let reread_params () =
 
   set_param ~default:"" "jira-host";
   set_param ~default:"8080" "jira-port"; (* http *)
-  set_param ~default:"jiraboot" "jira-user";
+  set_param ~default:"jirabot" "jira-user";
   set_param ~default:"ahng6Ije" "jira-pass";
 
   read_params ()

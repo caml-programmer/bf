@@ -115,4 +115,4 @@ let fix_issue key (pkg,ver,rev) =
       (`Assoc ["fields", `Assoc [jira_field, updated_fix_builds]]) in
   update_issue key body
 
-(*let _ = fix_issue "SKVT-7213" ("PKG","1.0",2)*)
+(*let _ = fix_issue "SKVT-7213" ("PKG","1.0",3)*)
