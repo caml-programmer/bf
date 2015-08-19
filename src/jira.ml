@@ -61,6 +61,7 @@ let http query =
   in
   let (code,header,body) =
     Http.call_request log io query in
+  Unix.shutdown_connection (fst io);
   let code = int_of_string code in
   if code < 200 || code >= 300 then
     raise (Bad_response_status (sprintf "%d, %s" code body))
