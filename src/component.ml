@@ -41,9 +41,13 @@ let with_component_dir ?(low=false) ?(strict=true) component (thunk : unit -> un
   let with_dir f =
     Sys.chdir component.name;
     let with_changes = f () in
-    thunk ();
-    Sys.chdir curdir;
-    with_changes
+    try
+      thunk ();
+      Sys.chdir curdir;
+      with_changes
+    with exn ->
+      Sys.chdir curdir;
+      raise exn
   in
 
   let label_type =
