@@ -200,37 +200,31 @@ let update ~specdir
       if top then
 	begin
 	  (* Fixbuild support *)
-	  let start_dir =
-	    Params.get_param "start-dir" in
-	  
-	  log_message (sprintf "DEBUG: chdir %s before fixbuild" start_dir);
-	  Sys.chdir start_dir;
-
 	  (match prev_tag with
 	    | None ->
-		log_message "DEBUG: no prev-tag -> ignore fixbuild";
+		log_message "[fixbuild]: no prev-tag -> ignore fixbuild";
 	    | Some (prev_pkgname, prev_ver, prev_rev) ->
-		log_message "DEBUG: check jira-host";
+		log_message "[fixbuild]: check jira-host";
 		if Params.get_param "jira-host" <> "" then
 		  (try
-		    log_message "DEBUG: jira-host ready";
+		    log_message (sprintf "[fixbuild]: jira-host=%s ready" (Params.get_param "jira-host"));
 		    let (pkgname, ver, rev) = tag in
 		    let rev_a = sprintf "%s-%d" prev_ver prev_rev in
 		    let rev_b = sprintf "%s-%d" ver rev in
 		    List.iter
 		      (fun ((pkg,ver,rev),tasks) ->
 			if tasks = [] then
-			  log_message (sprintf "DEBUG: no tasks found for %s/%s-%d" pkg ver rev);
+			  log_message (sprintf "[fixbuild]: no tasks found for %s/%s-%d" pkg ver rev);
 			List.iter
 			  (fun task_id ->
-			    printf "Fix jira-issue %s, set build -> %s-%s-%d\n%!" task_id pkg ver rev;
+			    printf "[fixbuild]: fix %s, set build -> %s-%s-%d\n%!" task_id pkg ver rev;
 			    Jira.fix_issue task_id (pkg,ver,rev))
 			  tasks)
 		      (Fixmap.make specdir rev_a rev_b)
 		  with exn ->
-		    Logger.log_message (sprintf "Fix build error: %s\n%!" (Printexc.to_string exn)))
+		    Logger.log_message (sprintf "[fixbuild]: error: %s\n%!" (Printexc.to_string exn)))
 		else
-		  log_message "DEBUG: jira-host empty -> ignore fixbuild")
+		  log_message "[fixbuild]: jira-host empty -> ignore fixbuild")
 	end;
       result
     end;
