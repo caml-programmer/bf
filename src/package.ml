@@ -200,6 +200,8 @@ let update ~specdir
       if top then
 	begin
 	  (* Fixbuild support *)
+	  Sys.chdir (Params.get_param "start-dir");
+
 	  (match prev_tag with
 	    | None ->
 		log_message "DEBUG: no prev-tag -> ignore fixbuild";
