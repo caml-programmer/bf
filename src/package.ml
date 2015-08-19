@@ -212,13 +212,15 @@ let update ~specdir
 		    let rev_a = sprintf "%s-%d" prev_ver prev_rev in
 		    let rev_b = sprintf "%s-%d" ver rev in
 		    List.iter
-		      (fun ((pkg,ver,rev),tasks) ->
+		      (fun ((pkg',ver',rev'),tasks) ->
 			if tasks = [] then
-			  log_message (sprintf "[fixbuild]: no tasks found for %s/%s-%d" pkg ver rev);
+			  log_message (sprintf "[fixbuild]: no tasks found for %s/%s-%d" pkg' ver' rev');
 			List.iter
 			  (fun task_id ->
-			    printf "[fixbuild]: fix %s, set build -> %s-%s-%d\n%!" task_id pkg ver rev;
-			    Jira.fix_issue task_id (pkg,ver,rev))
+			    printf "[fixbuild]: fix %s, set build -> %s-%s-%d\n%!" task_id pkg' ver' rev';
+			    Jira.fix_issue task_id (pkg',ver',rev');
+			    printf "[fixbuild]: fix %s, set build -> %s-%s-%d\n%!" task_id pkgname ver rev;
+			    Jira.fix_issue task_id (pkgname,ver,rev))
 			  tasks)
 		      (Fixmap.make specdir rev_a rev_b)
 		  with exn ->
