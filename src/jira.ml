@@ -19,6 +19,12 @@ exception Bad_response_status of string
 exception Bad_json_path of string
 exception Bad_json_value of J.json
 
+let debug =
+  try
+    ignore(Sys.getenv "DEBUG");
+    true
+  with Not_found -> false
+
 let jira_field = "customfield_10802"
 let jira_host = Params.get_param "jira-host"
 let jira_port =
@@ -43,13 +49,13 @@ let mkput key data =
     key jira_host (String.length data) basic data
 
 let http query =
-  Logger.log_message (sprintf "Connect to %s:%d user=%s pass=%s" jira_host jira_port jira_user jira_pass);
+  Logger.log_message (sprintf "[jira]: connect to %s:%d user=%s pass=%s" jira_host jira_port jira_user jira_pass);
   let io =
     Unix.open_connection
       (Unix.ADDR_INET
 	((Unix.gethostbyname jira_host).Unix.h_addr_list.(0),jira_port)) in
   let log =
-    if Params.get_param "log-level" = "high" then
+    if Params.get_param "log-level" = "high" || debug then
       print_string
     else (fun _ -> ())
   in
@@ -78,7 +84,8 @@ let rec extract value path =
 	  | `Assoc l ->
 	      let value =
 		List.assoc key l in
-	      printf "extract: %s -> %s\n%!" key (J.to_string value);
+	      if debug then
+		printf "[jira]: extract: %s -> %s\n%!" key (J.to_string value);
 	      (match value with
 		| `Null -> `Null
 		| _ -> extract value tl)

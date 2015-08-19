@@ -68,7 +68,7 @@ let read_chunked i =
   (try
     while true do
       let size = chunksize (nocarry (input_line i)) in
-      Printf.printf "chunk length: (%d)\n%!" size;
+      (*Printf.printf "chunk length: (%d)\n%!" size;*)
       if size = 0 then
 	raise Exit;
       for k=0 to pred size do
