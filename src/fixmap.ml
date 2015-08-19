@@ -21,17 +21,13 @@ let make specdir rev_a rev_b =
   non_first_build (rev_a,rev_b)
     (fun () ->
       try
-	printf "DEBUG: fixmap-make1: cwd=%s\n%!" (Sys.getcwd ());
 	let tree_a = Clonetree.tree_of_specdir ~log:false ~vr:(Some (vr_of_rev rev_a)) specdir in
-	printf "DEBUG: fixmap-make2: cwd=%s\n%!" (Sys.getcwd ());
 	let tree_b = Clonetree.tree_of_specdir ~log:false ~vr:(Some (vr_of_rev rev_b)) specdir in
-	printf "DEBUG: fixmap-make3: cwd=%s\n%!" (Sys.getcwd ());
 	let depends_a = List.map (fun (p,v,r,s) -> p,(v,r)) (list_of_deptree tree_a) in
 	let depends_b = List.map (fun (p,v,r,s) -> p,(v,r)) (list_of_deptree tree_b) in
 	List.iter
 	  (fun (pkgname_b,(ver_b,rev_b)) ->
 	    (try
-	      printf "DEBUG: fixmap-make4: cwd=%s\n%!" (Sys.getcwd ());
 	      let (ver_a,rev_a) =
 		List.assoc pkgname_b depends_a in
 	      let pkgname = Specdir.pkgname pkgname_b in
@@ -49,7 +45,6 @@ let make specdir rev_a rev_b =
 			  (Composite.components composite))) in
 		  fixmap := (((pkgname,ver_b,rev_b), tasks)::!fixmap)
 		end;
-	      printf "DEBUG: fixmap-make5: cwd=%s\n%!" (Sys.getcwd ());
 	    with Not_found -> ()))
 	  depends_b
       with exn ->
