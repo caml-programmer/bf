@@ -3,6 +3,14 @@
 let system_environment = Hashtbl.create 32;;
 let component_environment = Hashtbl.create 32;;
 
+let search_bf_env () =
+  if Sys.file_exists ".bf-env" then
+    Some (Filename.concat (Sys.getcwd ()) ".bf-env")
+  else
+    if Sys.file_exists "../.bf-env" then
+      Some (Filename.concat (Filename.dirname (Sys.getcwd ())) ".bf-env")
+    else None
+
 let init_system_environment () =
   Hashtbl.clear system_environment;
   Array.iter
@@ -11,7 +19,15 @@ let init_system_environment () =
 	let (key,value) = System.split_env_var s in
 	Hashtbl.add system_environment key value
       with Not_found -> ()))
-    (Unix.environment ())
+    (Unix.environment ());
+  (match search_bf_env () with
+    | None -> ()
+    | Some file ->
+	List.iter
+	  (fun s ->
+	    let (key,value) = System.split_env_var s in
+	    Hashtbl.add system_environment key value)
+	  (System.read_lines file))  
 
 let build_component_environment () =
   Hashtbl.iter
