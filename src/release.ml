@@ -94,7 +94,7 @@ let get ?(next=false) ?version specdir =
 		| None ->
 		    raise (Release_not_found (sprintf "%s -> no revisions" file)))
       with 
-	| Not_found as e-> raise e
+	| Release_not_found _ as e -> raise e
 	| e ->
 	    raise
 	      (Bad_release_file 
