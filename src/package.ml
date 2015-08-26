@@ -29,7 +29,7 @@ let build (specdir,ver,rev,spec) =
   ignore
     (Components.install (Components.with_tag (Some (Tag.mk tag))
       (* выкидываем pack-компонент, чтобы не было ненужных checkout'ов в pack'e *)
-      (List.filter (fun c -> c.name <> "pack") components)));
+      (List.filter (fun c -> c.name <> Params.get_param "pack") components)));
   (try
     Pkgbuild.build_package_file ~ready_spec:(Some spec) (specdir,ver,string_of_int rev);
   with

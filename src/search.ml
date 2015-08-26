@@ -142,10 +142,12 @@ exception Bad_pack_state of string
 let search_pack () =
   let parent = Filename.dirname (Sys.getcwd ()) in
   let f = Filename.concat parent in
-  if Sys.file_exists (f "pack.git") then
-    f "pack.git"
-  else if Sys.file_exists (f "pack") then
-    f "pack"
+  let a = Params.get_param "pack" in
+  let b = a ^ ".git" in
+  if Sys.file_exists (f a) then
+    f a
+  else if Sys.file_exists (f b) then
+    f b
   else raise Not_found_pack
 
 let commit_id commit_id =

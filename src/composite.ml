@@ -35,7 +35,7 @@ let short_load file =
     raise (Load_error (sprintf "%s: %s\n%!" file (Printexc.to_string exn)))
 
 let ignore_pack c =
-  c.Types.name <> "pack"
+  c.Types.name <> Params.get_param "pack"
 
 let load ?(short_composite=false) file =
   let components =

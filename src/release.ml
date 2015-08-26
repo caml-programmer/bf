@@ -35,7 +35,7 @@ let update file ver rev =
 
 let reg_pkg_release specdir ver rev =
   let name = "release" in
-  Component.with_component_dir ~strict:true (Component.make ~label:(Branch "master") "pack")
+  Component.with_component_dir ~strict:true (Component.make ~label:(Branch "master") (Params.get_param "pack"))
     (fun () ->
       let file = 
 	sprintf "%s/%s/%s" (Specdir.pkgname specdir) (Specdir.branch specdir) name in

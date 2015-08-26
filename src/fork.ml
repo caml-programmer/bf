@@ -272,7 +272,7 @@ let make ?(interactive=true) ?(depth=0) top_specdir dst =
 	      regjob component_location (make_new_branch ~start:None);
 	      { c with label = Branch dst }
 	  | Branch start ->
-	      if c.name = "pack" then c
+	      if c.name = Params.get_param "pack" then c
 	      else
 		begin
 		  regjob component_location 

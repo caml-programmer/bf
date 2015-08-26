@@ -24,10 +24,11 @@ let last pkgdir =
 	    raise (Bad_release release)
     else b
   in
-
-  if 
-    Filename.basename packdir <> "pack" &&
-    Filename.basename packdir <> "pack.git" 
+  let a = Params.get_param "pack" in
+  let b = a ^ ".git" in
+  if
+    Filename.basename packdir <> a &&
+    Filename.basename packdir <> b
   then
     raise (Bad_pkgdir pkgdir);
 

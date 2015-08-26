@@ -319,7 +319,7 @@ let composite specdir =
     (fun component ->
       component, commiters component)
     (List.filter
-      (fun c -> c.Types.pkg = None && c.Types.name <> "pack")
+      (fun c -> c.Types.pkg = None && c.Types.name <> (Params.get_param "pack"))
       (Composite.load (Filename.concat specdir "composite")))
 
 let html_quoting s =
