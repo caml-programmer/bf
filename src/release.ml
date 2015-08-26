@@ -50,6 +50,7 @@ let reg_pkg_release specdir ver rev =
 (* Read release *)
    
 exception Not_found of string
+exception Bad_release_file of string
 
 let vr_compare a b =
   let r = compare (fst b) (fst a) in
@@ -78,18 +79,28 @@ let get ?(next=false) ?version specdir =
       | None -> true in
   let file = Filename.concat specdir "release" in
   if Sys.file_exists file then
-    let ch = open_in file in
-    let versions =
-      List.map make
-	(System.list_of_channel ch) in
-    match max_vr (List.filter filter versions) with
-      | Some vr -> vr
-      | None ->
-	  (match version with
-	    | Some v' ->
-		raise (Not_found (sprintf "%s -> no revision for version %s" file v'))
-	    | None ->
-		raise (Not_found (sprintf "%s -> no revisions" file)))
+    begin
+      try
+	let ch = open_in file in
+	let versions =
+	  List.map make
+	    (System.list_of_channel ch) in
+	match max_vr (List.filter filter versions) with
+	  | Some vr -> vr
+	  | None ->
+	      (match version with
+		| Some v' ->
+		    raise (Not_found (sprintf "%s -> no revision for version %s" file v'))
+		| None ->
+		    raise (Not_found (sprintf "%s -> no revisions" file)))
+      with 
+	| Not_found _ as e -> raise e
+	| e ->
+	    raise
+	      (Bad_release_file 
+		(sprintf "%s (%s)" file
+		  (Printexc.to_string e)))
+    end
   else
     raise (Not_found (sprintf "release file (%s) not found" file))
 
