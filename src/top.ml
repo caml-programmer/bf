@@ -33,7 +33,7 @@ let tree_of_specdir ?(log=true) specdir : top_tree =
 	  try
 	    Release.get specdir 
 	  with 
-	      Release.Not_found error ->
+	      Release.Release_not_found error ->
 		if log then
 		  log_message (sprintf "%s fake-version %s by %s"
 		    (String.make depth ' ') specdir (sprintf "release not found by %s" error));

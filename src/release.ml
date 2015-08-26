@@ -49,7 +49,7 @@ let reg_pkg_release specdir ver rev =
 
 (* Read release *)
    
-exception Not_found of string
+exception Release_not_found of string
 exception Bad_release_file of string
 
 let vr_compare a b =
@@ -90,11 +90,11 @@ let get ?(next=false) ?version specdir =
 	  | None ->
 	      (match version with
 		| Some v' ->
-		    raise (Not_found (sprintf "%s -> no revision for version %s" file v'))
+		    raise (Release_not_found (sprintf "%s -> no revision for version %s" file v'))
 		| None ->
-		    raise (Not_found (sprintf "%s -> no revisions" file)))
+		    raise (Release_not_found (sprintf "%s -> no revisions" file)))
       with 
-	| Not_found _ as e -> raise e
+	| Not_found as e-> raise e
 	| e ->
 	    raise
 	      (Bad_release_file 
@@ -102,7 +102,7 @@ let get ?(next=false) ?version specdir =
 		  (Printexc.to_string e)))
     end
   else
-    raise (Not_found (sprintf "release file (%s) not found" file))
+    raise (Release_not_found (sprintf "release file (%s) not found" file))
 
 
 

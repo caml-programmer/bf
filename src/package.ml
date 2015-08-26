@@ -77,7 +77,7 @@ let update ~specdir
 	    v, (match rev with Some r -> conv_revision r | None -> log_error (sprintf "cannot update %s: revision does not set" pkgname))
 	| None ->
 	    Release.get ~next:true specdir)
-    with Release.Not_found _ ->
+    with Release.Release_not_found _ ->
       log_message (sprintf "Warning: Try using local pkg archive for search next package (%s %s) release" pkgname branch);
       let ver' =
 	match ver with
