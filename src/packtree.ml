@@ -5,6 +5,8 @@ open Deptree
 type pack_tree =
     (string * (Types.version * Types.revision option) option) deptree
 
+exception No_specdir of string
+
 let create ~default_branch specdir : pack_tree =
   let table = Hashtbl.create 32 in
   let pkgdir =
@@ -49,11 +51,12 @@ let create ~default_branch specdir : pack_tree =
 	  resolve depth specdir;
 	  Dep_val (value, Dep_list
 	    (List.fold_left
-	      (fun acc value -> (try acc @ [make (succ depth) value] with Exit -> acc)) [] depends))
+	      (fun acc value -> (try acc @ [make (succ depth) value] with No_specdir _ -> acc)) [] depends))
 	else
 	  begin
 	    resolve depth specdir;
 	    Dep_val (value, Dep_list [])
 	  end
-      else raise Exit
+      else raise (No_specdir specdir)
   in make 0 (specdir,None)
+
