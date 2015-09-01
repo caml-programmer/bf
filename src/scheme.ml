@@ -105,6 +105,7 @@ let component_of_sval s =
 	let rules = ref None in
 	let label = ref Current in
 	let nopack = ref false in
+	let forkmode = ref Branching in
 	let rec scan = function
 	  | Spair v ->
 	      (match v.car with
@@ -123,6 +124,13 @@ let component_of_sval s =
 			    | None   -> nopack := true;
 			    | Some s ->
 				raise (Nopack_mode_conflict_with_package s))
+		      | Ssymbol "fork"
+		      | Ssymbol "on-fork" ->
+			  forkmode := forkmode_of_string
+			    (match fst x.cdr with
+			      | Ssymbol s -> s
+			      | Sstring s -> s
+			      | x -> error x)
 		      | x -> error x)
 		| Snull -> ()
 		| x -> error x);
@@ -136,6 +144,7 @@ let component_of_sval s =
 	  pkg = !pkg;
 	  rules = !rules;
 	  nopack = !nopack;
+	  forkmode = !forkmode;
 	}
     | x -> error x
  

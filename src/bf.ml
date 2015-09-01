@@ -111,10 +111,18 @@ let analyze_arguments () =
 		  pkg = None; 
 		  rules = make_rules ();
 		  nopack = false;
+		  forkmode = Branching;
 		}
 	  | "tag" ->
 	      Is_component_with_label
-		{ name = Sys.argv.(2); label = (Tag Sys.argv.(4)); pkg = None; rules = make_rules (); nopack = false }
+		{ 
+		  name = Sys.argv.(2); 
+		  label = (Tag Sys.argv.(4)); 
+		  pkg = None; 
+		  rules = make_rules (); 
+		  nopack = false; 
+		  forkmode = Branching
+		}
 	  |  _ ->
 	       Is_components
 		[ 

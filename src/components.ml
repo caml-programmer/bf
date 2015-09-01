@@ -31,6 +31,7 @@ let with_tag tag components =
 	      pkg = component.pkg; 
 	      rules = component.rules;
 	      nopack = component.nopack;
+	      forkmode = component.forkmode;
 	    })
 	  components
 
@@ -50,6 +51,7 @@ let as_current l =
       pkg = c.pkg; 
       rules = c.rules;
       nopack = c.nopack;
+      forkmode = c.forkmode;
     }) l
 
 let tag_ready ~tag components =

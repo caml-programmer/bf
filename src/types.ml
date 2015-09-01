@@ -1,4 +1,11 @@
+exception Bad_forkmode of string
+
 type label = Tag of string | Branch of string | Current
+
+type forkmode =
+  | Tagging
+  | Branching
+  | Inherit
 
 type component = {
   name  : string;
@@ -6,7 +13,14 @@ type component = {
   pkg : string option;
   rules : string option;
   nopack: bool;
+  forkmode : forkmode;
 }
+
+let forkmode_of_string = function
+  | "do-branch" | "branch" | "branching" -> Branching
+  | "fixtag" | "tag" | "tagging"         -> Tagging
+  | "inherit"                            -> Inherit
+  | x -> raise (Bad_forkmode x)
 
 let string_of_label = function
   | Tag s -> s
