@@ -377,8 +377,7 @@ let changelog ?(branch=None) ?(diff=false) ?(since=None) tag_a tag_b component =
       let logs = git_log ~pack ~diff ~since tag_a tag_b in
       if List.length logs > 0 && String.length (List.nth logs 0) > 2
       then
-	begin
-	
+	begin	
 	  let chunk = 
 	    Printf.sprintf "\n %s (%s) (%s)\n"
 	      (String.uppercase component.name)
