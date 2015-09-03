@@ -1,0 +1,13 @@
+# bf project structure
+
+S src
+S smtp
+S regexp
+S plugins
+S ocs
+
+B _build/src
+B _build/smtp
+B _build/regexp
+B _build/plugins
+B _build/ocs
