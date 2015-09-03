@@ -7,6 +7,9 @@ all: build test
 build:
 	./compile
 
+environment:
+	opam install yojson
+
 install:
 	install -m 755 -d $(PREFIX) $(PREFIX)/bin
 	install -m 755 _build/src/bf.native $(PREFIX)/bin/bf
