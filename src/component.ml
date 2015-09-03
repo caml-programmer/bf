@@ -9,8 +9,8 @@ let with_rules s c =
 	s ^ "." ^ alt
     | None -> s
 
-let make ?(label=Current) ?(pkg=None) ?(rules=None) ?(nopack=false) s =
-  { name = s; label = label; pkg = pkg; rules = rules; nopack = nopack }
+let make ?(label=Current) ?(pkg=None) ?(rules=None) ?(nopack=false) ?(forkmode=Branching) s =
+  { name = s; label = label; pkg = pkg; rules = rules; nopack = nopack; forkmode = forkmode }
 
 let checkout ?(low=false) component =
   match component.label with
@@ -375,11 +375,17 @@ let changelog ?(branch=None) ?(diff=false) ?(since=None) tag_a tag_b component =
 	  None
       in
       let logs = git_log ~pack ~diff ~since tag_a tag_b in
-      if List.length logs > 0 && String.length (List.nth logs 0) > 2 then
-	chunks := (Printf.sprintf "\n %s (%s) (%s)\n"
-	  (String.uppercase component.name)
-	  (string_of_label_type component.label)
-	  (string_of_label component.label))::logs));
+      if List.length logs > 0 && String.length (List.nth logs 0) > 2
+      then
+	begin	
+	  let chunk = 
+	    Printf.sprintf "\n %s (%s) (%s)\n"
+	      (String.uppercase component.name)
+	      (string_of_label_type component.label)
+	      (string_of_label component.label) in
+	  if not (Strings.substring_exists "update dependencies" chunk) then
+	    chunks := chunk::logs;
+	end));
   !chunks
 
 let extract_tasks s =
