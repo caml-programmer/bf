@@ -1,7 +1,7 @@
 (define (build args)
     (log-command "./configure" (path-concat dest-dir top-dir))
   (log-command "make" "environment")
-  (make))
+  (log-command "make"))
 
 (define (install args)
     (log-command "make" "install"))
