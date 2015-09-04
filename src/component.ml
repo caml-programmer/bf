@@ -386,8 +386,8 @@ let changelog ?(branch=None) ?(diff=false) ?(since=None) tag_a tag_b component =
 	  let clearlogs =
 	    List.filter
 	      (fun log -> 
-		(not (Strings.substring_exists "update dependencies" chunk)) &&
-		(not (Strings.substring_exists "[bf] prepare" chunk)))
+		(not (Strings.substring_exists "update dependencies" log)) &&
+		(not (Strings.substring_exists "[bf] prepare" log)))
 	      logs in
 	  chunks := chunk::clearlogs
 	end));
