@@ -15,6 +15,7 @@ environment:
 	opam install ocamlfind -y
 	opam install yojson -y
 	eval `opam config env`
+	echo 'Environment created'
 
 install:
 	install -m 755 -d $(PREFIX) $(PREFIX)/bin
