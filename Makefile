@@ -8,7 +8,9 @@ build:
 	./compile
 
 environment:
-	opam install yojson
+	opam init -n
+	eval `opam config env`
+	opam install yojson -y
 
 install:
 	install -m 755 -d $(PREFIX) $(PREFIX)/bin
