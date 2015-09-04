@@ -378,13 +378,18 @@ let changelog ?(branch=None) ?(diff=false) ?(since=None) tag_a tag_b component =
       if List.length logs > 0 && String.length (List.nth logs 0) > 2
       then
 	begin	
-	  let chunk = 
+	  let chunk =
 	    Printf.sprintf "\n %s (%s) (%s)\n"
 	      (String.uppercase component.name)
 	      (string_of_label_type component.label)
 	      (string_of_label component.label) in
-	  if not (Strings.substring_exists "update dependencies" chunk) then
-	    chunks := chunk::logs;
+	  let clearlogs =
+	    List.filter
+	      (fun log -> 
+		(not (Strings.substring_exists "update dependencies" chunk)) &&
+		(not (Strings.substring_exists "[bf] prepare" chunk)))
+	      logs in
+	  chunks := chunk::clearlogs
 	end));
   !chunks
 
