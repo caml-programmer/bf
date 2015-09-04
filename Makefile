@@ -8,7 +8,7 @@ build:
 	./compile
 
 environment:
-	opam init -n
+	opam init
 	eval `opam config env`
 	opam install ocamlfind -y
 	opam install yojson -y
