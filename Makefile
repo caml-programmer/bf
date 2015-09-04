@@ -10,6 +10,7 @@ build:
 environment:
 	opam init -n
 	eval `opam config env`
+	opam install ocamlfind -y
 	opam install yojson -y
 
 install:
