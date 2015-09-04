@@ -5,7 +5,9 @@ include Makefile.config
 all: build test
 
 build:
+	echo 'Make build started'
 	./compile
+	echo 'Make build finished'
 
 environment:
 	opam init -y
@@ -20,7 +22,9 @@ install:
 	install -m 755 tools/make-autologin $(PREFIX)/bin/make-autologin
 
 test:
+	echo 'make test started'
 	mkdir -p .tests && cd .tests && ../_build/src/bf.native tests
+	echo 'make test finished'
 
 uninstall:
 	rm -f $(PREFIX)/bin/bf
