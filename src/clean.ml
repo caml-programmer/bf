@@ -25,18 +25,18 @@ let packages () =
   List.iter
     (fun (s,x) ->
       let (_,name,_,_,_,_,ver,rev) = x in
-      if Hashtbl.mem t name then
-	Hashtbl.replace t name ((s,ver,rev)::(Hashtbl.find t name))
+      if Hashtbl.mem t (name,ver) then
+	Hashtbl.replace t (name,ver) ((s,ver,rev)::(Hashtbl.find t (name,ver)))
       else
-	Hashtbl.add t name [s,ver,rev])
+	Hashtbl.add t (name,ver) [s,ver,rev])
     pkgs;
   let droplist = ref [] in
   let drop s =
     droplist := s::!droplist in
   Hashtbl.iter
-    (fun name list ->
+    (fun (name,ver) list ->
       let first = ref true in
-      printf "%s: %s\n" name
+      printf "%s [%s]: %s\n" name ver
 	(String.concat " "
 	  (List.map
 	    (fun (s,ver,rev) ->
