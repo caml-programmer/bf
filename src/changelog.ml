@@ -55,16 +55,12 @@ let diff ?(changelog=false) specdir rev_a rev_b =
 	printf "- %s %s %d\n%!" pkgname_a ver_a rev_a)
     depends_a
 
-let non_first_build (rev_a,rev_b) call =
-  let first_rev =
-    snd (vr_of_rev rev_a) = 0 in
-  if not first_rev then
-    call ()
+let non_first_build rev_a rev_b =
+  not (snd (vr_of_rev rev_a) = 0)
 
 let make specdir rev_a rev_b =
-  non_first_build (rev_a,rev_b)
-    (fun () ->
-      try
-	diff ~changelog:true specdir rev_a rev_b
-      with exn ->
-	Logger.log_message (sprintf "=> changelog-failed by %s\n" (Printexc.to_string exn)))
+  if non_first_build rev_a rev_b then
+    try
+      diff ~changelog:true specdir rev_a rev_b
+    with exn ->
+      Logger.log_message (sprintf "=> changelog-failed by %s\n" (Printexc.to_string exn))
