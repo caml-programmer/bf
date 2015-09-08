@@ -399,6 +399,8 @@ let main () =
 	      else
 		Changelog.make Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	    else usage ()
+	| "diff-ng" -> ()
+	| "changelog-ng" -> ChangelogNG.changelog Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	| "link" ->
 	    if len = 3 then
 	      Link.make ~hard:true Sys.argv.(2)
