@@ -1,5 +1,7 @@
 (* Depend tree support *)
 
+(* также здесь описан функционал работы с орграфом *)
+
 exception Tree_error of string
 
 type 'a deptree =
@@ -52,12 +54,15 @@ let has_edges_from g v =
 	  else acc) [] g
     end
   else raise Not_found_vertex
-  
+
+(* возвращает список стоков и изолированных вершин орграфа *)
 let find_finish_vtx g =
   List.map fst (List.filter (fun (k,vl) -> vl = []) g)
-    
+
 exception Cannot_unwind_depends_graph
 
+(* разворачивает орграф в список вершин, от сортированный по
+возрастанию исходящий рёбер от меньшего к большему *)
 let unwind g =
   let acc = ref [] in
   let work = ref g in
@@ -94,9 +99,12 @@ let list_of_deptree ?(add_parent=false) tree =
 	  | None -> ());
 	List.iter (fill_graph (Some x)) l
     | _ -> assert false
-  in fill_graph None tree;
+  in
+  fill_graph None tree;
   let l = unwind !g in
   if add_parent then
+    (* как может корень deptree не содержаться в списке, полученном из unwind? *)
+    (* однако, add_parent добавляет родительский объект в список *)
     (try
       (match tree with
 	| Dep_val (x, _) ->
@@ -104,7 +112,7 @@ let list_of_deptree ?(add_parent=false) tree =
 	      l
 	    else x::l
 	| _ -> raise Not_found)
-    with _ -> l)
+      with _ -> l)
   else l
 
 let rec map_deptree f = function

@@ -35,6 +35,7 @@ let with_tag tag components =
 	    })
 	  components
 
+(* возвращает только те компоненты, которые собираются в рамках данного пакета *)
 let only_local components =
   List.filter
     (fun c -> c.pkg = None) components

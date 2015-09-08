@@ -209,7 +209,7 @@ let tree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
       begin
 	checkout_pack 
 	  (Tag.mk ((Specdir.pkgname specdir), ver, rev));
-	
+
 	if Sys.file_exists specdir then
 	  let spec = 
 	    Specload.v2
@@ -249,12 +249,12 @@ let tree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
 	else raise Exit
       end
   in
-  
+
   let tree =
     try
       make 0 (specdir,ver,rev,true)
     with Exit -> checkout_pack "master";
-      raise (Tree_error (sprintf "not found specdir (%s) for pack state: %s/%s-%d\n%!" specdir (Specdir.pkgname specdir) ver rev));
+		 raise (Tree_error (sprintf "not found specdir (%s) for pack state: %s/%s-%d\n%!" specdir (Specdir.pkgname specdir) ver rev))
   in
 
   checkout_pack "master";

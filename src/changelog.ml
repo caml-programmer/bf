@@ -11,23 +11,23 @@ let vr_of_rev s =
     String.sub s 0 pos,
     int_of_string (String.sub s (succ pos) (len - pos - 1))
   with _ -> raise (Invalid_argument s)
-    
+
 let diff ?(changelog=false) specdir rev_a rev_b =
   let tree_a = Clonetree.tree_of_specdir ~log:false ~vr:(Some (vr_of_rev rev_a)) specdir in
   let tree_b = Clonetree.tree_of_specdir ~log:false ~vr:(Some (vr_of_rev rev_b)) specdir in
   Check.pack_component ();
   let depends_a =
     List.map (fun (p,v,r,s) -> p,(v,r))
-      (list_of_deptree tree_a) in
+      (list_of_deptree ~add_parent:true tree_a) in
   let depends_b =
     List.map (fun (p,v,r,s) -> p,(v,r))
-      (list_of_deptree tree_b) in
+      (list_of_deptree ~add_parent:true tree_b) in
 
   print_endline "\nCHANGELOG:\n";
 
   List.iter
     (fun (pkgname_b,(ver_b,rev_b)) ->
-      (try
+     (try
 	let (ver_a,rev_a) =
 	  List.assoc pkgname_b depends_a in
 	let pkgname = Specdir.pkgname pkgname_b in
