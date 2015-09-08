@@ -120,8 +120,7 @@ let load ?snapshot ?(interactive=false) ?(ignore_last=false) file : platform_dep
     try
       Scheme.map
 	(fun x ->
-	  platform_of_string
-	  (Scheme.make_string x)) v
+	  platform_of_string (Scheme.make_string x)) v
     with Not_found ->
       log_message "Platforms value:";
       Scheme.print v;
