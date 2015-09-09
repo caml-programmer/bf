@@ -8,6 +8,23 @@ type upgrade_mode =
   | Complete
   | Default
 
+let mark_table_file =
+  ".bf-upgrade-marktable"
+
+let create_mark_table () =
+  let table = Hashtbl.create 32 in
+  if Sys.file_exists mark_table_file then
+    begin
+      let ch = open_in mark_table_file in
+      (try
+	while true do
+	  Hashtbl.replace
+	    table (input_line ch) true
+	done
+      with End_of_file -> close_in ch)
+    end;
+  ((open_out mark_table_file), table)
+
 let make specdir upgrade_mode default_branch =
   let specdir = System.path_strip_directory specdir in
   let pkgname = Specdir.pkgname specdir in
@@ -28,7 +45,7 @@ let make specdir upgrade_mode default_branch =
   Interactive.stop_delay 5;
 
   let build_table = Hashtbl.create 32 in
-  let mark_table = Hashtbl.create 32 in
+  let (mark_channel, mark_table) = create_mark_table () in
 
   let find_specdir specdir =
     let rec make acc = function
@@ -51,7 +68,7 @@ let make specdir upgrade_mode default_branch =
   in
 
   let eval_lazy_mode specdir =
-    let dep_paths = 
+    let dep_paths =
       find_specdir specdir in
     if Hashtbl.mem mark_table specdir && not (Hashtbl.mem build_table specdir) then
       (false,dep_paths)
@@ -73,12 +90,15 @@ let make specdir upgrade_mode default_branch =
 	    ~top:(Specdir.pkgname specdir = pkgname)
 	    ~check_pack:false
 	    ~check_fs:check_fs_packages
-	    ~interactive:true ()
-	in
+	    ~interactive:true () in
 	Hashtbl.replace build_table specdir updated;
 	if updated then
 	  List.iter
-	    (fun s -> Hashtbl.replace mark_table s true) dep_paths)
+	    (fun s ->
+	      output_string mark_channel (s ^ "\n");
+	      flush mark_channel;
+	      Hashtbl.replace mark_table s true)
+	    dep_paths)
       depends
   in
   
@@ -96,5 +116,7 @@ let make specdir upgrade_mode default_branch =
     | Complete ->
 	complete_impl false;
     | Default ->
-	complete_impl true)
-  
+	complete_impl true);  
+
+  if Sys.file_exists mark_table_file then
+    Unix.unlink mark_table_file
