@@ -22,6 +22,11 @@ let forkmode_of_string = function
   | "inherit"                            -> Inherit
   | x -> raise (Bad_forkmode x)
 
+let string_of_forkmode = function
+  | Tagging -> "tagging"
+  | Branching -> "branching"
+  | Inherit -> "inherit"
+	       
 let string_of_label = function
   | Tag s -> s
   | Branch s -> s
@@ -52,3 +57,24 @@ type tag_status =
 
 type version = string
 type revision = int
+
+let string_of_string_option = function
+  | Some (x:string) -> x
+  | None -> ""
+
+open String
+open Printf
+	      
+let string_of_component comp = 
+  concat "\n"
+		[
+		  (sprintf "NAME: %s" comp.name);
+		  (sprintf "LABEL: %s %s" (string_of_label_type comp.label)
+			   (string_of_label comp.label));
+		  (sprintf "PKG: %s" (string_of_string_option comp.pkg));
+		  (sprintf "RULES: %s" (string_of_string_option comp.rules));
+		  (sprintf "NOPACK: %B" comp.nopack);
+		  (sprintf "FORKMODE: %s" (string_of_forkmode comp.forkmode));
+		  ""
+		]
+

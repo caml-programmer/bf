@@ -459,7 +459,9 @@ let main () =
 	      Clean.droptags Sys.argv.(2)
 	    else usage ()
 	| "tests" ->
-	    Tests.run ()
+	   Tests.run ()
+	| "test" ->
+	   Changelog_ng.test ()
 	| _ ->
 	    analyze ()
     else usage ()

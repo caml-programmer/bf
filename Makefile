@@ -2,7 +2,7 @@ include Makefile.config
 
 .PHONY: install clean distclean uninstall test
 
-all: build test
+all: build
 
 build:
 	./compile
