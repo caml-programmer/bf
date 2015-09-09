@@ -30,7 +30,7 @@ let extract ~userhost pkg_path =
 	  else acc
 	with Not_found ->
 	  (try
-	    let a = Pcre.extract ~rex:without_rev_require s in	    
+	    let a = Pcre.extract ~rex:without_rev_require s in
 	    let pkg_name = a.(1) in
 	    if Params.home_made_package pkg_name then
 	      begin
@@ -40,7 +40,7 @@ let extract ~userhost pkg_path =
 	      end
 	    else acc
 	  with Not_found ->
-	    (try 
+	    (try
 	      let a = Pcre.extract ~rex:without_ver_require s in
 	      let pkg_name = a.(1) in
 	      if Params.home_made_package pkg_name then
