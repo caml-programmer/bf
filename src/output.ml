@@ -1,16 +1,15 @@
-open Params
-open Printf
-open String
+(* данный модуль реализует функционал, относящийся к формированию
+сообщений, которые подлежат выводу на экран *)
 
 let current_log_level () =
-  (get_param "log-level")
+  (Params.get_param "log-level")
 
 let int_of_log_level loglevel =
   match loglevel with
+  | "always" -> 0
   | "low" -> 1
   | "high" -> 2
-  | "debug" -> 999
-  | "all" -> 999
+  | "debug" | "all" -> 999
   | "never" -> 1000000
   | _ -> failwith "Unknown log-level"
 
@@ -32,7 +31,9 @@ let prefix_textblock prefix string =
 let msg func loglevel msg =
   if log_level_acceptable loglevel then
     print_endline (prefix_textblock (func ^ ": ") msg)
-			
+
+(* строковые предикаты *)
+		  
 let equal_strings s1 s2 =
   0 = String.compare s1 s2
 

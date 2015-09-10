@@ -122,7 +122,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
   in
   (match Specdir.get_version (with_specdir "version") with
     | "1.0" ->
-	(match Specload.v1 abs_specdir with
+	(match Spectype.load_v1 abs_specdir with
 	    [spec;files;findreq] ->
 	      let pkgname = 
 		Filename.basename specdir in
@@ -142,9 +142,9 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 	    | Some s -> s
 	    | None ->
 		if specver = "3.0" then
-		  Specload.v3 ~snapshot ~version ~revision:release abs_specdir
+		  Spectype.load_v3 ~snapshot ~version ~revision:release abs_specdir
 		else
-		  Specload.v2 ~snapshot ~version ~revision:release abs_specdir in
+		  Spectype.load_v2 ~snapshot ~version ~revision:release abs_specdir in
 	let bf_table = Hashtbl.create 32 in
 	let reg k =
 	  if Hashtbl.mem bf_table k then "" 
@@ -663,7 +663,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 	      log_command
 		"mv" [(Filename.concat abs_specdir "debian.deb");pkgfile])
     | version ->
-	raise (Specload.Unsupported_specdir_version version))
+	raise (Spectype.Unsupported_specdir_version version))
 
 let build_package_file ?(snapshot=false) ?(ready_spec=None) args =
   with_platform

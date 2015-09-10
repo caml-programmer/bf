@@ -1,7 +1,7 @@
 exception Bad_forkmode of string
 
 type label = Tag of string | Branch of string | Current
-
+			    
 type forkmode =
   | Tagging
   | Branching
@@ -15,31 +15,6 @@ type component = {
   nopack: bool;
   forkmode : forkmode;
 }
-
-let forkmode_of_string = function
-  | "do-branch" | "branch" | "branching" -> Branching
-  | "fixtag" | "tag" | "tagging"         -> Tagging
-  | "inherit"                            -> Inherit
-  | x -> raise (Bad_forkmode x)
-
-let string_of_forkmode = function
-  | Tagging -> "tagging"
-  | Branching -> "branching"
-  | Inherit -> "inherit"
-	       
-let string_of_label = function
-  | Tag s -> s
-  | Branch s -> s
-  | Current -> ""
-
-let string_of_label_type = function
-  | Tag _    -> "tag"
-  | Branch _ -> "branch"
-  | Current  -> "current"
-
-let string_of_rules = function
-  | None -> ""
-  | Some r -> r
 
 type content_status =
   | Tree_prepared               (* nothing to do *)
@@ -58,23 +33,43 @@ type tag_status =
 type version = string
 type revision = int
 
+let string_of_label = function
+  | Tag s -> s
+  | Branch s -> s
+  | Current -> ""
+
+let forkmode_of_string = function
+  | "do-branch" | "branch" | "branching" -> Branching
+  | "fixtag" | "tag" | "tagging"         -> Tagging
+  | "inherit"                            -> Inherit
+  | x -> raise (Bad_forkmode x)
+
+let string_of_forkmode = function
+  | Tagging -> "tagging"
+  | Branching -> "branching"
+  | Inherit -> "inherit"
+
+let string_of_label_type = function
+  | Tag _    -> "tag"
+  | Branch _ -> "branch"
+  | Current  -> "current"
+
+let string_of_rules = function
+  | None -> ""
+  | Some r -> r
+
 let string_of_string_option = function
   | Some (x:string) -> x
   | None -> ""
 
-open String
-open Printf
-	      
 let string_of_component comp = 
-  concat "\n"
-		[
-		  (sprintf "NAME: %s" comp.name);
-		  (sprintf "LABEL: %s %s" (string_of_label_type comp.label)
-			   (string_of_label comp.label));
-		  (sprintf "PKG: %s" (string_of_string_option comp.pkg));
-		  (sprintf "RULES: %s" (string_of_string_option comp.rules));
-		  (sprintf "NOPACK: %B" comp.nopack);
-		  (sprintf "FORKMODE: %s" (string_of_forkmode comp.forkmode));
-		  ""
-		]
-
+  String.concat "\n"
+    [
+      (Printf.sprintf "NAME: %s" comp.name);
+      (Printf.sprintf "LABEL: %s %s" (string_of_label_type comp.label)
+		      (string_of_label comp.label));
+      (Printf.sprintf "PKG: %s" (string_of_string_option comp.pkg));
+      (Printf.sprintf "RULES: %s" (string_of_string_option comp.rules));
+      (Printf.sprintf "NOPACK: %B" comp.nopack);
+      (Printf.sprintf "FORKMODE: %s" (string_of_forkmode comp.forkmode));
+    ]

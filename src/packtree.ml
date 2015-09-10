@@ -46,7 +46,7 @@ let create ~default_branch specdir : pack_tree =
 	      with exn ->
 		log_message (sprintf "Warning: deptree_of_pack problem: %s\n" (Printexc.to_string exn));
 		acc)
-	      [] (Depends.load ~ignore_last:false depfile)
+	      [] (Spectype.depload ~ignore_last:false depfile)
 	  in
 	  resolve depth specdir;
 	  Dep_val (value, Dep_list

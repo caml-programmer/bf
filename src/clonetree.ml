@@ -213,7 +213,7 @@ let tree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
 	    checkout_pack 
 	      (Tag.mk ((Specdir.pkgname specdir), ver, rev));
 	    let spec =
-	      Specload.v2
+	      Spectype.load_v2
 		~version:ver
 		~revision:(string_of_int rev) specdir in
 	    Hashtbl.replace table specdir (ver,rev,spec);
@@ -230,7 +230,7 @@ let tree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
 
 	if Sys.file_exists specdir then
 	  let spec = 
-	    Specload.v2
+	    Spectype.load_v2
 	      ~version:ver
 	      ~revision:(string_of_int rev) specdir in
 	  
@@ -252,7 +252,7 @@ let tree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
 		    end
 		  else acc
 		with _ -> acc)
-		[] (Depends.load ~ignore_last:false depfile)
+		[] (Spectype.depload ~ignore_last:false depfile)
 	    in
 	    resolve depth specdir ver rev;
 	    Dep_val (specdir, Dep_list

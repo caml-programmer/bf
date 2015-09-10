@@ -54,7 +54,7 @@ let tree_of_specdir ?(log=true) specdir : top_tree =
 		else
 		  acc @ [new_specdir]
 	      with _ -> acc)
-	      [] (Depends.load ~ignore_last:true depfile)
+	      [] (Spectype.depload ~ignore_last:true depfile)
 	  in
 	  resolve depth specdir;
 	  Dep_val ((specdir,ver,rev), Dep_list
