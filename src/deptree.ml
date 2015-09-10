@@ -2,6 +2,8 @@
 
 (* также здесь описан функционал работы с орграфом *)
 
+open Output
+
 exception Tree_error of string
 
 type 'a deptree =
@@ -120,4 +122,18 @@ let rec map_deptree f = function
       Dep_val (f x, map_deptree f tree)
   | Dep_list l ->
       Dep_list (List.map (map_deptree f) l)
+
+let string_of_deptree (tree:string deptree) =
+  let space depth = String.make (2*depth) ' ' in
+  let rec print_tree depth = function
+    | Dep_val (specdir, deptree) ->
+       string_of_string_list [
+	   ((space depth) ^ specdir);
+	   (print_tree (1+ depth) deptree)
+	 ]
+    | Dep_list trees ->
+       string_of_string_list
+	 (List.map (print_tree depth) trees)
+  in
+  print_tree 0 tree
 

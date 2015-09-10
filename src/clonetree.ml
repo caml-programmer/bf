@@ -4,6 +4,7 @@ open Spectype
 open Logger
 open Printf
 open Pkgpath
+open Output
 
 type clone_val = string * Types.version * Types.revision * spec
 
@@ -13,6 +14,23 @@ type pkg_clone_tree =
 type clone_tree =
     clone_val deptree
 
+let string_of_clone_val (pkg, ver, rev, spec) =
+  pkg ^ " " ^ ver ^ "-" ^ (string_of_int rev) ^ "\n" ^ "SPEC:\n" ^ (string_of_spec spec)
+	      
+let string_of_clone_tree (tree:clone_tree) =
+  let space depth = String.make (2*depth) ' ' in
+  let rec print_tree depth = function
+    | Dep_val (clone_val, deptree) ->
+       string_of_string_list [
+	   ((space depth) ^ (string_of_clone_val clone_val));
+	   (print_tree (1+ depth) deptree)
+	 ]
+    | Dep_list trees ->
+       string_of_string_list
+	 (List.map (print_tree depth) trees)
+  in
+  print_tree 0 tree
+	      
      
 let new_only e =
   with_platform

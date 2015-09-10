@@ -65,26 +65,28 @@ let string_of_platform_depend (pkg_name, dep, desc) =
     ]
 
 let string_of_spec spec =
-  string_of_string_list
-    [
-      (sprintf "PKGNAME: %s" spec.pkgname);
-      "DEPENDS:";
-      (prefix_textblock "  " (string_of_string_list
-				(List.map string_of_platform_depend spec.depends)));
-      "PRIVIDES:";
-      (prefix_textblock "  " (string_of_string_list spec.provides));
-      "OBSOLETES:";
-      (prefix_textblock "  " (string_of_string_list spec.obsoletes));
-      "REJECTS:";
-      (prefix_textblock "  " (string_of_string_list spec.rejects));
-      "COMPONENTS:";
-      (prefix_textblock "  " (string_of_string_list
-				(List.map string_of_component spec.components)));
-      (sprintf "PRE_INSTALL: %s" (string_of_string_option spec.pre_install));
-      (sprintf "PRE_UPDATE: %s" (string_of_string_option spec.pre_update));
-      (sprintf "PRE_UNINSTALL: %s" (string_of_string_option spec.pre_uninstall));
-      (sprintf "POST_INSTALL: %s" (string_of_string_option spec.post_install));
-      "PARAMS: TODO";
-      (sprintf "HOOKS: %s" (string_of_string_option spec.hooks));
-    ]
+  string_of_string_list (
+      List.filter
+	not_string_empty
+	[
+	  (sprintf "PKGNAME: %s" spec.pkgname);
+	  "DEPENDS:";
+	  (prefix_textblock "  " (string_of_string_list
+				    (List.map string_of_platform_depend spec.depends)));
+	  "PRIVIDES:";
+	  (prefix_textblock "  " (string_of_string_list spec.provides));
+	  "OBSOLETES:";
+	  (prefix_textblock "  " (string_of_string_list spec.obsoletes));
+	  "REJECTS:";
+	  (prefix_textblock "  " (string_of_string_list spec.rejects));
+	  "COMPONENTS:";
+	  (prefix_textblock "  " (string_of_string_list
+				    (List.map string_of_component spec.components)));
+	  (sprintf "PRE_INSTALL: %s" (string_of_string_option spec.pre_install));
+	  (sprintf "PRE_UPDATE: %s" (string_of_string_option spec.pre_update));
+	  (sprintf "PRE_UNINSTALL: %s" (string_of_string_option spec.pre_uninstall));
+	  (sprintf "POST_INSTALL: %s" (string_of_string_option spec.post_install));
+	  "PARAMS: TODO";
+	  (sprintf "HOOKS: %s" (string_of_string_option spec.hooks));
+	])
 
