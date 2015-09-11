@@ -6,7 +6,7 @@ open Printf
 open Pkgpath
 open Output
 
-type clone_val = string * Types.version * Types.revision * spec
+type clone_val = string * Component.version * Component.revision * spec
 
 type pkg_clone_tree =
     Pkgpath.t deptree

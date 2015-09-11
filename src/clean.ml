@@ -51,8 +51,7 @@ let packages () =
       (fun x -> not (List.mem (fst x) !droplist)) pkgs in
   let drop_list_without_deps =
     List.fold_left
-      (fun acc (s,x) ->
-	let (_,name,_,_,_,_,ver,rev) = x in
+      (fun acc (s,_) ->
 	let deps = Pkgdeps.extract ~userhost:None s in
 	List.fold_left
 	  (fun acc (pkg_name,ver_opt,rev_opt,_) ->

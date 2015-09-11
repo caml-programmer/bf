@@ -1,8 +1,172 @@
+open System
 open Git
-open Types
 open Logger
 open Printf
+open Scheme
+open Ocs_types
+       
+exception Bad_forkmode of string
 
+type label = Tag of string | Branch of string | Current
+			    
+type forkmode =
+  | Tagging
+  | Branching
+  | Inherit
+
+type component = {
+  name  : string;
+  label : label;
+  pkg : string option;
+  rules : string option;
+  nopack: bool;
+  forkmode : forkmode;
+}
+
+type content_status =
+  | Tree_prepared               (* nothing to do *)
+  | Tree_changed of string list (* checkout -f && clean -d *)
+
+type worktree_status =
+  | Tree_not_exists            (* do remove, clone and checkout -f *)
+  | Tree_exists_with_given_key of content_status
+  | Tree_exists_with_other_key of string (* do checkout -f and clean -d *)
+
+type version = string
+type revision = int
+
+let string_of_label = function
+  | Tag s -> s
+  | Branch s -> s
+  | Current -> ""
+
+let forkmode_of_string = function
+  | "do-branch" | "branch" | "branching" -> Branching
+  | "fixtag" | "tag" | "tagging"         -> Tagging
+  | "inherit"                            -> Inherit
+  | x -> raise (Bad_forkmode x)
+
+let string_of_forkmode = function
+  | Tagging -> "tagging"
+  | Branching -> "branching"
+  | Inherit -> "inherit"
+
+let string_of_label_type = function
+  | Tag _    -> "tag"
+  | Branch _ -> "branch"
+  | Current  -> "current"
+
+let string_of_rules = function
+  | None -> ""
+  | Some r -> r
+
+let string_of_string_option = function
+  | Some (x:string) -> x
+  | None -> ""
+
+let string_of_component comp = 
+  String.concat "\n"
+    [
+      (Printf.sprintf "NAME: %s" comp.name);
+      (Printf.sprintf "LABEL: %s %s" (string_of_label_type comp.label)
+		      (string_of_label comp.label));
+      (Printf.sprintf "PKG: %s" (string_of_string_option comp.pkg));
+      (Printf.sprintf "RULES: %s" (string_of_string_option comp.rules));
+      (Printf.sprintf "NOPACK: %B" comp.nopack);
+      (Printf.sprintf "FORKMODE: %s" (string_of_forkmode comp.forkmode));
+    ]
+
+
+
+let git_worktree_status ~strict component =
+  let ignore =
+    if Sys.file_exists ".bf-ignore" then
+      list_of_channel (open_in ".bf-ignore")
+    else []
+  in  
+  let worktree_changes =
+    if not strict then [] else git_status () in
+  let source_changes =
+    match component.label with
+      | Current ->
+	  git_diff ~ignore ()
+      | Tag key ->
+	  git_diff ~ignore ~key ()
+      | Branch key ->
+	  git_diff ~ignore ~key ()
+  in
+  if source_changes = [] && worktree_changes = [] then
+    Tree_prepared
+  else
+    Tree_changed (source_changes @ worktree_changes)
+
+let git_tag_status ~strict component =
+  match component.label with
+    | Current  -> assert false
+    | Branch _ -> assert false
+    | Tag m ->
+	let tags = git_tag_list () in
+	if not (List.mem m tags) then
+	  Tree_exists_with_other_key "unknown"
+	else
+	  Tree_exists_with_given_key 
+	    (git_worktree_status ~strict component)
+
+let git_branch_status ~strict component =
+  match component.label with
+    | Current  -> assert false
+    | Tag _ -> assert false
+    | Branch m ->
+	match git_current_branch () with
+	  | Some cur ->
+	      if cur = m then
+		Tree_exists_with_given_key (git_worktree_status ~strict component)
+	      else
+		Tree_exists_with_other_key cur
+	  | None ->
+	      Tree_exists_with_other_key "unknown"
+
+let git_key_status ~strict component =
+  match component.label with
+    | Current  -> Tree_exists_with_given_key (git_worktree_status ~strict component)
+    | Tag _    -> git_tag_status ~strict component
+    | Branch _ -> git_branch_status ~strict component
+
+let git_component_status ~strict component =
+  let cur = Sys.getcwd () in
+  if not (System.is_directory component.name) then
+    Tree_not_exists
+  else
+    begin
+      Sys.chdir component.name;
+      let status =
+	git_key_status ~strict component in
+      Sys.chdir cur;
+      status
+    end
+
+let git_create_url component =
+  let s = Params.get_param "git-url" in
+  match Pcre.split (Re.compile (Re.rep1 Re.space)) s with
+    | [] -> raise Invalid_url
+    | [one] -> one
+    | list ->
+	try
+	  List.iter
+	    (fun url ->
+	      check_component_url url component.name)
+	    list;
+	  raise (Component_not_found component.name)
+	with Found_component url -> url
+
+
+
+
+    
+
+
+
+       
 let with_rules s c =
   match c.rules with
     | Some alt ->
@@ -431,4 +595,66 @@ let changelog_tasks ?(branch=None) ?(diff=false) ?(since=None) tag_a tag_b compo
 	    logs	    
 	end));
   !tasks
+
+
+exception Nopack_mode_conflict_with_package of string
+
+let component_of_sval s =
+  match s with
+    | Spair v ->
+	let name =
+	  (match v.car with
+	    | Ssymbol s -> s
+	    | x -> error x)
+	in
+	let pkg = ref None in
+	let rules = ref None in
+	let label = ref Current in
+	let nopack = ref false in
+	let forkmode = ref Branching in
+	let rec scan = function
+	  | Spair v ->
+	      (match v.car with
+		| Spair x ->
+		    (match x.car with
+		      | Ssymbol "branch" ->
+			  label := Branch (match fst x.cdr with Sstring s -> s | x -> error x)
+		      | Ssymbol "tag" ->
+			  label := Tag (match fst x.cdr with Sstring s ->  s | x -> error x)
+		      | Ssymbol "package" ->
+			  pkg := Some (match fst x.cdr with Sstring s ->  s | x -> error x)
+		      | Ssymbol "rules" ->
+			  rules := Some (match fst x.cdr with Sstring s ->  s | x -> error x)
+		      | Ssymbol "nopack" ->
+			  (match !pkg with
+			    | None   -> nopack := true;
+			    | Some s ->
+				raise (Nopack_mode_conflict_with_package s))
+		      | Ssymbol "fork"
+		      | Ssymbol "on-fork" ->
+			  forkmode := forkmode_of_string
+			    (match fst x.cdr with
+			      | Ssymbol s -> s
+			      | Sstring s -> s
+			      | x -> error x)
+		      | x -> error x)
+		| Snull -> ()
+		| x -> error x);
+	      scan v.cdr;
+	  | Snull -> ()
+	  | _ -> assert false
+	in scan v.cdr;
+	{ 
+	  name = name; 
+	  label = !label;
+	  pkg = !pkg;
+	  rules = !rules;
+	  nopack = !nopack;
+	  forkmode = !forkmode;
+	}
+    | x -> error x
+ 
+let components_of_sval_array v =
+  List.map component_of_sval (Array.to_list v)
+
 

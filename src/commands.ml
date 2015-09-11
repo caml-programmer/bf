@@ -3,8 +3,8 @@ open Rules
 open Logger
 open Ocs_types
 open Printf
+open Component
 open Components
-open Types
 
 let read_command cmd =
   System.read_lines ~env:(Env.component ()) cmd
@@ -94,27 +94,27 @@ let scm_make_list f v =
 let scm_prepare v =
   System.with_dir ".."
     (fun () ->
-      prepare (Scheme.components_of_sval_array v)); Snull
+      prepare (Component.components_of_sval_array v)); Snull
       
 let scm_build v =
   System.with_dir ".."
     (fun () ->
-      build (Scheme.components_of_sval_array v)); Snull
+      build (Component.components_of_sval_array v)); Snull
 
 let scm_rebuild v =
   System.with_dir ".."
     (fun () ->
-      rebuild (Scheme.components_of_sval_array v)); Snull
+      rebuild (Component.components_of_sval_array v)); Snull
       
 let scm_install v =
   System.with_dir ".."
     (fun () ->
-      ignore (install (Scheme.components_of_sval_array v))); Snull
+      ignore (install (Component.components_of_sval_array v))); Snull
 
 let scm_reinstall v =
   System.with_dir ".."
     (fun () ->
-      reinstall (Scheme.components_of_sval_array v)); Snull
+      reinstall (Component.components_of_sval_array v)); Snull
 
 let scm_simple_configure v =
   Rules.simple_configure (Scheme.string_list_of_sval_array v); Snull

@@ -1,5 +1,5 @@
 open Printf
-open Types
+open Component
 open Logger
 open Spectype
 

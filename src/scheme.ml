@@ -2,8 +2,7 @@
 
 open Ocs_prim
 open Ocs_types
-open Types
-
+       
 let env = Ocs_top.make_env ();;
 let thread = Ocs_top.make_thread ();;
 
@@ -90,66 +89,6 @@ let fst = function
 let snd = function
   | Spair v -> v.cdr
   | x -> error x
-
-exception Nopack_mode_conflict_with_package of string
-
-let component_of_sval s =
-  match s with
-    | Spair v ->
-	let name =
-	  (match v.car with
-	    | Ssymbol s -> s
-	    | x -> error x)
-	in
-	let pkg = ref None in
-	let rules = ref None in
-	let label = ref Current in
-	let nopack = ref false in
-	let forkmode = ref Branching in
-	let rec scan = function
-	  | Spair v ->
-	      (match v.car with
-		| Spair x ->
-		    (match x.car with
-		      | Ssymbol "branch" ->
-			  label := Branch (match fst x.cdr with Sstring s -> s | x -> error x)
-		      | Ssymbol "tag" ->
-			  label := Tag (match fst x.cdr with Sstring s ->  s | x -> error x)
-		      | Ssymbol "package" ->
-			  pkg := Some (match fst x.cdr with Sstring s ->  s | x -> error x)
-		      | Ssymbol "rules" ->
-			  rules := Some (match fst x.cdr with Sstring s ->  s | x -> error x)
-		      | Ssymbol "nopack" ->
-			  (match !pkg with
-			    | None   -> nopack := true;
-			    | Some s ->
-				raise (Nopack_mode_conflict_with_package s))
-		      | Ssymbol "fork"
-		      | Ssymbol "on-fork" ->
-			  forkmode := forkmode_of_string
-			    (match fst x.cdr with
-			      | Ssymbol s -> s
-			      | Sstring s -> s
-			      | x -> error x)
-		      | x -> error x)
-		| Snull -> ()
-		| x -> error x);
-	      scan v.cdr;
-	  | Snull -> ()
-	  | _ -> assert false
-	in scan v.cdr;
-	{ 
-	  name = name; 
-	  label = !label;
-	  pkg = !pkg;
-	  rules = !rules;
-	  nopack = !nopack;
-	  forkmode = !forkmode;
-	}
-    | x -> error x
- 
-let components_of_sval_array v =
-  List.map component_of_sval (Array.to_list v)
 
 let eval_pair v =
   let (a,b) = v in

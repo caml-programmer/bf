@@ -1,11 +1,12 @@
 open Platform
-open Types
+open Component
 open Printf
 open List
 open String
 open Output
 open Logger
-
+open Ocs_types
+       
 (* описание типов *)
 
 type pkg_name = string
@@ -341,6 +342,7 @@ let load_v3 ?(snapshot=false) ~version ~revision specdir =
 (* Функция Spec.load получает на вход директорию specdir и возвращает spec, характеризующий её *)
 let load ~snapshot ~version ~revision specdir = 
   let version_file = Filename.concat specdir "version" in
-  match int_of_string (Specdir.get_version version_file) with
-  | 2 -> load_v2 ~snapshot ~version ~revision specdir
-  | 3 -> load_v3 ~snapshot ~version ~revision specdir
+  match Specdir.get_version version_file with
+  | "2" -> load_v2 ~snapshot ~version ~revision specdir
+  | "3" -> load_v3 ~snapshot ~version ~revision specdir
+  | _ -> failwith "Unknown version of specdir"

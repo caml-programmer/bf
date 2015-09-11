@@ -1,5 +1,5 @@
 open Test
-open Types
+open Component
 open Spectype
 open Printf
 

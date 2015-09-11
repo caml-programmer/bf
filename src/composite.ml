@@ -13,7 +13,7 @@ let std_load file =
     match !composite with
       | None -> log_error "composite handler is not called"
       | Some v ->
-	  (Scheme.map Scheme.component_of_sval v)
+	  (Scheme.map Component.component_of_sval v)
   with exn ->
     raise (Load_error (sprintf "%s: %s\n%!" file (Printexc.to_string exn)))
 
@@ -25,7 +25,7 @@ let short_load file =
       match Ocs_read.read_from_port port with
 	| Seof -> 
 	    Ocs_port.close port;
-	    List.map Scheme.component_of_sval (List.rev acc)
+	    List.map Component.component_of_sval (List.rev acc)
 	| value ->
 	    load (value::acc)
   in
@@ -35,7 +35,7 @@ let short_load file =
     raise (Load_error (sprintf "%s: %s\n%!" file (Printexc.to_string exn)))
 
 let ignore_pack c =
-  c.Types.name <> Params.get_param "pack"
+  c.Component.name <> Params.get_param "pack"
 
 let load ?(short_composite=false) file =
   let components =
@@ -68,26 +68,26 @@ let write file components =
     if not !first then
       out "\n  ";
     out "(";
-    out c.Types.name;    
-    (match c.Types.label with
-      | Types.Current -> ()
-      | Types.Branch s ->
+    out c.Component.name;    
+    (match c.Component.label with
+      | Component.Current -> ()
+      | Component.Branch s ->
 	  out " (branch \"";
 	  out s;
 	  out "\")";
-      | Types.Tag s ->
+      | Component.Tag s ->
 	  out " (tag \"";
 	  out s;
 	  out "\")");
-    (match c.Types.pkg with
+    (match c.Component.pkg with
       | None -> ()
       | Some s ->
 	  out " (package \"";
 	  out s;
 	  out "\")");
-    if c.Types.nopack then
+    if c.Component.nopack then
 	  out " (nopack)";
-    (match c.Types.rules with
+    (match c.Component.rules with
       | None -> ()
       | Some s ->
 	  out " (rules \"";
@@ -110,13 +110,13 @@ let components ?(short_composite=false) ?(replace_composite=None) composite =
     (fun c ->
       match List.filter 
 	(fun r -> 
-	  r.Types.name  = c.Types.name &&
-	  r.Types.rules = c.Types.rules)
+	  r.Component.name  = c.Component.name &&
+	  r.Component.rules = c.Component.rules)
 	replace with
 	  | r::_ ->
 	      printf "replace %s.%s.%s -> %s.%s.%s\n%!"
-		c.Types.name (Types.string_of_label c.Types.label) (Types.string_of_rules c.Types.rules)
-		r.Types.name (Types.string_of_label r.Types.label) (Types.string_of_rules r.Types.rules);
+		c.Component.name (Component.string_of_label c.Component.label) (Component.string_of_rules c.Component.rules)
+		r.Component.name (Component.string_of_label r.Component.label) (Component.string_of_rules r.Component.rules);
 	      r
 	  | [] -> c)
     (load ~short_composite composite)

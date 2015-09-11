@@ -1,6 +1,6 @@
 (* changelogNG.ml *)
 
-open Types
+open Component
 open Output
 
 (* данная функция выводит changelog пакета и всех его зависимостей *)       

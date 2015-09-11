@@ -1,4 +1,4 @@
 #!/bin/sh -e
 
-ocamlbuild -cflags '-w +44' -j 4 -no-links -cflag -g -lflag -g -use-ocamlfind bf.native 2>&1 
-#ocamlbuild -j 4 -no-links -cflag -g -lflag -g -use-ocamlfind bf.native 2>&1 
+#ocamlbuild -cflags '-w +44' -j 4 -no-links -cflag -g -lflag -g -use-ocamlfind bf.native 2>&1 
+ocamlbuild -j 4 -no-links -cflag -g -lflag -g -use-ocamlfind bf.native 2>&1 

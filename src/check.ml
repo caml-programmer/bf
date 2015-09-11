@@ -1,4 +1,4 @@
-open Types
+open Component
 
 exception Bad_specdir of string
 

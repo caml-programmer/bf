@@ -11,8 +11,8 @@ type t = {
   pkg_platform : platform;
   pkg_extension : string;
   pkg_arch : string;
-  pkg_version : Types.version;
-  pkg_revision : Types.revision;
+  pkg_version : Component.version;
+  pkg_revision : Component.revision;
   pkg_branch: pack_branch;
 }
 

@@ -3,7 +3,7 @@ open Printf
 open Deptree
 
 type pack_tree =
-    (string * (Types.version * Types.revision option) option) deptree
+    (string * (Component.version * Component.revision option) option) deptree
 
 exception No_specdir of string
 

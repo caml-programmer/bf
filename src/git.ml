@@ -1,8 +1,12 @@
-open Types
-open Logger
 open System
 open Printf
-
+open Logger
+       
+type tag_status =
+  | Tag_already_exists
+  | Tag_created
+  | Tag_creation_problem
+       
 let env = Env.system ();;
 
 let git_init () =
@@ -299,72 +303,6 @@ let git_status () =
     then [] else lines
   with System.Error s -> log_error s
 
-let git_worktree_status ~strict component =
-  let ignore =
-    if Sys.file_exists ".bf-ignore" then
-      list_of_channel (open_in ".bf-ignore")
-    else []
-  in  
-  let worktree_changes =
-    if not strict then [] else git_status () in
-  let source_changes =
-    match component.label with
-      | Current ->
-	  git_diff ~ignore ()
-      | Tag key ->
-	  git_diff ~ignore ~key ()
-      | Branch key ->
-	  git_diff ~ignore ~key ()
-  in
-  if source_changes = [] && worktree_changes = [] then
-    Tree_prepared
-  else
-    Tree_changed (source_changes @ worktree_changes)
-
-let git_tag_status ~strict component =
-  match component.label with
-    | Current  -> assert false
-    | Branch _ -> assert false
-    | Tag m ->
-	let tags = git_tag_list () in
-	if not (List.mem m tags) then
-	  Tree_exists_with_other_key "unknown"
-	else
-	  Tree_exists_with_given_key 
-	    (git_worktree_status ~strict component)
-
-let git_branch_status ~strict component =
-  match component.label with
-    | Current  -> assert false
-    | Tag _ -> assert false
-    | Branch m ->
-	match git_current_branch () with
-	  | Some cur ->
-	      if cur = m then
-		Tree_exists_with_given_key (git_worktree_status ~strict component)
-	      else
-		Tree_exists_with_other_key cur
-	  | None ->
-	      Tree_exists_with_other_key "unknown"
-
-let git_key_status ~strict component =
-  match component.label with
-    | Current  -> Tree_exists_with_given_key (git_worktree_status ~strict component)
-    | Tag _    -> git_tag_status ~strict component
-    | Branch _ -> git_branch_status ~strict component
-
-let git_component_status ~strict component =
-  let cur = Sys.getcwd () in
-  if not (System.is_directory component.name) then
-    Tree_not_exists
-  else
-    begin
-      Sys.chdir component.name;
-      let status =
-	git_key_status ~strict component in
-      Sys.chdir cur;
-      status
-    end
 
 exception Invalid_url
 exception Found_component of string
@@ -387,16 +325,3 @@ let check_component_url url name =
     done; check ()
   with End_of_file -> check ())
 
-let git_create_url component =
-  let s = Params.get_param "git-url" in
-  match Pcre.split (Re.compile (Re.rep1 Re.space)) s with
-    | [] -> raise Invalid_url
-    | [one] -> one
-    | list ->
-	try
-	  List.iter
-	    (fun url ->
-	      check_component_url url component.name)
-	    list;
-	  raise (Component_not_found component.name)
-	with Found_component url -> url

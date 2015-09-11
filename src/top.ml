@@ -1,9 +1,9 @@
 open Printf
 open Deptree
-open Types
+open Component
 open Logger
 
-type top_val = string * Types.version * Types.revision
+type top_val = string * Component.version * Component.revision
 type top_tree = top_val deptree
 
 let tree_of_specdir ?(log=true) specdir : top_tree =

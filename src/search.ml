@@ -1,7 +1,7 @@
 (* Search *)
 
 open Printf
-open Types
+open Component
 open Deptree
 
 exception Bad_component of string

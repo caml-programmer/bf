@@ -1,6 +1,6 @@
 (* Fix build support *)
 
-open Types
+open Component
 open Deptree
 open Printf
 open Changelog

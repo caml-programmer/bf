@@ -271,7 +271,7 @@ let commiters component =
       let search () =
 	let ignored = ref false in
 	let loctable =      
-	  match component.Types.name with
+	  match component.Component.name with
 	    | "boost" | "icu" | "samba" | "squid" | "apache" | "ant" | "maven" -> 
 		ignored := true;
 		[]
@@ -319,7 +319,7 @@ let composite specdir =
     (fun component ->
       component, commiters component)
     (List.filter
-      (fun c -> c.Types.pkg = None && c.Types.name <> (Params.get_param "pack"))
+      (fun c -> c.Component.pkg = None && c.Component.name <> (Params.get_param "pack"))
       (Composite.load (Filename.concat specdir "composite")))
 
 let html_quoting s =

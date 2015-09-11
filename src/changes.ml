@@ -1,4 +1,4 @@
-open Types
+open Component
 open Printf
 open Logger
 

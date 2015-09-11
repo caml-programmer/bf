@@ -1,6 +1,6 @@
 (* Buildfarm for GIT-repository *)
 
-open Types
+open Component
 
 (* Locking *)
 

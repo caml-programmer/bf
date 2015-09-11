@@ -2,7 +2,7 @@
 
 open Deptree
 open Printf
-open Types
+open Component
 
 let vr_of_rev s =
   try

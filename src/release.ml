@@ -1,4 +1,4 @@
-open Types
+open Component
 open Printf
 
 exception Bad_format of string
