@@ -12,11 +12,11 @@ let env = Env.system ();;
 let git_version =
   match read_lines "git version" with
     | s::_ ->
-	match Str.split (Str.regexp " ") s with
+	(match Str.split (Str.regexp " ") s with
 	  | "git"::"version"::version::_ ->
 	      List.map int_of_string
 		(Str.split (Str.regexp "\\.") version)
-	  | _ -> []
+	  | _ -> [])
     | _ -> []
 
 let no_edit =
