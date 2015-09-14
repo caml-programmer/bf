@@ -15,7 +15,7 @@ let git_version =
 	match Str.split (Str.regexp " ") s with
 	  | "git"::"version"::version::_ ->
 	      List.map int_of_string
-		(Str.split (Str.regexp ".") version)
+		(Str.split (Str.regexp "\\.") version)
 	  | _ -> []
     | _ -> []
 
