@@ -213,7 +213,7 @@ let command ?(env=Unix.environment()) ?(ignore_errors=false) ?(filter=(fun _ -> 
   let errors = String.concat "\n" (read [] perr) in
   let status = Unix.close_process_full (pout,pin,perr) in
   match status with
-  | Unix.WEXITED st -> if ignore_errors
+  | Unix.WEXITED st -> if ignore_errors || st = 0
 		       then (st, outputs, errors)
 		       else failwith (sprintf "Command '%s' exited with non-nil status: %d" command st)
   | Unix.WSIGNALED signal -> failwith (sprintf "Command '%s' was killed by signal: %d" command signal)
