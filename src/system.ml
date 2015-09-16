@@ -188,9 +188,7 @@ let arch () =
 	  ignore(Unix.close_process_in ch); name)
 
 let hostname () =
-  let ch = Unix.open_process_in "hostname" in
-  let name = input_line ch in
-  ignore(Unix.close_process_in ch); name
+  Unix.gethostname ()
 
 let list_of_directory dir =
   let dh = Unix.opendir dir in

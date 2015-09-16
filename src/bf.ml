@@ -72,6 +72,7 @@ let usage () =
   print_endline "   or: bf droptags <lifetime>";
   print_endline "   or: bf log";
   print_endline "   or: bf tests";
+  print_endline "   or: bf checknode <smtp-server>[:<smap-port>] <e-mail-list>";
   exit 1
 
 let make_int s =
@@ -460,6 +461,25 @@ let main () =
 	    else usage ()
 	| "tests" ->
 	   Tests.run ()
+	| "checknode" ->
+	    begin
+	      let (smtp_server, smtp_port, emails) = 
+		match Array.to_list Sys.argv with
+		  | _::_::server_info::emails ->
+		      (match Str.split (Str.regexp ":") server_info with
+			| server::port::_ ->
+			    (try
+			      (server,int_of_string port,emails)
+			    with _ -> usage ())
+			| server::_ ->
+			    (server,25,emails)
+			| _ -> usage ())
+		  | _ -> usage () in	      
+	      Checknode.start
+		~smtp_server
+		~smtp_port
+		emails
+	    end	    
 	| "test" ->
 	   Changelog_ng.test ()
 	| _ ->
