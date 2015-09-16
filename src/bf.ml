@@ -72,7 +72,7 @@ let usage () =
   print_endline "   or: bf droptags <lifetime>";
   print_endline "   or: bf log";
   print_endline "   or: bf tests";
-  print_endline "   or: bf checknode <smtp-server>[:<smap-port>] <e-mail-list>";
+  print_endline "   or: bf checknode <smtp-server>[:<smtp-port>] <e-mail-list>";
   exit 1
 
 let make_int s =
