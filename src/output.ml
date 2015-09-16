@@ -32,6 +32,9 @@ let msg func loglevel msg =
   if log_level_acceptable loglevel then
     print_endline (prefix_textblock (func ^ ": ") msg)
 
+let count_strings string =
+  List.length (string_list_of_string string)
+		  
 (* строковые предикаты *)
 		  
 let equal_strings s1 s2 =

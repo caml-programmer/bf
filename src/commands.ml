@@ -200,34 +200,18 @@ let scm_read_command cmd =
   scm_make_list (fun s -> Sstring s)
     (read_command (Scheme.string_of_sval cmd))
 
-let command ?(env=Unix.environment()) ?(ignore_errors=false) ?(filter=(fun _ -> true)) command =
-  let (pout,pin,perr) = Unix.open_process_full command env in
-  let rec read acc ch =
-    try
-      let s = input_line ch in
-      if filter s 
-      then read (s::acc) ch
-      else read acc ch
-    with End_of_file -> acc in
-  let outputs = String.concat "\n" (read [] pout) in
-  let errors = String.concat "\n" (read [] perr) in
-  let status = Unix.close_process_full (pout,pin,perr) in
-  match status with
-  | Unix.WEXITED st -> if ignore_errors
-		       then (st, outputs, errors)
-		       else failwith (sprintf "Command '%s' exited with non-nil status: %d" command st)
-  | Unix.WSIGNALED signal -> failwith (sprintf "Command '%s' was killed by signal: %d" command signal)
-  | Unix.WSTOPPED signal -> failwith (sprintf "Command '%s' was stopped by signal: %d" command signal)
-      
 let scm_command cmd =
-  let (status,outputs,errors) = command (Scheme.string_of_sval cmd) in
+  let (status,outputs,errors) = System.command (Scheme.string_of_sval cmd) in
   Spair {car = Sint status;
 	 cdr =
 	   Spair {car = Sstring outputs;
 		  cdr=
 		    Spair {car = Sstring errors;
 			   cdr = Snull}}}
-    
+
+let scm_cpu_number () =
+  Sint (System.cpu_number ())
+	
 let scm_update_make_params v =
   update_make_params (Scheme.make_params_of_sval v);
   Snull
@@ -438,7 +422,7 @@ Ocs_env.set_pf1 Scheme.env scm_get_env "get-env";;
 Ocs_env.set_pf1 Scheme.env scm_read_command "read-command";;
 Ocs_env.set_pf0 Scheme.env scm_current_directory "current-directory";;
 Ocs_env.set_pf1 Scheme.env scm_command "command";;
-  
+
 Ocs_env.set_pf0 Scheme.env scm_uname "uname";;
 Ocs_env.set_pf0 Scheme.env scm_arch "arch";;
 Ocs_env.set_pf1 Scheme.env scm_dirname "dirname";;
@@ -461,7 +445,8 @@ Ocs_env.set_pf2 Scheme.env scm_write_scheme_value "write-scheme-value";;
 Ocs_env.set_pf2 Scheme.env scm_substring "substring?";;
 Ocs_env.set_pf2 Scheme.env scm_substrings "substrings";;
 Ocs_env.set_pfn Scheme.env scm_env_append "env-append";;
-
+Ocs_env.set_pf0 Scheme.env scm_cpu_number "cpu-number";;
+    
 Ocs_env.set_pf2 Scheme.env scm_git_push_cycle "git-push-cycle";;
 Ocs_env.set_pf3 Scheme.env scm_git_push_tag_cycle "git-push-tag-cycle";;
 
