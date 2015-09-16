@@ -31,6 +31,7 @@ let make specdir upgrade_mode default_branch =
 
   Check.specdir specdir;
   Check.pack_component ();
+  Check.install_dir ();
 
   let deptree =
     log_message "make depends tree...";

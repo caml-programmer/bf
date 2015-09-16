@@ -55,6 +55,8 @@ let make ?(vr=None) ~recursive ~overwrite specdir =
 
   Check.specdir specdir;
   Check.pack_component ();
+  Check.install_dir ();
+
   let deptree =
     if recursive then
       log_message "make depends tree...";

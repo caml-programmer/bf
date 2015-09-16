@@ -27,3 +27,11 @@ let pack_component () =
 	(match Git.git_current_branch () with
 	  | Some "master" -> ()
 	  | _ -> Git.git_checkout ~force:true ~key:"master" ())))
+
+let install_dir () =
+  let install_dir =
+    Filename.concat 
+      (Params.get_param "dest-dir")
+      (Params.get_param "top-dir") in
+  if not (Sys.file_exists install_dir) then
+    System.make_directory_r install_dir
