@@ -62,7 +62,7 @@ let update ~specdir
   let branch = Specdir.branch specdir in
 
   let have_pack_changes =
-    Changes.pack specdir (Component.make ~label:(Branch "master") "pack") in
+    Changes.pack specdir (Component.make ~label:(Branch "master") (Params.get_param "pack")) in
 
   let conv_revision r =
     try int_of_string r with _ -> raise (Revision_must_be_digital r) in
