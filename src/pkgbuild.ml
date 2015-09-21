@@ -214,10 +214,12 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		call_before_build ~snapshot
 		  ~pkgname:spec.pkgname ~version ~revision:release ~platform spec.hooks in
 	      
+	      let filecount = ref 0 in
 	      let files =
 		with_out "rpmbuild.files"
 		  (fun out ->
 		    let make_rpm_line s =
+		      incr filecount;
 		      let l = String.length s in
 		      if l > 2 then			      
 			(match s.[0] with
@@ -305,9 +307,13 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		    out "%define _use_internal_dependency_generator 0\n";
 		    out "%define __find_requires %findreq\n";
 		    out "%description\n";
-		    out "%files\n";
-		    out (sprintf "%%include %s\n" files);
 
+		    if !filecount > 0 then
+		      begin
+			out "%files\n";
+			out (sprintf "%%include %s\n" files);
+		      end;
+		    
 		    let oo s = out (resolve_params find_value s); out "\n" in
 		    
 		    (match spec.pre_install with

@@ -38,27 +38,29 @@ let ignore_pack c =
   c.Component.name <> Params.get_param "pack"
 
 let load ?(short_composite=false) file =
-  let components =
-    if short_composite then
-      short_load file
-    else
-      begin
-	let loc = Filename.dirname file in
-	let ver = Filename.concat loc "version" in
-	let ch = open_in ver in
-	let res =
-	  match input_line ch with
-	    | "3.0" ->
-		(* printf "SHORTLOAD\n%!"; *)
-	      short_load file
-	    | _ ->
-		(* printf "STDLOAD\n%!"; *)
-		std_load file in
-	close_in ch;
-	res
-      end in
-  List.filter
-    ignore_pack components
+  if Sys.file_exists file then
+    let components =
+      if short_composite then
+	short_load file
+      else
+	begin
+	  let loc = Filename.dirname file in
+	  let ver = Filename.concat loc "version" in
+	  let ch = open_in ver in
+	  let res =
+	    match input_line ch with
+	      | "3.0" ->
+		  (* printf "SHORTLOAD\n%!"; *)
+		  short_load file
+	      | _ ->
+		  (* printf "STDLOAD\n%!"; *)
+		  std_load file in
+	  close_in ch;
+	  res
+	end in
+    List.filter
+      ignore_pack components
+  else []
       
 let write file components =
   let ch = open_out file in
