@@ -308,9 +308,9 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		    out "%define __find_requires %findreq\n";
 		    out "%description\n";
 
+		    out "%files\n";
 		    if !filecount > 0 then
 		      begin
-			out "%files\n";
 			out (sprintf "%%include %s\n" files);
 		      end;
 		    
