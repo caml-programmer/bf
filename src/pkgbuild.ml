@@ -121,20 +121,6 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
     close_out ch; n
   in
   (match Specdir.get_version (with_specdir "version") with
-    | "1.0" ->
-	(match Spectype.load_v1 abs_specdir with
-	    [spec;files;findreq] ->
-	      let pkgname = 
-		Filename.basename specdir in
-	      let hookfile =
-		Filename.concat abs_specdir "hooks.scm" in
-	      let hooks =
-		if Sys.file_exists hookfile then
-		  Some hookfile
-		else None
-	      in build_over_rpmbuild ~snapshot
-		   (pkgname,platform,version,release,spec,files,findreq,hooks)
-	  | _-> assert false)
     | "2.0" 
     | "3.0" as specver ->
 	let spec =
