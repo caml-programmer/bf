@@ -2,18 +2,6 @@ open Component
 open Logger
 open Printf
 
-let non_empty_iter f = function
-    []   -> log_error "don't know what to do"
-  | list -> List.iter f list
-
-let non_empty_map f = function
-    []   -> log_error "don't know what to do"
-  | list -> List.map f list
-
-let non_empty_list = function
-    []   -> log_error "don't know what to do"
-  | list -> list
-
 let rec max_value f cur = function
   | [] -> cur
   | hd::tl ->
@@ -70,28 +58,28 @@ let status components =
     max_value (fun n -> String.length n.name) 0 components in
   let max_label_length =
     max_value (fun n -> String.length (string_of_label n.label)) 0 components in
-  non_empty_iter
-    (fun component -> 
+  List.iter
+    (fun component ->
       Component.status ~max_component_length ~max_label_length component)
     components
 
 let make_tag tag components =
-  non_empty_iter (Component.tag tag) components
+  List.iter (Component.tag tag) components
 
 let make_diff tag_a tag_b components =
-  non_empty_iter (Component.diff tag_a tag_b) components
+  List.iter (Component.diff tag_a tag_b) components
 
 let prepare components =
-  non_empty_iter Component.prepare components
-
+  List.iter Component.prepare components
+    
 let forward components =
-  non_empty_iter Component.forward components
+  List.iter Component.forward components
 
 let build components =
-  non_empty_iter Component.build components
+  List.iter Component.build components
 
 let rebuild components =
-  non_empty_iter Component.rebuild components
+  List.iter Component.rebuild components
 
 let install components =
   List.fold_left
@@ -102,10 +90,10 @@ let install components =
 	component::acc
       else
 	acc)
-    [] (non_empty_list components)
+    [] components
 
 let reinstall components =
-  non_empty_iter Component.reinstall components
+  List.iter Component.reinstall components
 
 let update components =
   List.exists (fun x -> x) (List.map Component.update components)
@@ -115,12 +103,12 @@ let make_review since components =
 
   let chunks = ref [] in
   let add s = chunks:=s::!chunks in
-  non_empty_iter
+  List.iter
     (fun component -> 
       let tag = string_of_label component.label in
       List.iter add (Component.changelog ~diff:false ~since:(Some since) tag tag component)) components;
   add "\n------------------ DIFF -------------------\n";
-  non_empty_iter
+  List.iter
     (fun component ->
       let tag = string_of_label component.label in
       List.iter add (Component.changelog ~diff:true ~since:(Some since) tag tag component))
@@ -134,13 +122,13 @@ let make_review since components =
 let make_changelog ?(interactive=false) ?(compact=false) ?(branch=None) tag_a tag_b components =
   let chunks = ref [] in
   let add s = chunks:=s::!chunks in
-  non_empty_iter
+  List.iter
     (fun component -> 
       List.iter add (Component.changelog ~branch ~diff:false tag_a tag_b component)) components;
   if not compact then
     begin
       add "\n------------------ DIFF -------------------\n";
-      non_empty_iter
+      List.iter
 	(fun component ->
 	  List.iter add (Component.changelog ~branch ~diff:true tag_a tag_b component))
 	components;
