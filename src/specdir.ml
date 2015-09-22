@@ -1,5 +1,6 @@
 open Printf
-
+open Output
+       
 let pkgname specdir =
   Filename.basename (Filename.dirname specdir)
 
@@ -44,3 +45,41 @@ let select_branch ~default_branch pkgdir pkg =
 
 let of_pkg ~default_branch pkgdir pkg =
   sprintf "%s/%s/%s" pkgdir pkg (select_branch ~default_branch pkgdir pkg)
+
+let last_line_of_file filename =
+  let channel = open_in filename in
+  let line = ref "" in
+  let rec read () =
+    try line := input_line channel;
+	read ()
+    with End_of_file -> close_in channel;
+			!line in
+  read ()
+
+let ver_rev_of_release release =
+  let err msg = err "ver_rev_of_release" msg in
+  match Str.split (Str.regexp " ") release with
+  | [ver;rev] -> ver,rev
+  | x -> err ("Invalid release: \""^(String.concat "" x)^"\"")
+
+let release_by_specdir specdir =
+  let err msg = err "release_by_specdir" msg in
+  last_line_of_file (Path.make [specdir;"release"])
+
+let specdir_by_version pkg_name version =
+  let err msg = err "specdir_by_version" msg in
+  let pkg_dir = Path.make ["pack";pkg_name] in
+  print_endline ("DEBUG "^pkg_dir);
+  let specdirs = List.map (fun dir -> Path.make [pkg_dir;dir])
+			  (System.list_of_directory pkg_dir) in
+  List.iter (fun dir -> print_endline ("DEBUG FUCK "^dir)) specdirs;
+  let rec check_specdir_version specdirs =
+    match specdirs with
+    | specdir :: specdirs ->
+       let (ver,rev) = ver_rev_of_release (release_by_specdir specdir) in
+       print_endline ("DEBUG "^ver^":"^rev);
+       if ver = version then specdir else check_specdir_version specdirs
+    | [] -> err ("specdir for version "^version^" not found") in
+  check_specdir_version specdirs
+
+  

@@ -132,6 +132,10 @@ let reread_params () =
   set_param ~default:"jirabot" "jira-user";
   set_param ~default:"ahng6Ije" "jira-pass";
 
+  set_param ~default:"http://mirror.yandex.ru/centos/" "centos-mirror";
+  set_param ~default:"Packages" "centos-packages-dir";
+  set_param ~default:"chroots" "chroots-dir";
+  
   read_params ()
 
 (* Utils *)

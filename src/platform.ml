@@ -162,3 +162,4 @@ let with_platform (f : os -> platform -> 'a) =
 	in f os platform
     | SunOS ->
 	f os (sunos_platfrom ())
+

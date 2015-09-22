@@ -44,6 +44,3 @@ let changelog_specdir specdir rev_a rev_b =
       if not (List.mem_assoc specdir_a depends_b) then
 	Printf.printf "- %s %s %d\n%!" specdir_a ver_a rev_a)
     depends_a
-
-let test () =
-  msg "changelog" "low" "fucking holy shit!"

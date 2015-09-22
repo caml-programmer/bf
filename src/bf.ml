@@ -461,7 +461,7 @@ let main () =
 	| "tests" ->
 	   Tests.run ()
 	| "test" ->
-	   Changelog_ng.test ()
+	   Test.chroots ()
 	| _ ->
 	    analyze ()
     else usage ()

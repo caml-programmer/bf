@@ -82,7 +82,7 @@ let string_of_spec spec =
 	  "REJECTS:";
 	  (prefix_textblock "  " (string_of_string_list spec.rejects));
 	  "COMPONENTS:";
-	  (prefix_textblock "  " (string_of_string_list
+	  (prefix_textblock "  " (enumerate_string_list
 				    (List.map string_of_component spec.components)));
 	  (sprintf "PRE_INSTALL: %s" (string_of_string_option spec.pre_install));
 	  (sprintf "PRE_UPDATE: %s" (string_of_string_option spec.pre_update));
@@ -109,7 +109,7 @@ let depload ?snapshot ?(interactive=false) ?(ignore_last=false) file : platform_
       let pkg_op = ref None in
       let pkg_ver = ref None in
       let pkg_desc = ref None in
-      
+
       let add_op op v =
 	let ver =
 	  Scheme.make_string (Scheme.fst v) in
@@ -340,9 +340,11 @@ let load_v3 ?(snapshot=false) ~version ~revision specdir =
   load_v2 ~short_composite:true ~snapshot ~version ~revision specdir
      
 (* Функция Spec.load получает на вход директорию specdir и возвращает spec, характеризующий её *)
-let load ~snapshot ~version ~revision specdir = 
+let load ?(snapshot=false) ~version ~revision specdir = 
   let version_file = Filename.concat specdir "version" in
   match Specdir.get_version version_file with
-  | "2" -> load_v2 ~snapshot ~version ~revision specdir
-  | "3" -> load_v3 ~snapshot ~version ~revision specdir
+  | "2.0" -> load_v2 ~snapshot ~version ~revision specdir
+  | "3.0" -> load_v3 ~snapshot ~version ~revision specdir
   | _ -> failwith "Unknown version of specdir"
+
+		  

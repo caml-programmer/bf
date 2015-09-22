@@ -201,7 +201,7 @@ let scm_read_command cmd =
     (read_command (Scheme.string_of_sval cmd))
 
 let scm_command cmd =
-  let (status,outputs,errors) = System.command (Scheme.string_of_sval cmd) in
+  let (status,outputs,errors) = Cmd.command (Scheme.string_of_sval cmd) in
   Spair {car = Sint status;
 	 cdr =
 	   Spair {car = Sstring outputs;
@@ -210,7 +210,7 @@ let scm_command cmd =
 			   cdr = Snull}}}
 
 let scm_cpu_number () =
-  Sint (System.cpu_number ())
+  Sint (Cmd.cpu_number ())
 	
 let scm_update_make_params v =
   update_make_params (Scheme.make_params_of_sval v);

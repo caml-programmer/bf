@@ -9,3 +9,8 @@ let write_lines file lines =
   System.write
     (Buffer.contents buf)
     file
+
+let chroots () =
+  Chroot.make "centos" Platform.Cent6;
+  Chroot.buildpkg "centos" "jet-racket5" "14.0.0"
+	      

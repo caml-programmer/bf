@@ -159,14 +159,6 @@ let git_create_url component =
 	  raise (Component_not_found component.name)
 	with Found_component url -> url
 
-
-
-
-    
-
-
-
-       
 let with_rules s c =
   match c.rules with
     | Some alt ->
@@ -189,6 +181,15 @@ let checkout ?(low=false) component =
 	  git_checkout ~low ~force:true ~key:"master" ()
 	else
 	  git_checkout ~low ~force:true ~key:"HEAD" ()
+
+let checkout_new component =
+  let label = match component.label with
+    | Tag x -> x
+    | Branch x -> x
+    | Current -> "." in
+  System.with_dir component.name
+		  (fun () -> Output.msg "Component.checkout_new" "always" (Sys.getcwd ());
+			     Git.checkout label)
 
 let remove component =
   if System.is_directory component.name then
@@ -656,5 +657,3 @@ let component_of_sval s =
  
 let components_of_sval_array v =
   List.map component_of_sval (Array.to_list v)
-
-

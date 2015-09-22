@@ -1,7 +1,8 @@
 open System
 open Printf
 open Logger
-       
+open Output
+
 type tag_status =
   | Tag_already_exists
   | Tag_created
@@ -121,12 +122,7 @@ let git_log ?(pack=None) ?(diff=false) ?(since=None) tag_a tag_b =
   chunks := (Buffer.contents buf)::!chunks;
   List.rev !chunks
 
-let git_checkout
-  ?(low=false)
-  ?(force=false)
-  ?branch
-  ?(modify=false)
-  ?(track=false) ?key ?files () =
+let git_checkout ?(low=false) ?(force=false) ?branch ?(modify=false) ?(track=false) ?key ?files () =
   let args = ref ["checkout";"-q"] in
   let add arg = args := !args @ [arg] in
   if force then add "-f";
@@ -137,6 +133,9 @@ let git_checkout
   (match files with Some l -> List.iter add l | None -> ());
   log_command ~low ~env "git" !args
 
+let checkout label =
+  Cmd.command_log ("git checkout "^label)
+	      
 let git_branch ?(filter=(fun _ -> true)) ?(raw_filter=(fun _ -> true)) ?(remote=false) () =
   let remotes_cleaner s =
     let a = "remotes/origin/" in
@@ -339,4 +338,3 @@ let check_component_url url name =
       ignore(input_line ch);
     done; check ()
   with End_of_file -> check ())
-
