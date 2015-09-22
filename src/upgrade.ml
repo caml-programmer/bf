@@ -29,6 +29,8 @@ let make specdir upgrade_mode default_branch =
   let specdir = System.path_strip_directory specdir in
   let pkgname = Specdir.pkgname specdir in
 
+  (* TODO: автоматическая установка pkg-prefix, pack, plugins-dir *)
+
   Check.install_dir ();
   Check.specdir specdir;
   Check.pack_component ();
