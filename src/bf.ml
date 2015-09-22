@@ -247,7 +247,7 @@ let main () =
 		  Some Sys.argv.(pos)
 		else None
 	      in
-	      if Sys.file_exists version && Sys.file_exists composite then
+	      if Sys.file_exists version then
 		with_lock (fun () ->
 		  ignore (Package.update ~specdir ~lazy_mode ~ver ~rev ()))
 	      else
