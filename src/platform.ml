@@ -111,14 +111,12 @@ let linux_platform_mapping =
   [
     "/etc/redhat-release",
     [
-      "^Red Hat Enterprise.*?release 3",Rhel3;
-      "^Red Hat Enterprise.*?release 4",Rhel4;
       "^Red Hat Enterprise.*?release 5",Rhel5;
       "^Red Hat Enterprise.*?release 6",Rhel6;
-      "^CentOS.*?release 4",Cent4;
-      "^CentOS.*?release 5",Cent5;
-      "^CentOS.*?release 6",Cent6;
-      "^CentOS.*?release 7",Cent7;
+      "^Red Hat Enterprise.*?release 7",Rhel7;
+      "^CentOS.*?release 5",Rhel5;
+      "^CentOS.*?release 6",Rhel6;
+      "^CentOS.*?release 7",Rhel7;
       "^Fedora.*?release 10",Fedora10;
       "^ALT Linux",Alt
     ];
