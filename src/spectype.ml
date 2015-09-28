@@ -94,8 +94,19 @@ let string_of_spec spec =
 
 (* функция загрузки depends *)
 
+exception No_pkg_prefix of string
+
 let depload ?snapshot ?(interactive=false) ?(ignore_last=false) file : platform_depend list =
   let packdir = Filename.dirname (Filename.dirname (Filename.dirname file)) in
+  let pkgname =
+    Filename.basename (Filename.dirname (Filename.dirname file)) in
+  let pkg_prefix =
+    try
+      let pos = String.index pkgname '-' in
+      String.sub pkgname 0 (pred pos)
+    with Not_found ->
+      raise (No_pkg_prefix pkgname) in
+
   let acc = ref ([] : platform_depend list) in
   let add_depend v = acc := v::!acc in
   let add_package v =
@@ -124,7 +135,7 @@ let depload ?snapshot ?(interactive=false) ?(ignore_last=false) file : platform_
 		| _ ->
 		    (match !pkg_name with
 		      | Some pkg ->
-			  if Strings.have_prefix (Params.get_param "pkg-prefix") pkg then
+			  if Strings.have_prefix pkg_prefix pkg then
 			    pkg_ver := Some ver'
 			  else 
 			    pkg_ver := Some ver

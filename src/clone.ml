@@ -53,6 +53,8 @@ let make ?(vr=None) ~recursive ~overwrite specdir =
 
   let specdir = System.path_strip_directory specdir in
 
+  Params.update_for_specdir specdir;
+
   Check.install_dir ();
   Check.specdir specdir;
   Check.pack_component ();

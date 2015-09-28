@@ -4,7 +4,19 @@ open Platform
 open Deptree
 open Logger
 
+exception No_pkg_prefix of string
+
 let make ~hard pkg_path =
+  let pkg_prefix =
+    let name = Filename.basename pkg_path in
+    try
+      let pos = String.index name '-' in
+      String.sub name 0 (pred pos)
+    with Not_found ->
+      raise (No_pkg_prefix name) in
+  
+  Params.update_param "pkg-prefix" pkg_prefix;
+
   let depends =
     Clonetree.tree_of_package pkg_path in
   let pkg_dir = Filename.dirname pkg_path in
