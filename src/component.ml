@@ -191,15 +191,28 @@ let checkout_new component =
 		  (fun () -> Output.msg "Component.checkout_new" "always" (Sys.getcwd ());
 			     Git.checkout label)
 
+let ls_files component =
+  System.with_dir component.name Git.ls_files
+
+
+		  
 let remove component =
   if System.is_directory component.name then
     System.remove_directory component.name
       
 let clone component =
   git_clone
-    (Filename.concat 
-      (git_create_url component) component.name) component.name
+    (Filename.concat (git_create_url component) component.name)
+    component.name
 
+let clone_new ?from component =
+  let branch = string_of_label component.label in
+  let url = match from with
+    | None -> (Filename.concat (git_create_url component) component.name)
+    | Some url -> url in
+  System.with_dir ~create:true component.name
+		  (fun () -> Git.clone ~branch ~depth:1 url)
+    
 let with_component_dir ?(low=false) ?(strict=true) component (thunk : unit -> unit) =
   let curdir = Sys.getcwd () in
 

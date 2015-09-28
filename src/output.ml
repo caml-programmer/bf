@@ -18,11 +18,11 @@ let log_level_acceptable loglevel =
   let funlevel = int_of_log_level loglevel in
   funlevel <= syslevel
 
-let string_list_of_string string =
-  Str.split (Str.regexp "\n") string
+let string_list_of_string ?(separator="\n") string =
+  Str.split (Str.regexp separator) string
 
-let string_of_string_list strings =
-  String.concat "\n" strings
+let string_of_string_list ?(separator="\n") strings =
+  String.concat separator strings
 
 let prefix_textblock prefix string =
   let strings = string_list_of_string string in

@@ -31,6 +31,11 @@ let git_init () =
 let git_clone url name =
   log_command ~env "git" ["clone";"-n";"-q";url;name]
 
+let clone ?(branch="") ?(depth=0) url =
+  let branch_str = if (String.length branch) != 0 then (" -b "^branch) else "" in
+  let depth_str = match depth with 0 -> "" | depth -> (" --depth "^(string_of_int depth)) in
+  Cmd.command_log ("git clone "^url^branch_str^depth_str)
+
 let git_add name =
   log_command ~env "git" ["add";name]
 
@@ -135,7 +140,11 @@ let git_checkout ?(low=false) ?(force=false) ?branch ?(modify=false) ?(track=fal
 
 let checkout label =
   Cmd.command_log ("git checkout "^label)
-	      
+
+let ls_files () =
+  let (_,output,_) = Cmd.command "git ls-files" in
+  output
+		  
 let git_branch ?(filter=(fun _ -> true)) ?(raw_filter=(fun _ -> true)) ?(remote=false) () =
   let remotes_cleaner s =
     let a = "remotes/origin/" in
@@ -338,3 +347,5 @@ let check_component_url url name =
       ignore(input_line ch);
     done; check ()
   with End_of_file -> check ())
+
+

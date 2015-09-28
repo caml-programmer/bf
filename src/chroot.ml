@@ -57,13 +57,21 @@ let make chroot_name platform =
      ignore (Cmd.command ("wget "^repo_packages^centos_release_pkg^" -O "^centos_release_pkg_path));
      ignore (Cmd.command ("fakeroot fakechroot rpm --root "^chroot_dir^" --initdb"));
      ignore (Cmd.command ("fakeroot fakechroot rpm --root "^chroot_dir^" --nodeps -ivh "^centos_release_pkg_path));
-     ignore (Cmd.command ("rm "^(Path.make [chroot_dir; "etc/yum.repos.d/*.repo"])))
+     ignore (Cmd.command ("rm "^(Path.make [chroot_dir; "etc/yum.repos.d/*.repo"])));
+     ignore (Cmd.command ("mkdir -p "^(Path.make [chroot_dir; "projects/"])))
   | p -> unsupported_platform p
 
 (* Эта функция копирует компонент в директорию $chroot_name/projects *)
 let clone_component chroot_name component =
   let chroot_dir = compose_chroot_path chroot_name in
-  Component.checkout_new component
+  Component.checkout_new component;
+  let component_path = (Path.make [(Sys.getcwd ());
+				   component.name]) in
+  print_endline ("DEBUG "^component_path);
+  System.with_dir ~create:true (Path.make [chroot_dir;"projects"])
+		  (fun () -> Component.clone_new ~from:component_path component)
+		       
+			 
   
 let buildpkg chroot_name pkg_name version =
   print_endline ("DEBUG !!!");
@@ -77,5 +85,5 @@ let buildpkg chroot_name pkg_name version =
   print_endline (Spectype.string_of_spec spec);
   List.iter (fun component -> ignore (clone_component chroot_dir component))
 	    spec.components
-		
+	    
 		

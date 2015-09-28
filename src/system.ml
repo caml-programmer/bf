@@ -372,16 +372,6 @@ let read_directory dir =
       Unix.closedir dh; List.rev acc
   in read []
 
-let with_dir dir f =
-  let cur = Sys.getcwd () in
-  try
-    Sys.chdir dir;
-    let r = f () in
-    Sys.chdir cur;
-    r
-  with exn ->
-    Sys.chdir cur; raise exn
-
 let move_file src dir =
   let name = Filename.basename src in
   let dst = Filename.concat dir name in
@@ -402,6 +392,17 @@ let make_directory_r ?(mode=0o755) s =
     else
       make (s::rest) dir
   in make [] (path_strip_directory s)
+
+let with_dir ?(create=false) dir f =
+  let cur = Sys.getcwd () in
+  try
+    if create then make_directory_r dir;
+    Sys.chdir dir;
+    let r = f () in
+    Sys.chdir cur;
+    r
+  with exn ->
+    Sys.chdir cur; raise exn
 
 let readdir dir =
   let dh = Unix.opendir dir in
