@@ -20,20 +20,22 @@ let up_search ~default name =
 
 let read_from_file filename =
   let rex = Re_perl.compile_pat "^([^\\s]+)\\s+(.*)\\s*$" in
-  let ch = open_in filename in
-  List.iter
-    (fun s ->
-      try
-	let res = Re.exec rex s in
-	let key = Re.get res 1 in
-	let value = Re.get res 2 in	
-	Hashtbl.replace user_params key value;
-	Ocs_env.set_glob Scheme.env
-	  (Ssymbol key) (Sstring value)
-      with Not_found ->
-	Printf.printf "ignore: %s\n%!" s)
-    (list_of_channel ch);
-  user_params
+  if Sys.file_exists filename
+  then let ch = open_in filename in
+       List.iter
+	 (fun s ->
+	  try
+	    let res = Re.exec rex s in
+	    let key = Re.get res 1 in
+	    let value = Re.get res 2 in	
+	    Hashtbl.replace user_params key value;
+	    Ocs_env.set_glob Scheme.env
+			     (Ssymbol key) (Sstring value)
+	  with Not_found ->
+	    Printf.printf "ignore: %s\n%!" s)
+	 (list_of_channel ch);
+       user_params
+  else Hashtbl.create 0
 
 let read_params () =
   let default =

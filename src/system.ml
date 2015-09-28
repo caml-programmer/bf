@@ -45,6 +45,11 @@ let list_of_channel ch =
       List.rev acc
   in read []
 
+let list_of_file file =
+  if Sys.file_exists file then
+    list_of_channel (open_in file)
+  else []
+	  
 exception Env_problem of string
 
 let get_env name =
@@ -320,6 +325,13 @@ let read_file ~file =
     with End_of_file ->
       close_in ch; Buffer.contents buffer
   else ""
+
+exception File_not_exist of string
+	 
+let string_of_file file =
+  if Sys.file_exists file
+  then string_of_channel (open_in file)
+  else raise (File_not_exist file)
 
 let pid_exists file =
   let pid =

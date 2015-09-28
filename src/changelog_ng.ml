@@ -3,6 +3,29 @@
 open Component
 open Output
 
+let make ?(recursive=false) pkg_name version begin_rev end_rev =
+  ignore begin (string_of_bool recursive)
+	       ^ pkg_name ^ version
+	       ^ (string_of_int begin_rev)
+	       ^ (string_of_int end_rev)
+	 end;
+  let msg loglevel text = msg "Changelog_ng.make" loglevel text in
+  let begin_tag = Tag.make pkg_name version begin_rev in
+  let end_tag = Tag.make pkg_name version end_rev in
+  let specdir = Specdir.specdir_by_version pkg_name version in
+  msg "always" ("tag-a: " ^ begin_tag);
+  msg "always" ("tag-b: " ^ end_tag);
+  msg "always" ("specdir: " ^ specdir);
+  let begin_tree =
+    Clonetree.tree_of_specdir ~newload:true ~log:false ~vr:(Some (Release.of_ver_rev version begin_rev)) specdir in
+  let end_tree =
+    Clonetree.tree_of_specdir ~newload:true ~log:false ~vr:(Some (Release.of_ver_rev version end_rev)) specdir in
+  msg "debug" "TREE BEGIN: --------------------";
+  msg "debug" (Clonetree.string_of_clone_tree begin_tree);
+  msg "debug" "TREE END: --------------------";
+  msg "debug" (Clonetree.string_of_clone_tree end_tree)
+  
+       
 (* данная функция выводит changelog пакета и всех его зависимостей *)       
 let changelog_specdir specdir rev_a rev_b =
   let tree_a = Clonetree.tree_of_specdir ~log:false ~vr:(Some (Changelog.vr_of_rev rev_a)) specdir in

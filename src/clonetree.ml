@@ -15,7 +15,9 @@ type clone_tree =
     clone_val deptree
 
 let string_of_clone_val (pkg, ver, rev, spec) =
-  pkg ^ " " ^ ver ^ "-" ^ (string_of_int rev) ^ "\n" ^ "SPEC:\n" ^ (string_of_spec spec)
+  pkg ^ " " ^ ver ^ "-" ^ (string_of_int rev) ^ "\n"
+  ^ "SPEC:\n"
+  ^ (string_of_spec spec)
 	      
 let string_of_clone_tree (tree:clone_tree) =
   let space depth = String.make (2*depth) ' ' in
@@ -179,7 +181,7 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
 
   make 0 pkg_path
 
-let tree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
+let tree_of_specdir ?(newload=false) ?(log=true) ?packdir ~vr specdir : clone_tree =
   let table = Hashtbl.create 32 in
   let pkgdir =
     match packdir with
@@ -213,9 +215,15 @@ let tree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
 	    checkout_pack 
 	      (Tag.mk ((Specdir.pkgname specdir), ver, rev));
 	    let spec =
-	      Spectype.load_v2
-		~version:ver
-		~revision:(string_of_int rev) specdir in
+	      if newload
+	      then
+		let pkgname = Specdir.pkgname specdir in
+		let (version,_) = Specdir.ver_rev_of_release (Specdir.release_by_specdir specdir) in
+		Spectype.newload pkgname version
+	      else
+		Spectype.load
+		  ~version:ver
+		  ~revision:(string_of_int rev) specdir in
 	    Hashtbl.replace table specdir (ver,rev,spec);
 	    replace depth specdir ver' rev' ver rev;
 	  end
@@ -229,10 +237,16 @@ let tree_of_specdir ?(log=true) ?packdir ~vr specdir : clone_tree =
 	  (Tag.mk ((Specdir.pkgname specdir), ver, rev));
 
 	if Sys.file_exists specdir then
-	  let spec = 
-	    Spectype.load_v2
-	      ~version:ver
-	      ~revision:(string_of_int rev) specdir in
+	  let spec =
+	    if newload
+	    then
+	      let pkgname = Specdir.pkgname specdir in
+	      let (version,_) = Specdir.ver_rev_of_release (Specdir.release_by_specdir specdir) in
+	      Spectype.newload pkgname version
+	    else
+	      Spectype.load
+		~version:ver
+		~revision:(string_of_int rev) specdir in
 	  
 	  Hashtbl.add table specdir (ver,rev,spec);
 	  

@@ -57,7 +57,7 @@ let string_of_op = function
   | v -> string_of_pkg_op v
 
 let string_of_platform_depend (pkg_name, dep, desc) =
-  string_of_string_list
+  string_of_string_list ~separator:" "
     [
       pkg_name;
       (match dep with
@@ -98,8 +98,12 @@ exception No_pkg_prefix of string
 
 let depload ?snapshot ?(interactive=false) ?(ignore_last=false) file : platform_depend list =
   let packdir = Filename.dirname (Filename.dirname (Filename.dirname file)) in
-  let pkgname =
-    Filename.basename (Filename.dirname (Filename.dirname file)) in
+  let pkgname = Filename.basename (Filename.dirname (Filename.dirname file)) in
+(*
+  print_endline ("file: " ^ file);
+  print_endline ("packdir: " ^ packdir);
+  print_endline ("pkgname: " ^ pkgname);
+ *)
   let pkg_prefix =
     try
       let pos = String.index pkgname '-' in
@@ -349,7 +353,7 @@ let load_v2 ?(snapshot=false) ?(short_composite=false) ~version ~revision specdi
 
 let load_v3 ?(snapshot=false) ~version ~revision specdir =
   load_v2 ~short_composite:true ~snapshot ~version ~revision specdir
-     
+	  
 (* Функция Spec.load получает на вход директорию specdir и возвращает spec, характеризующий её *)
 let load ?(snapshot=false) ~version ~revision specdir = 
   let version_file = Filename.concat specdir "version" in
@@ -358,4 +362,43 @@ let load ?(snapshot=false) ~version ~revision specdir =
   | "3.0" -> load_v3 ~snapshot ~version ~revision specdir
   | _ -> failwith "Unknown version of specdir"
 
-		  
+
+(* release  version *)
+
+let load_v2_new pkgname version =
+  let load_file file =
+    try Some (System.string_of_file file)
+    with System.File_not_exist _ -> None in
+  let components = Composite.components "composite" in
+  let depends = depload "depends" in
+  let provides = System.list_of_file "provides" in
+  let rejects = System.list_of_file "rejects" in
+  let obsoletes = System.list_of_file "obsoletes" in
+  let pre_install = load_file "pre-install" in
+  let pre_update = load_file "pre-update" in
+  let pre_uninstall = load_file "pre-uninstall" in
+  let post_install = load_file "post-install" in
+  let params = Params.read_from_file "params" in
+  {
+    pkgname = pkgname;
+    depends = depends;
+    provides = provides;
+    obsoletes = obsoletes;
+    rejects = rejects;
+    components = components;
+    pre_install = pre_install;
+    pre_update = pre_update;
+    pre_uninstall = pre_uninstall;
+    post_install = post_install;
+    params = params;
+    hooks = None; (* атавизм со времён load_v1 *)
+  }
+
+let newload pkgname version =
+  System.with_dir (Specdir.specdir_by_version pkgname version)
+    (fun () ->
+     match Specdir.get_version "version" with
+     | "2.0" -> load_v2_new pkgname version
+     | _ -> failwith "Not now"
+    )
+

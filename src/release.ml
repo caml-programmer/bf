@@ -104,7 +104,15 @@ let get ?(next=false) ?version specdir =
   else
     raise (Release_not_found (sprintf "release file (%s) not found" file))
 
+type release = string * int
+	  
+let of_ver_rev ver rev = (ver, rev)
 
-
-
-
+let of_string release_str =
+  let err msg = Output.err "of_string" msg in
+  try
+    let pos = String.index release_str '-' in
+    let len = String.length release_str in
+    String.sub release_str 0 pos,
+    int_of_string (String.sub release_str (succ pos) (len - pos - 1))
+  with Not_found -> err ("Invalid release: " ^ release_str)

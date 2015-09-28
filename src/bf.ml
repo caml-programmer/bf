@@ -482,6 +482,12 @@ let main () =
 	    end	    
 	| "test" ->
 	   Test.chroots ()
+	| "test-changelog" ->
+	   let package = Sys.argv.(2) in
+	   let version = Sys.argv.(3) in
+	   let rev_a = Sys.argv.(4) in
+	   let rev_b = Sys.argv.(5) in
+	   ignore (Changelog_ng.make package version (int_of_string rev_a) (int_of_string rev_b))
 	| _ ->
 	    analyze ()
     else usage ()

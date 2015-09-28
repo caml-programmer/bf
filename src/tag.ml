@@ -4,6 +4,9 @@ open Logger
 let mk (pkgname,ver,rev) =
   sprintf "%s/%s-%d" pkgname ver rev
 
+let make pkgname ver rev =
+  mk (pkgname,ver,rev)
+	  
 let pkgname tag =
   try
     Some (String.sub tag 0 (String.index tag '/'))
