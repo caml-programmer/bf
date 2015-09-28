@@ -59,6 +59,9 @@ let non_first_build rev_a rev_b =
   not (snd (vr_of_rev rev_a) = 0)
 
 let make specdir rev_a rev_b =
+
+  Params.update_for_specdir specdir;
+
   if non_first_build rev_a rev_b then
     try
       diff ~changelog:true specdir rev_a rev_b
