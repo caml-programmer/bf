@@ -199,7 +199,7 @@ let string_handler_of_sval v =
 let unpair = function
   | Spair v -> v
   | _ -> raise Not_found
-
+	       
 let make_string = function
   | Sstring s -> s
   | Ssymbol s -> s
@@ -227,6 +227,32 @@ let rec map f = function
 
 let read_list =
   map (fun v -> v)
+	   
+exception Key_not_found of string
+exception Not_alist
+exception Not_list
+	    
+let rec filter pred = function
+  | Spair x ->
+     if pred x.car
+     then x.car :: (filter pred x.cdr)
+     else filter pred x.cdr
+  | Snull -> []
+  | _ -> raise Not_list
+
+let filter_key key alist =
+  filter (function
+	   | Spair pair -> (make_string pair.car) = key
+	   | _ -> raise Not_alist)
+	 alist
+
+let rec assoc key = function
+  | Spair x ->
+     if key = (make_string x.car)
+     then x.cdr
+     else assoc key x.cdr
+  | Snull -> raise (Key_not_found key)
+  | _ -> raise Not_alist
 
 let condrun name f = function
   | Spair x ->
@@ -247,6 +273,4 @@ let rec parse m = function
   | _ -> ()
 
 
-
-
-
+     

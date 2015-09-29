@@ -66,6 +66,15 @@ let string_of_platform_depend (pkg_name, dep, desc) =
        | None -> "")
     ]
 
+let op_of_string = function
+  | "last" -> Pkg_last
+  | "<=" -> Pkg_le
+  | "<" -> Pkg_lt
+  | "=" -> Pkg_eq
+  | ">=" -> Pkg_ge
+  | ">" -> Pkg_gt
+  | _ as op -> Output.err "Spectype.op_of_string" ("Undefined operator: "^op)
+	     
 let string_of_spec spec =
   string_of_string_list (
       List.filter
@@ -75,7 +84,7 @@ let string_of_spec spec =
 	  "DEPENDS:";
 	  (prefix_textblock "  " (string_of_string_list
 				    (List.map string_of_platform_depend spec.depends)));
-	  "PRIVIDES:";
+	  "PROVIDES:";
 	  (prefix_textblock "  " (string_of_string_list spec.provides));
 	  "OBSOLETES:";
 	  (prefix_textblock "  " (string_of_string_list spec.obsoletes));
@@ -113,6 +122,7 @@ let depload ?snapshot ?(interactive=false) ?(ignore_last=false) file : platform_
 
   let acc = ref ([] : platform_depend list) in
   let add_depend v = acc := v::!acc in
+  
   let add_package v =
     let v2 = Scheme.map (fun v -> v) v in
     try
@@ -365,12 +375,52 @@ let load ?(snapshot=false) ~version ~revision specdir =
 
 (* release  version *)
 
-let load_v2_new pkgname version =
+
+let depload_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) depfile : platform_depend list =
+  let err msg = Output.err "Spectype.depload_v2_new" msg in
+  let remove_fst_level alist = List.map (function
+					  | Spair x -> x.cdr
+					  | _ -> err "Not an alist")
+					alist in
+  let make_dep dep_scm =
+    let dep = Scheme.read_list dep_scm in
+    (*List.map (fun sval -> print_endline ("DEBUG-1: "^(Scm.string_of_sval sval))) dep;*)
+    let pkgname = Scheme.make_string (List.nth dep 0) in
+    let op_ver_scm = List.nth dep 1 in
+    let pkgop = op_of_string (Scheme.make_string (Scheme.fst op_ver_scm)) in
+    let pkgver = Scheme.make_string (Scheme.snd op_ver_scm) in
+    let op_ver_opt = Some (pkgop, pkgver) in
+    let desc_scm_opt = try Some (List.nth dep 2) with _ -> None in
+    let desc_opt = match desc_scm_opt with
+      | Some desc_scm -> Some (Scheme.make_string (Scheme.snd desc_scm))
+      | None -> None in
+    (pkgname, op_ver_opt, desc_opt) in
+
+  if Sys.file_exists depfile
+  then let deplist = Ocs_read.read_from_port (Ocs_port.open_input_port depfile) in
+       (*print_endline ("DEBUG-2: "^(Scm.string_of_sval deplist));*)
+       let dep_oses = Scheme.assoc "depends" deplist in
+       (*print_endline ("DEBUG-3: "^(Scm.string_of_sval dep_oses));*)
+       let dep_os = remove_fst_level (Scheme.filter_key (Platform.string_of_os os) dep_oses) in
+       (*List.map (fun sval -> print_endline ("DEBUG-4: "^(Scm.string_of_sval sval))) dep_os;*)
+       let deps_platforms =
+	 List.filter (function
+		       | Spair {car=platforms_scm; cdr=_} ->
+			  List.mem platform
+				   (Scheme.map (fun x -> platform_of_string (Scheme.make_string x))
+					       platforms_scm)
+		       | sval -> err ("Invalid dependency sval: "^(Scm.string_of_sval sval)))
+		     dep_os in
+       let deps = remove_fst_level deps_platforms in
+       List.map make_dep deps
+  else []
+
+let load_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname version =
   let load_file file =
     try Some (System.string_of_file file)
     with System.File_not_exist _ -> None in
   let components = Composite.components "composite" in
-  let depends = depload "depends" in
+  let depends = depload_v2_new ~platform "depends" in
   let provides = System.list_of_file "provides" in
   let rejects = System.list_of_file "rejects" in
   let obsoletes = System.list_of_file "obsoletes" in
@@ -394,11 +444,11 @@ let load_v2_new pkgname version =
     hooks = None; (* атавизм со времён load_v1 *)
   }
 
-let newload pkgname version =
+let newload ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname version =
   System.with_dir (Specdir.specdir_by_version pkgname version)
     (fun () ->
      match Specdir.get_version "version" with
-     | "2.0" -> load_v2_new pkgname version
+     | "2.0" -> load_v2_new pkgname version ~platform
      | _ -> failwith "Not now"
     )
 

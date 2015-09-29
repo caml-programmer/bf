@@ -69,15 +69,15 @@ let release_by_specdir specdir =
 let specdir_by_version pkg_name version =
   let err msg = err "specdir_by_version" msg in
   let pkg_dir = Path.make ["pack";pkg_name] in
-  print_endline ("DEBUG "^pkg_dir);
+  (*print_endline ("DEBUG "^pkg_dir);*)
   let specdirs = List.map (fun dir -> Path.make [pkg_dir;dir])
 			  (System.list_of_directory pkg_dir) in
-  List.iter (fun dir -> print_endline ("DEBUG FUCK "^dir)) specdirs;
+  (*List.iter (fun dir -> print_endline ("DEBUG FUCK "^dir)) specdirs;*)
   let rec check_specdir_version specdirs =
     match specdirs with
     | specdir :: specdirs ->
        let (ver,rev) = ver_rev_of_release (release_by_specdir specdir) in
-       print_endline ("DEBUG "^ver^":"^rev);
+       (*print_endline ("DEBUG "^ver^":"^rev);*)
        if ver = version then specdir else check_specdir_version specdirs
     | [] -> err ("specdir for version "^version^" not found") in
   check_specdir_version specdirs

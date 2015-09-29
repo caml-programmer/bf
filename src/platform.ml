@@ -101,7 +101,12 @@ let os_of_string = function
   | "linux" -> Linux
   | "sunos" -> SunOS
   | s -> log_error (sprintf "Unsupported OS (%s)" s)
-      
+
+let string_of_os = function
+  | Linux -> "linux"
+  | SunOS -> "sunos"
+  | _ -> Output.err "Platform.string_of_os" "Unknown OS"
+		   
 let os_as_string = System.uname
 
 let os () =
@@ -124,7 +129,7 @@ let linux_platform_mapping =
     "/etc/debian_version",["^.*",Debian];
     "/etc/gentoo-release",["^.*",Gentoo];
   ]
-    
+
 let rec select_platforms acc = function
   | [] -> acc
   | (file,mapping)::tl ->
@@ -142,6 +147,11 @@ let rec select_platforms acc = function
 	end
       else select_platforms acc tl
 
+let current () =
+  match select_platforms [] linux_platform_mapping with
+  | [] -> Unknown_linux
+  | p::_ -> p
+			    
 let sunos_platfrom () =
   match System.uname ~flag:'r' () with
     | "5.8"  -> Solaris8
