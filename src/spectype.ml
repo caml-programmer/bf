@@ -384,14 +384,10 @@ let depload_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) depfile 
 					alist in
   let make_dep dep_scm =
     let dep = Scheme.read_list dep_scm in
-    (*print_endline ("DEBUG-M-1: "^(Scm.string_of_sval dep_scm));*)
     let pkgname = Scheme.make_string (List.nth dep 0) in
-    (*print_endline ("DEBUG-M-2: "^pkgname);*)
     let op_ver_scm = List.nth dep 1 in
     let pkgop = op_of_string (Scheme.make_string (Scheme.first op_ver_scm)) in
-    (*print_endline ("DEBUG-M-3: "^(string_of_op pkgop));*)
     let pkgver = Scheme.make_string (Scheme.second op_ver_scm) in
-    (*print_endline ("DEBUG-M-4: "^pkgver);*)
     let op_ver_opt = Some (pkgop, pkgver) in
     let desc_scm_opt = try Some (List.nth dep 2) with _ -> None in
     let desc_opt = match desc_scm_opt with
@@ -401,11 +397,8 @@ let depload_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) depfile 
 
   if Sys.file_exists depfile
   then let deplist = Ocs_read.read_from_port (Ocs_port.open_input_port depfile) in
-       (*print_endline ("DEBUG-2: "^(Scm.string_of_sval deplist));*)
        let dep_oses = Scheme.assoc "depends" deplist in
-       (*print_endline ("DEBUG-3: "^(Scm.string_of_sval dep_oses));*)
        let dep_os = remove_fst_level (Scheme.filter_key (Platform.string_of_os os) dep_oses) in
-       (*List.map (fun sval -> print_endline ("DEBUG-4: "^(Scm.string_of_sval sval))) dep_os;*)
        let deps_platforms =
 	 List.filter (function
 		       | Spair {car=platforms_scm; cdr=_} ->
@@ -418,10 +411,7 @@ let depload_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) depfile 
 						   platforms_scm))
 		       | sval -> err ("Invalid dependency sval: "^(Scm.string_of_sval sval)))
 		     dep_os in
-       (*List.map (fun sval -> print_endline ("DEBUG-6: "^(Scm.string_of_sval sval)))
-		deps_platforms;*)
        let deps_list = remove_fst_level deps_platforms in
-       (*List.map (fun sval -> print_endline ("DEBUG-7: "^(Scm.string_of_sval sval))) deps_list;*)
        let deps = List.flatten (List.map Scheme.read_list deps_list) in
        List.map make_dep deps
   else []
