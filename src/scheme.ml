@@ -90,6 +90,12 @@ let snd = function
   | Spair v -> v.cdr
   | x -> error x
 
+let first = fst
+
+let second = function
+  | Spair v -> fst v.cdr
+  | x -> error x
+      
 let eval_pair v =
   let (a,b) = v in
   (match a with
@@ -199,11 +205,13 @@ let string_handler_of_sval v =
 let unpair = function
   | Spair v -> v
   | _ -> raise Not_found
+
+exception Not_found_string
 	       
 let make_string = function
   | Sstring s -> s
   | Ssymbol s -> s
-  | _ -> raise Not_found
+  | _ -> raise Not_found_string
 
 let make_int = function
   | Sint n -> n

@@ -56,7 +56,8 @@ let string_of_op = function
   | Pkg_last -> "last"
   | v -> string_of_pkg_op v
 
-let string_of_platform_depend (pkg_name, dep, desc) =
+let string_of_platform_depend (dependency:platform_depend) =
+  let (pkg_name, dep, _) = dependency in
   string_of_string_list ~separator:" "
     [
       pkg_name;
@@ -375,7 +376,6 @@ let load ?(snapshot=false) ~version ~revision specdir =
 
 (* release  version *)
 
-
 let depload_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) depfile : platform_depend list =
   let err msg = Output.err "Spectype.depload_v2_new" msg in
   let remove_fst_level alist = List.map (function
@@ -384,15 +384,18 @@ let depload_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) depfile 
 					alist in
   let make_dep dep_scm =
     let dep = Scheme.read_list dep_scm in
-    (*List.map (fun sval -> print_endline ("DEBUG-1: "^(Scm.string_of_sval sval))) dep;*)
+    (*print_endline ("DEBUG-M-1: "^(Scm.string_of_sval dep_scm));*)
     let pkgname = Scheme.make_string (List.nth dep 0) in
+    (*print_endline ("DEBUG-M-2: "^pkgname);*)
     let op_ver_scm = List.nth dep 1 in
-    let pkgop = op_of_string (Scheme.make_string (Scheme.fst op_ver_scm)) in
-    let pkgver = Scheme.make_string (Scheme.snd op_ver_scm) in
+    let pkgop = op_of_string (Scheme.make_string (Scheme.first op_ver_scm)) in
+    (*print_endline ("DEBUG-M-3: "^(string_of_op pkgop));*)
+    let pkgver = Scheme.make_string (Scheme.second op_ver_scm) in
+    (*print_endline ("DEBUG-M-4: "^pkgver);*)
     let op_ver_opt = Some (pkgop, pkgver) in
     let desc_scm_opt = try Some (List.nth dep 2) with _ -> None in
     let desc_opt = match desc_scm_opt with
-      | Some desc_scm -> Some (Scheme.make_string (Scheme.snd desc_scm))
+      | Some desc_scm -> Some (Scheme.make_string (Scheme.second desc_scm))
       | None -> None in
     (pkgname, op_ver_opt, desc_opt) in
 
@@ -406,12 +409,20 @@ let depload_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) depfile 
        let deps_platforms =
 	 List.filter (function
 		       | Spair {car=platforms_scm; cdr=_} ->
-			  List.mem platform
-				   (Scheme.map (fun x -> platform_of_string (Scheme.make_string x))
-					       platforms_scm)
+			  (match platforms_scm with
+			   | Snull -> true
+			   | _ -> 
+			      List.mem platform
+				       (Scheme.map (fun x -> platform_of_string
+							       (Scheme.make_string x))
+						   platforms_scm))
 		       | sval -> err ("Invalid dependency sval: "^(Scm.string_of_sval sval)))
 		     dep_os in
-       let deps = remove_fst_level deps_platforms in
+       (*List.map (fun sval -> print_endline ("DEBUG-6: "^(Scm.string_of_sval sval)))
+		deps_platforms;*)
+       let deps_list = remove_fst_level deps_platforms in
+       (*List.map (fun sval -> print_endline ("DEBUG-7: "^(Scm.string_of_sval sval))) deps_list;*)
+       let deps = List.flatten (List.map Scheme.read_list deps_list) in
        List.map make_dep deps
   else []
 
@@ -420,7 +431,7 @@ let load_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname ver
     try Some (System.string_of_file file)
     with System.File_not_exist _ -> None in
   let components = Composite.components "composite" in
-  let depends = depload_v2_new ~platform "depends" in
+  let depends = depload_v2_new ~platform ~os "depends" in
   let provides = System.list_of_file "provides" in
   let rejects = System.list_of_file "rejects" in
   let obsoletes = System.list_of_file "obsoletes" in
@@ -448,7 +459,7 @@ let newload ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname version
   System.with_dir (Specdir.specdir_by_version pkgname version)
     (fun () ->
      match Specdir.get_version "version" with
-     | "2.0" -> load_v2_new pkgname version ~platform
+     | "2.0" -> load_v2_new pkgname version ~platform ~os
      | _ -> failwith "Not now"
     )
 
