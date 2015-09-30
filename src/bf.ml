@@ -148,11 +148,11 @@ let with_teleport mode f =
   let new_location =
     match mode with
       | Goto_bf_rules ->
-	  (match Params.up_search ~default:None ".bf-rules" with
+	  (match System.up_search ~default:None ".bf-rules" with
 	    | None -> raise Rules_not_found
 	    | Some x -> Filename.dirname x)
       | Goto_bf_params ->
-	  (match Params.up_search ~default:None ".bf-params" with
+	  (match System.up_search ~default:None ".bf-params" with
 	    | None -> raise Params_not_found
 	    | Some x -> Filename.dirname x)
   in
@@ -488,7 +488,9 @@ let main () =
 	   let version = Sys.argv.(3) in
 	   let rev_a = Sys.argv.(4) in
 	   let rev_b = Sys.argv.(5) in
-	   ignore (Changelog_ng.make package version (int_of_string rev_a) (int_of_string rev_b))
+	   with_teleport Goto_bf_params
+	     (fun () ->
+	      ignore (Changelog_ng.make package version (int_of_string rev_a) (int_of_string rev_b)))
 	| _ ->
 	    analyze ()
     else usage ()

@@ -6,18 +6,6 @@ exception Unknown_parameter of string
 
 let user_params = Hashtbl.create 32;;
 
-let up_search ~default name =
-  let rec search dir =
-    let f = Filename.concat dir name in
-    if Sys.file_exists f then
-      Some f
-    else
-      if dir = "/" then
-	default
-      else
-	search (Filename.dirname dir)
-  in search (Sys.getcwd ())
-
 let read_from_file filename =
   let rex = Re_perl.compile_pat "^([^\\s]+)\\s+(.*)\\s*$" in
   if Sys.file_exists filename
@@ -44,7 +32,7 @@ let read_params () =
       Some def
     else
       None in
-  match up_search ~default ".bf-params" with
+  match System.up_search ~default ".bf-params" with
     | None -> Hashtbl.create 32
     | Some filename ->
 	Printf.printf "loading %s\n%!" filename;

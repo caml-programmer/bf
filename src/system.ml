@@ -442,4 +442,14 @@ let mkdir_if_not_exists dir =
   if not (Sys.file_exists dir)
   then try Unix.mkdir dir 0o755 with _ -> failwith (sprintf "Cannot make directory: %s" dir)
 
- 
+let up_search ~default name =
+  let rec search dir =
+    let f = Filename.concat dir name in
+    if Sys.file_exists f then
+      Some f
+    else
+      if dir = "/" then
+	default
+      else
+	search (Filename.dirname dir)
+  in search (Sys.getcwd ())

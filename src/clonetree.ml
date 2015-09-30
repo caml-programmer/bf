@@ -218,8 +218,7 @@ let tree_of_specdir ?(newload=false) ?(log=true) ?packdir ~vr specdir : clone_tr
 	      if newload
 	      then
 		let pkgname = Specdir.pkgname specdir in
-		let (version,_) = Specdir.ver_rev_of_release (Specdir.release_by_specdir specdir) in
-		Spectype.newload pkgname version
+		Spectype.newload pkgname ver
 	      else
 		Spectype.load
 		  ~version:ver
