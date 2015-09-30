@@ -8,7 +8,7 @@ let int_of_log_level loglevel =
   match loglevel with
   | "always" | "error" -> 0
   | "low" -> 1
-  | "high" -> 2
+  | "high" | "warning" -> 2
   | "debug" | "all" -> 999
   | "never" -> 1000000
   | _ -> failwith "Unknown log-level"
@@ -53,6 +53,9 @@ let msg func loglevel msg =
   if log_level_acceptable loglevel then
     print_endline (prefix_textblock (func ^ ": ") msg)
 
+let warn func message =
+  msg func "warning" ("WARNING: "^message)
+		  
 let err func message =
   msg func "error" message;
   failwith message

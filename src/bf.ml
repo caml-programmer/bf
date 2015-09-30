@@ -162,6 +162,7 @@ let with_teleport mode f =
   goto new_location; f (); goto location
 
 let main () =
+  Check.pack_component ();
   let len = Array.length Sys.argv in
     if len > 1 then
       let action = Sys.argv.(1) in
@@ -522,7 +523,8 @@ let _ =
 	let bt = Printexc.get_raw_backtrace () in
 	print_current_state ();
 	Printf.printf "Exception: %s (main thread)\nBacktrace:\n%s\n%!"
-	  (string_of_exn exn) (Printexc.raw_backtrace_to_string bt);
+		      (string_of_exn exn) (Printexc.raw_backtrace_to_string bt);
+	Check.pack_component ();
 	exit 2
 
 

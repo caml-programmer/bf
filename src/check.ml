@@ -17,7 +17,9 @@ let specdir specdir =
   with _ ->
     raise (Bad_specdir specdir)
 
+(* Проверяет, что pack последней версии и на ветке master *)	  
 let pack_component () =
+  Output.msg "Check.pack_component" "low" "cleaning pack component";
   let component = 
     Component.make ~label:(Branch "master") (Params.get_param "pack") in
   ignore(Component.update_pack component);

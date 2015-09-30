@@ -62,23 +62,29 @@ let ver_rev_of_release release =
   | [ver;rev] -> ver,rev
   | x -> err ("Invalid release: \""^(String.concat "" x)^"\"")
 
+exception No_release_file
+	     
 let release_by_specdir specdir =
   let err msg = err "release_by_specdir" msg in
-  last_line_of_file (Path.make [specdir;"release"])
+  let release_file = Path.make [specdir;"release"] in
+  if Sys.file_exists release_file then
+    last_line_of_file release_file
+  else raise No_release_file
 
 let specdir_by_version pkg_name version =
   let err msg = err "specdir_by_version" msg in
+  let warn msg = warn "specdir_by_version" msg in
   let pkg_dir = Path.make ["pack";pkg_name] in
-  (*print_endline ("DEBUG "^pkg_dir);*)
   let specdirs = List.map (fun dir -> Path.make [pkg_dir;dir])
 			  (System.list_of_directory pkg_dir) in
-  (*List.iter (fun dir -> print_endline ("DEBUG FUCK "^dir)) specdirs;*)
   let rec check_specdir_version specdirs =
     match specdirs with
     | specdir :: specdirs ->
-       let (ver,rev) = ver_rev_of_release (release_by_specdir specdir) in
-       (*print_endline ("DEBUG "^ver^":"^rev);*)
-       if ver = version then specdir else check_specdir_version specdirs
+       (try
+	   let (ver,rev) = ver_rev_of_release (release_by_specdir specdir) in
+	   if ver = version then specdir else check_specdir_version specdirs
+	 with No_release_file -> warn ("No release file in directory '"^specdir^"'");
+				 check_specdir_version specdirs)
     | [] -> err ("specdir for version "^version^" not found") in
   check_specdir_version specdirs
 

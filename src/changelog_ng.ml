@@ -17,9 +17,11 @@ let make ?(recursive=false) pkg_name version begin_rev end_rev =
   msg "always" ("tag-b: " ^ end_tag);
   msg "always" ("specdir: " ^ specdir);
   let begin_tree =
-    Clonetree.tree_of_specdir ~newload:true ~log:false ~vr:(Some (Release.of_ver_rev version begin_rev)) specdir in
+    Clonetree.tree_of_specdir ~newload:true ~log:false
+			      ~vr:(Some (Release.of_ver_rev version begin_rev)) specdir in
   let end_tree =
-    Clonetree.tree_of_specdir ~newload:true ~log:false ~vr:(Some (Release.of_ver_rev version end_rev)) specdir in
+    Clonetree.tree_of_specdir ~newload:true ~log:false
+			      ~vr:(Some (Release.of_ver_rev version end_rev)) specdir in
   msg "debug" "TREE BEGIN: --------------------";
   msg "debug" (Clonetree.string_of_clone_tree begin_tree);
   msg "debug" "TREE END: --------------------";
