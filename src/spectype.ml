@@ -35,8 +35,24 @@ type spec = {
   post_install : string option;
   params : (string,string) Hashtbl.t;
   hooks : string option;
+  version: pkg_ver;
+  revision: int;
+  local: bool;
   }
 
+exception Dependency_not_found of pkg_name
+	      
+let find_dependency spec pkgname =
+  let rec find = function
+    | dep :: deps ->
+       let (pkg, opver, _) = dep in
+       if pkg = pkgname then opver else find deps
+    | [] -> raise (Dependency_not_found pkgname) in
+  find spec.depends
+
+let release_of_spec spec =
+  spec.version^"-"^(string_of_int spec.revision)
+       
 exception Pack_branch_is_not_found of string
 exception Invalid_specdir_format
 exception Unsupported_specdir_version of string
@@ -102,6 +118,28 @@ let string_of_spec spec =
 	  (sprintf "HOOKS: %s" (string_of_string_option spec.hooks));
 	])
 
+(* Загрузка spec-а системного пакета. В некотором роде хак, чтобы
+рассматривать системные зависимости также, как и локальные *)
+let system_pkg_spec pkgname version =
+  {
+    pkgname = pkgname;
+    depends = [];
+    provides = [];
+    obsoletes = [];
+    rejects = [];
+    components = [];
+    pre_install = None;
+    pre_update = None;
+    pre_uninstall = None;
+    post_install = None;
+    params = (Hashtbl.create 0);
+    hooks = None;
+    version = version;
+    revision = 0;
+    local = false;
+  }
+
+			
 (* функция загрузки depends *)
 
 exception No_pkg_prefix of string
@@ -360,6 +398,9 @@ let load_v2 ?(snapshot=false) ?(short_composite=false) ~version ~revision specdi
     post_install = post_install;
     params = params;
     hooks = hooks;
+    version = ""; (* старым кодом не используется *)
+    revision = 0; (* старым кодом не используется *)
+    local = true; (* старым кодом не используется *)
   }
 
 let load_v3 ?(snapshot=false) ~version ~revision specdir =
@@ -430,6 +471,7 @@ let load_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname ver
   let pre_uninstall = load_file "pre-uninstall" in
   let post_install = load_file "post-install" in
   let params = Params.read_from_file "params" in
+  let (_,revision) = Specdir.ver_rev_by_specdir "." in
   {
     pkgname = pkgname;
     depends = depends;
@@ -443,6 +485,9 @@ let load_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname ver
     post_install = post_install;
     params = params;
     hooks = None; (* атавизм со времён load_v1 *)
+    version = version;
+    revision = revision;
+    local = true;
   }
 
 let newload ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname version =

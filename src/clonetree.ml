@@ -14,25 +14,29 @@ type pkg_clone_tree =
 type clone_tree =
     clone_val deptree
 
-let string_of_clone_val (pkg, ver, rev, spec) =
-  pkg ^ " " ^ ver ^ "-" ^ (string_of_int rev) ^ "\n"
+let string_of_clone_val (specdir, ver, rev, spec) =
+  "SPECINFO: " ^ specdir ^ " " ^ ver ^ "-" ^ (string_of_int rev) ^ "\n"
   ^ "SPEC:\n"
   ^ (string_of_spec spec)
 	      
-let string_of_clone_tree (tree:clone_tree) =
+let string_of_clone_tree ?(limit_depth=None) (tree:clone_tree) =
   let space depth = String.make (2*depth) ' ' in
   let rec print_tree depth = function
     | Dep_val (clone_val, deptree) ->
        string_of_string_list [
 	   ((space depth) ^ (string_of_clone_val clone_val));
-	   (print_tree (1+ depth) deptree)
+	   (let next_depth = succ depth in
+	    match limit_depth with
+	    | Some limit -> if next_depth = limit then
+			      ""
+			    else (print_tree (1+ depth) deptree)
+	    | None -> (print_tree (1+ depth) deptree))
 	 ]
     | Dep_list trees ->
        string_of_string_list
 	 (List.map (print_tree depth) trees)
   in
   print_tree 0 tree
-	      
      
 let new_only e =
   with_platform
@@ -265,7 +269,10 @@ let tree_of_specdir ?(newload=false) ?(log=true) ?packdir ~vr specdir : clone_tr
 		    end
 		  else acc
 		with _ -> acc)
-		[] (Spectype.depload ~ignore_last:false depfile)
+		[]
+		((*if newload
+		 then Spectype.depload_v2_new depfile
+		 else*) Spectype.depload ~ignore_last:false depfile)
 	    in
 	    resolve depth specdir ver rev;
 	    Dep_val (specdir, Dep_list

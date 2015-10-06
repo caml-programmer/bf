@@ -70,7 +70,7 @@ let revision ?(interactive=false) pkgname version =
 	(List.map snd
 	  (filter_pkg
 	    (fun (ver,_) -> ver = version) pkgname))
-    with [] -> raise Not_found
+    with [] -> failwith ("Not found: "^pkgname^" "^version)
       | hd::tl -> hd)
   with exn ->
     if interactive then

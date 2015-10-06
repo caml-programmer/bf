@@ -73,6 +73,7 @@ let usage () =
   print_endline "   or: bf log";
   print_endline "   or: bf tests";
   print_endline "   or: bf checknode <smtp-server>[:<smtp-port>] <e-mail-list>";
+  print_endline "   or: bf test-deptree <pkg-name> <version> <revision>";
   exit 1
 
 let make_int s =
@@ -491,6 +492,14 @@ let main () =
 	   with_teleport Goto_bf_params
 	     (fun () ->
 	      ignore (Changelog_ng.make package version (int_of_string rev_a) (int_of_string rev_b)))
+	| "test-depload" ->
+	   let depfile = Sys.argv.(2) in
+	   Test.depload depfile
+	| "test-deptree" ->
+	   let pkgname = Sys.argv.(2) in
+	   let version = Sys.argv.(3) in
+	   let revision = int_of_string Sys.argv.(4) in
+	   Test.depgraph pkgname version revision
 	| _ ->
 	    analyze ()
     else usage ()
@@ -526,7 +535,6 @@ let _ =
 	print_current_state ();
 	Printf.printf "Exception: %s (main thread)\nBacktrace:\n%s\n%!"
 		      (string_of_exn exn) (Printexc.raw_backtrace_to_string bt);
-	Check.pack_component ();
 	exit 2
 
 

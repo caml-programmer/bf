@@ -36,7 +36,7 @@ let compare ?(retype=fun _ -> None) a b =
 	else r in
   let init =
     compare (List.length a) (List.length b) in
-  cmp init (a,b)  
+  cmp init (a,b)
 
 let exists x =
   let n = ref false in
@@ -129,3 +129,28 @@ let parse_vr_opt vr_opt =
   (match vr_opt with
     | Some (op,ver) -> Some (make_ver ver)
     | None          -> None)
+
+let max v1 v2 =
+  let v1_list = parse v1 in
+  let v2_list = parse v2 in
+  match compare v1_list v2_list with
+  | 1 | 0 -> v1
+  | -1 -> v2
+  | _ -> failwith "Will never happen"
+
+let less v1 v2 =
+  let v1_list = parse v1 in
+  let v2_list = parse v2 in
+  match compare v1_list v2_list with
+  | -1 -> true
+  | _ -> false
+
+let greater v1 v2 =
+  let v1_list = parse v1 in
+  let v2_list = parse v2 in
+  match compare v1_list v2_list with
+  | 1 -> true
+  | _ -> false
+
+let equal v1 v2 =
+  v1 = v2

@@ -72,7 +72,7 @@ let clone_component chroot_name component =
 		  (fun () -> Component.clone_new ~from:component_path component)
 		       
 			 
-  
+(*  
 let buildpkg chroot_name pkg_name version =
   print_endline ("DEBUG !!!");
   let chroot_dir = compose_chroot_path chroot_name in
@@ -80,10 +80,11 @@ let buildpkg chroot_name pkg_name version =
   let specdir = Specdir.specdir_by_version pkg_name version in
   print_endline ("DEBUG "^specdir);
   let (ver,rev) = Specdir.ver_rev_of_release (Specdir.release_by_specdir specdir) in
-  print_endline ("DEBUGISCHE "^ver^":"^rev);
+  print_endline ("DEBUGISCHE "^ver^":"^(string_of_int rev));
   let spec = Spectype.load ~version:ver ~revision:rev specdir in
   print_endline (Spectype.string_of_spec spec);
   List.iter (fun component -> ignore (clone_component chroot_dir component))
 	    spec.components
 	    
 		
+ *)

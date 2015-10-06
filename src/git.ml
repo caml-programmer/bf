@@ -107,6 +107,7 @@ let git_log ?(pack=None) ?(diff=false) ?(since=None) tag_a tag_b =
       | None,false ->
 	  sprintf "git log --pretty=format:\"%s\" '%s'..'%s'%s" fmt tag_a tag_b file
   in
+  (*print_endline ("GIT_LOG: "^cmd);*)
   let chunks = ref [] in
   let buf = Buffer.create 64 in
   let ch = Unix.open_process_in cmd in
@@ -138,8 +139,8 @@ let git_checkout ?(low=false) ?(force=false) ?branch ?(modify=false) ?(track=fal
   (match files with Some l -> List.iter add l | None -> ());
   log_command ~low ~env "git" !args
 
-let checkout label =
-  Cmd.command_log ("git checkout "^label)
+let checkout ?(loglevel="high") label =
+  Cmd.command_log ~loglevel ("git checkout "^label)
 
 let ls_files () =
   let (_,output,_) = Cmd.command "git ls-files" in

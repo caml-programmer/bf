@@ -537,6 +537,7 @@ let diff tag_a tag_b component =
 
 let changelog ?(branch=None) ?(diff=false) ?(since=None) tag_a tag_b component =
   let chunks = ref [] in
+  if tag_a <> tag_b then
   ignore (with_component_dir ~low:true ~strict:false component
     (fun () ->
       

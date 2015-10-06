@@ -11,6 +11,20 @@ let write_lines file lines =
     file
 
 let chroots () =
-  Chroot.make "centos" Platform.Cent6;
-  Chroot.buildpkg "centos" "jet-racket5" "14.0.0"
+  Chroot.make "centos" Platform.Cent6  (*;
+  Chroot.buildpkg "centos" "jet-racket5" "14.0.0"*)
 
+let depgraph pkgname version revision =
+  let depgraph = Depgraph.of_pkg pkgname version revision in
+  print_endline (Depgraph.string_of_deptree depgraph)
+
+let depload file =
+  let deplist_v1 = Spectype.depload file in
+  let deplist_v2 = Spectype.depload_v2_new file in
+  print_endline ("---------- DEPS V1 ----------");
+  print_endline (Output.string_of_string_list
+		   (List.map Spectype.string_of_platform_depend deplist_v1));
+  print_endline ("---------- DEPS V2 ----------");
+  print_endline (Output.string_of_string_list
+		   (List.map Spectype.string_of_platform_depend deplist_v2))
+  

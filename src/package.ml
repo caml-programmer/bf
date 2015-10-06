@@ -6,6 +6,10 @@ open Spectype
 let reinstalled_components = (* for update and upgrade actions *)
   Hashtbl.create 32;;
 
+let is_local pkg_name =
+  let pkg_dir = Path.make ["pack";pkg_name] in
+  (Sys.file_exists pkg_dir) && (Sys.is_directory pkg_dir)
+  
 exception Cannot_build_package of string
 
 let build (specdir,ver,rev,spec) =

@@ -56,11 +56,13 @@ let last_line_of_file filename =
 			!line in
   read ()
 
+exception Invalid_release of string
+       
 let ver_rev_of_release release =
   let err msg = err "ver_rev_of_release" msg in
   match Str.split (Str.regexp " ") release with
-  | [ver;rev] -> ver,rev
-  | x -> err ("Invalid release: \""^(String.concat "" x)^"\"")
+  | [ver;rev] -> ver,(int_of_string rev)
+  | x -> raise (Invalid_release (String.concat " " x))
 
 exception No_release_file
 	     
@@ -70,6 +72,9 @@ let release_by_specdir specdir =
   if Sys.file_exists release_file then
     last_line_of_file release_file
   else raise No_release_file
+
+let ver_rev_by_specdir specdir =
+  ver_rev_of_release (release_by_specdir specdir)
 
 let specdir_by_version pkg_name version =
   let err msg = err "specdir_by_version" msg in
@@ -83,9 +88,30 @@ let specdir_by_version pkg_name version =
        (try
 	   let (ver,rev) = ver_rev_of_release (release_by_specdir specdir) in
 	   if ver = version then specdir else check_specdir_version specdirs
-	 with No_release_file -> warn ("No release file in directory '"^specdir^"'");
-				 check_specdir_version specdirs)
-    | [] -> err ("specdir for version "^version^" not found") in
+	 with
+	 | No_release_file -> warn ("No release file in directory '"^specdir^"'");
+			      check_specdir_version specdirs
+	 | Invalid_release release -> warn ("Invalid release in specdir '"^specdir^"': "^release);
+				      check_specdir_version specdirs)
+    | [] -> err ("specdir for pkgver '"^pkg_name^" "^version^"' not found") in
   check_specdir_version specdirs
 
   
+let revision_by_pkgver pkgname version =
+  let (_, rev) = ver_rev_by_specdir (specdir_by_version pkgname version) in rev
+
+(* Хак для обработки >= *)
+let find_max_version pkg_name =
+  let err msg = err "specdir_by_version" msg in
+  let warn msg = warn "specdir_by_version" msg in
+  let pkg_dir = Path.make ["pack";pkg_name] in
+  let specdirs = List.map (fun dir -> Path.make [pkg_dir;dir])
+			  (System.list_of_directory pkg_dir) in
+  let rec search maxver = function
+    | specdir :: specdirs ->
+       (try let (ver,_) = ver_rev_of_release (release_by_specdir specdir) in
+	    let maxver = Version.max maxver ver in
+	    search maxver specdirs
+	with No_release_file | Invalid_release _ -> search maxver specdirs)
+    | [] -> maxver in
+  search "" specdirs
