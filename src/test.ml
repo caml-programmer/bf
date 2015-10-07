@@ -14,8 +14,8 @@ let chroots () =
   Chroot.make "centos" Platform.Cent6  (*;
   Chroot.buildpkg "centos" "jet-racket5" "14.0.0"*)
 
-let depgraph pkgname version revision =
-  let depgraph = Depgraph.of_pkg pkgname version revision in
+let depgraph pkgname version revision_opt =
+  let depgraph = Depgraph.of_pkg pkgname version revision_opt in
   print_endline (Depgraph.string_of_deptree depgraph)
 
 let depload file =

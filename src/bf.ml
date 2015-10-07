@@ -73,7 +73,7 @@ let usage () =
   print_endline "   or: bf log";
   print_endline "   or: bf tests";
   print_endline "   or: bf checknode <smtp-server>[:<smtp-port>] <e-mail-list>";
-  print_endline "   or: bf test-deptree <pkg-name> <version> <revision>";
+  print_endline "   or: bf test-deptree <pkg-name> <version> [<revision>]";
   exit 1
 
 let make_int s =
@@ -498,8 +498,10 @@ let main () =
 	| "test-deptree" ->
 	   let pkgname = Sys.argv.(2) in
 	   let version = Sys.argv.(3) in
-	   let revision = int_of_string Sys.argv.(4) in
-	   Test.depgraph pkgname version revision
+	   let revision_opt = match len with
+	     | 4 -> None
+	     | 5 -> Some (int_of_string Sys.argv.(4)) in
+	   Test.depgraph pkgname version revision_opt
 	| _ ->
 	    analyze ()
     else usage ()

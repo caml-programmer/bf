@@ -10,11 +10,10 @@ let rec make ?(toplevel=true) pkg_name version rev_a rev_b =
   let tag_a = Tag.make pkg_name version rev_a in
   let tag_b = Tag.make pkg_name version rev_b in
   let specdir = Specdir.specdir_by_version pkg_name version in
-  let depgraph_a = Depgraph.of_pkg pkg_name version rev_a in
-  let depgraph_b = Depgraph.of_pkg pkg_name version rev_b in
+  let depgraph_a = Depgraph.of_pkg pkg_name version (Some rev_a) in
+  let depgraph_b = Depgraph.of_pkg pkg_name version (Some rev_b) in
   ()
 
-  
 (* данная функция выводит changelog пакета и всех его зависимостей *)       
 let changelog_specdir specdir rev_a rev_b =
   let tree_a = Clonetree.tree_of_specdir ~log:false ~vr:(Some (Changelog.vr_of_rev rev_a)) specdir in

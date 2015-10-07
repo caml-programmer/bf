@@ -58,9 +58,9 @@ let reg_dep depgraph head_pkg tail_pkg =
   if has_circular_dep depgraph then
     err "reg_dep" ("Circular dependencies have occured: " ^ (find_circular_dep depgraph))
 
-(* Загрузка графа зависимостей *)
-let of_pkg pkgname version revision : depgraph =
-  let func = "Depgraph.of_pkg" in
+(* Загрузка графа зависимостей определённой ревизии *)
+let of_pkg_with_rev pkgname version revision : depgraph =
+  let func = "Depgraph.of_pkg_with_rev" in
   let err = Output.err func in
   let warn = Output.warn func in
   let msg = Output.msg func in
@@ -98,7 +98,7 @@ let of_pkg pkgname version revision : depgraph =
       (if prevpkg <> "" then reg_dep prevpkg pkg);
       let deps =
 	List.map (fun dep ->
-		  let (deppkg, Some (op, depver), _) = dep in
+		  let (deppkg, Some (_, depver), _) = dep in
 		  match Package.is_local deppkg with
 		  | false -> (deppkg, depver, 0)
 		  | true ->
@@ -110,6 +110,48 @@ let of_pkg pkgname version revision : depgraph =
   (* Основное тело функции *)
   fill_graph (pkgname, version, revision);
   depgraph
+
+let of_pkg_only pkgname version =
+  let func = "Depgraph.of_pkg_only" in
+  let err = Output.err func in
+  let warn = Output.warn func in
+  let msg = Output.msg func in
+
+  let specload pkg ver =
+    if Package.is_local pkg then
+      Spectype.newload pkg ver
+    else
+      Spectype.system_pkg_spec pkg ver in
+
+  let depgraph = create () in
+
+  let has_pkg = has_pkg depgraph in
+  let get_spec = get_spec depgraph in
+  let reg_pkg = reg_pkg depgraph in
+  let upd_pkg = upd_pkg_if_rev_less depgraph in
+  let reg_dep = reg_dep depgraph in
+
+  let rec fill_graph ?(prevpkg="") (pkg, ver) =
+    if has_pkg pkg then
+      reg_dep prevpkg pkg
+    else
+      let spec = specload pkg ver in
+      reg_pkg spec;
+      (if prevpkg <> "" then reg_dep prevpkg pkg);
+      let deps =
+	List.map (fun dep ->
+		  let (deppkg, Some (_, depver), _) = dep in
+		  (deppkg, depver))
+		 spec.depends in
+      List.iter (fill_graph ~prevpkg:pkg) deps in
+
+  fill_graph (pkgname, version);
+  depgraph
+
+let of_pkg package version revision_opt =
+  match revision_opt with
+  | None -> of_pkg_only package version
+  | Some revision -> of_pkg_with_rev package version revision
 
 let string_of_deptree ?(limit_depth=1000000) (depgraph:depgraph) =
   let space depth = String.make (2*depth) ' ' in
