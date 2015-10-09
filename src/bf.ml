@@ -163,7 +163,6 @@ let with_teleport mode f =
   goto new_location; f (); goto location
 
 let main () =
-  Check.pack_component ();
   let len = Array.length Sys.argv in
     if len > 1 then
       let action = Sys.argv.(1) in
