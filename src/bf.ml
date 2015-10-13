@@ -504,7 +504,7 @@ let main () =
 	     | 5 -> Some (int_of_string Sys.argv.(4))
 	     | _ -> raise (Invalid_argument "Exhaustive") in
 	   Test.depgraph pkgname version revision_opt
-	| "build_component" ->
+	| "build-component" ->
 	   begin
 	     let chroot_name = Sys.argv.(2) in
 	     match len with
