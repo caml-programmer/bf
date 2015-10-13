@@ -194,24 +194,22 @@ let checkout_new component =
 let ls_files component =
   System.with_dir component.name Git.ls_files
 
-
-		  
 let remove component =
   if System.is_directory component.name then
     System.remove_directory component.name
-      
+
 let clone component =
   git_clone
     (Filename.concat (git_create_url component) component.name)
     component.name
 
-let clone_new ?from component =
+(* from нужен для указания локального источника *)    
+let clone_last ?from component =
   let branch = string_of_label component.label in
-  let url = match from with
+  let url_or_path = match from with
     | None -> (Filename.concat (git_create_url component) component.name)
-    | Some url -> url in
-  System.with_dir ~create:true component.name
-		  (fun () -> Git.clone ~branch ~depth:1 url)
+    | Some url_or_path -> url_or_path in
+  Git.clone ~branch ~depth:1 url_or_path
     
 let with_component_dir ?(low=false) ?(strict=true) component (thunk : unit -> unit) =
   let curdir = Sys.getcwd () in
@@ -671,3 +669,6 @@ let component_of_sval s =
  
 let components_of_sval_array v =
   List.map component_of_sval (Array.to_list v)
+
+let path component =
+  Path.make [component.name]

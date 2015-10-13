@@ -140,7 +140,7 @@ let git_checkout ?(low=false) ?(force=false) ?branch ?(modify=false) ?(track=fal
   log_command ~low ~env "git" !args
 
 let checkout ?(loglevel="high") label =
-  Cmd.command_log ~loglevel ("git checkout "^label)
+  ignore (Cmd.command_log ~loglevel ("git checkout "^label))
 
 let ls_files () =
   let (_,output,_) = Cmd.command "git ls-files" in

@@ -36,6 +36,26 @@ type platform_mapping =
 exception Permanent_error of string
 exception Pkg_engine_not_found
 
+let os_of_platform = function
+  | Rhel3          -> Linux
+  | Rhel4          -> Linux
+  | Rhel5          -> Linux
+  | Rhel6          -> Linux
+  | Rhel7          -> Linux
+  | Cent4          -> Linux
+  | Cent5          -> Linux
+  | Cent6          -> Linux
+  | Cent7          -> Linux
+  | Fedora10       -> Linux
+  | Alt            -> Linux
+  | Arch           -> Linux
+  | Debian         -> Linux
+  | Gentoo         -> Linux
+  | Unknown_linux  -> Linux
+  | Solaris8       -> SunOS
+  | Solaris9       -> SunOS
+  | Solaris10      -> SunOS    
+
 let engine_of_platform = function
   | Rhel3     -> Rpm_build
   | Rhel4     -> Rpm_build

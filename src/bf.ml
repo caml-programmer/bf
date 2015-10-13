@@ -481,8 +481,10 @@ let main () =
 		~smtp_port
 		emails
 	    end	    
-	| "test" ->
-	   Test.chroots ()
+	| "test-chroot" ->
+	   with_teleport Goto_bf_params
+	     (fun () ->
+	      ignore (Test.chroot ()))
 	| "test-changelog" ->
 	   let package = Sys.argv.(2) in
 	   let version = Sys.argv.(3) in
@@ -499,8 +501,18 @@ let main () =
 	   let version = Sys.argv.(3) in
 	   let revision_opt = match len with
 	     | 4 -> None
-	     | 5 -> Some (int_of_string Sys.argv.(4)) in
+	     | 5 -> Some (int_of_string Sys.argv.(4))
+	     | _ -> raise (Invalid_argument "Exhaustive") in
 	   Test.depgraph pkgname version revision_opt
+	| "build_component" ->
+	   begin
+	     let chroot_name = Sys.argv.(2) in
+	     match len with
+	     | 3 -> Chroot.build_component chroot_name None
+	     | 4 -> let rules = Some Sys.argv.(3) in
+		    Chroot.build_component chroot_name rules
+	     | _ -> usage ()
+	   end
 	| _ ->
 	    analyze ()
     else usage ()

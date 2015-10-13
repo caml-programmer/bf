@@ -1,7 +1,9 @@
 open Output
 open Platform
 open Printf
-
+open Component
+open Spectype
+       
 let centos6_base_repo_filename = "Centos6-Base.repo"
 let centos7_base_repo_filename = "Centos7-Base.repo"
 let centos_base_repo_content () =
@@ -26,6 +28,12 @@ let compose_chroot_path chroot_name =
        let chroots_dir = Path.make [home_dir; (Params.get_param "chroots-dir")] in
        Path.make [chroots_dir; chroot_name]
 
+let projects_path () =
+  Params.get_param "projects-dir"
+		 
+let compose_projects_path chroot_name =
+  Path.make [(compose_chroot_path chroot_name); (projects_path ())]
+	      
 (* Эта функция создаёт chroot-окружение с именем chroot_name в
    директории, описываемой параметром chroots-dir. В этом окружении
    разворачивается базовая система platform *)
@@ -58,33 +66,43 @@ let make chroot_name platform =
      ignore (Cmd.command ("fakeroot fakechroot rpm --root "^chroot_dir^" --initdb"));
      ignore (Cmd.command ("fakeroot fakechroot rpm --root "^chroot_dir^" --nodeps -ivh "^centos_release_pkg_path));
      ignore (Cmd.command ("rm "^(Path.make [chroot_dir; "etc/yum.repos.d/*.repo"])));
-     ignore (Cmd.command ("mkdir -p "^(Path.make [chroot_dir; "projects/"])))
+
+     ignore (Cmd.command ("mkdir -p "^(Path.make [chroot_dir; "projects/"])));
+     ignore (Cmd.command ("cp .bf-params "^(Path.make [chroot_dir; "projects/"])));
+
+     ignore (Cmd.command ("mkdir -p "^(Path.make [chroot_dir; "/usr/bin"])));
+     ignore (Cmd.command ("cp /usr/bin/bf "^(Path.make [chroot_dir; "/usr/bin"])))
   | p -> unsupported_platform p
 
 (* Эта функция копирует компонент в директорию $chroot_name/projects *)
 let clone_component chroot_name component =
-  let chroot_dir = compose_chroot_path chroot_name in
   Component.checkout_new component;
-  let component_path = (Path.make [(Sys.getcwd ());
-				   component.name]) in
-  print_endline ("DEBUG "^component_path);
-  System.with_dir ~create:true (Path.make [chroot_dir;"projects"])
-		  (fun () -> Component.clone_new ~from:component_path component)
-		       
-			 
-(*  
-let buildpkg chroot_name pkg_name version =
-  print_endline ("DEBUG !!!");
-  let chroot_dir = compose_chroot_path chroot_name in
-  print_endline ("DEBUG "^chroot_dir);
-  let specdir = Specdir.specdir_by_version pkg_name version in
-  print_endline ("DEBUG "^specdir);
-  let (ver,rev) = Specdir.ver_rev_of_release (Specdir.release_by_specdir specdir) in
-  print_endline ("DEBUGISCHE "^ver^":"^(string_of_int rev));
-  let spec = Spectype.load ~version:ver ~revision:rev specdir in
-  print_endline (Spectype.string_of_spec spec);
-  List.iter (fun component -> ignore (clone_component chroot_dir component))
+  let component_path = "file://"^(Path.make_absolute (Component.path component)) in
+  System.with_dir (compose_projects_path chroot_name)
+		  (fun () -> Component.clone_last ~from:component_path component)
+
+(* Эта функция вызывается из корня chroot-окружения, переходит в
+каталог, куда склонированы проекты, а затем: переходит там в
+директорию компонента, собирает его и устанавливает в окружение.*)
+let build_component component_name rules =
+  let projects_relative_path = projects_path () in
+  let project_path = Path.make [projects_relative_path; component_name] in
+  System.with_dir project_path
+    (fun () ->
+     Rules.build_rules rules;
+     Rules.install_rules rules)
+
+(* Эта функция копирует все компоненты пакета в chroot-окружение и
+запускает их сборку *)
+let buildpkg ?(os=Platform.os ()) ?(platform=Platform.current ()) chroot_name pkgname version =
+  let spec = Spectype.newload ~os ~platform pkgname version in
+  let chroot_path = compose_chroot_path chroot_name in
+  List.iter (fun component -> ignore (clone_component chroot_name component))
+	    spec.components;
+  List.iter (fun component ->
+	     let name = component.name in
+	     let rules = Component.string_of_rules component.rules in
+	     (ignore (Cmd.command_log ("fakeroot fakechroot chroot " ^ chroot_path ^ " " ^
+					 "/usr/bin/bf build-component "^name^" "^rules))))
 	    spec.components
-	    
-		
- *)
+    

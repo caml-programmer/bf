@@ -1,3 +1,5 @@
+open Component
+
 let test name call =
   Printf.printf "Test %s: %b\n" name (call ())
 
@@ -10,9 +12,20 @@ let write_lines file lines =
     (Buffer.contents buf)
     file
 
-let chroots () =
-  Chroot.make "centos" Platform.Cent6  (*;
-  Chroot.buildpkg "centos" "jet-racket5" "14.0.0"*)
+let chroot () =
+  Check.pack_component ();
+
+  let os = Platform.Linux in
+  let platform = Platform.Cent6 in
+
+  let chroot_name = "centos" in
+  let pkgname = "jet-racket5" in
+  let version = "14.0.0" in
+
+  Chroot.make chroot_name platform;
+  Chroot.buildpkg ~os ~platform chroot_name pkgname version;
+
+  ()
 
 let depgraph pkgname version revision_opt =
   let depgraph = Depgraph.of_pkg pkgname version revision_opt in
@@ -27,4 +40,4 @@ let depload file =
   print_endline ("---------- DEPS V2 ----------");
   print_endline (Output.string_of_string_list
 		   (List.map Spectype.string_of_platform_depend deplist_v2))
-  
+

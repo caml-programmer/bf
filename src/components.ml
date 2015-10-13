@@ -157,3 +157,4 @@ let changelog components tag_a tag_b =
       with exn ->
 	log_message (sprintf "=> changelog-failed by %s\n" (Printexc.to_string exn))
     end
+

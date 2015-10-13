@@ -10,3 +10,9 @@ let make dir_list =
 let is_absolute path =
   let first_symbol = String.sub path 0 1 in
   first_symbol = "/"
+
+let make_absolute path =
+  if is_absolute path then
+    path
+  else
+    make [Sys.getcwd (); path]

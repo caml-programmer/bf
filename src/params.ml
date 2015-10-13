@@ -55,6 +55,8 @@ let get_param s =
     Hashtbl.find user_params s
   with Not_found -> raise (Unknown_parameter s)
 
+let get = get_param
+			  
 let update_param name value =
   Ocs_env.set_glob Scheme.env
     (Ssymbol name) (Sstring value);
@@ -125,6 +127,7 @@ let reread_params () =
   set_param ~default:"http://mirror.yandex.ru/centos/" "centos-mirror";
   set_param ~default:"Packages" "centos-packages-dir";
   set_param ~default:"chroots" "chroots-dir";
+  set_param ~default:"projects" "projects-dir";
   
   read_params ()
 
