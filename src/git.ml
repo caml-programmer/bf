@@ -11,19 +11,24 @@ type tag_status =
 let env = Env.system ();;
 
 let git_version =
-  match read_lines "git version" with
-    | s::_ ->
-	(match Str.split (Str.regexp " ") s with
+  lazy begin
+      match read_lines "git version" with
+      | s::_ ->
+	 (match Str.split (Str.regexp " ") s with
 	  | "git"::"version"::version::_ ->
-	      List.map int_of_string
-		(Str.split (Str.regexp "\\.") version)
+	     List.map int_of_string
+		      (Str.split (Str.regexp "\\.") version)
 	  | _ -> [])
-    | _ -> []
+      | _ -> []
+    end
 
 let no_edit =
-  match git_version with
-    | 1::7::1::_ -> []
-    | _          -> ["--no-edit"]
+  lazy
+    begin
+      match Lazy.force git_version with
+      | 1::7::1::_ -> []
+      | _          -> ["--no-edit"]
+    end			
 
 let git_init () =
   log_command ~env "git" ["init"]
@@ -58,10 +63,10 @@ let git_pull ?(force=false) ?refspec url =
   match refspec with
     | Some spec ->
 	let opts = if force then ["--force"] else [] in
-	log_command ~env "git" (["pull"] @ no_edit @ opts @ [url;spec])
+	log_command ~env "git" (["pull"] @ (Lazy.force no_edit) @ opts @ [url;spec])
     | None ->
 	let opts = if force then ["--force"] else [] in
-	log_command ~env "git" (["pull"] @ no_edit @ opts @ [url])
+	log_command ~env "git" (["pull"] @ (Lazy.force no_edit) @ opts @ [url])
 
 let git_push ?(tags=false) ?refspec url =
   match refspec with
