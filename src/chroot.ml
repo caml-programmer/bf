@@ -70,8 +70,8 @@ let make chroot_name platform =
      ignore (Cmd.command ("mkdir -p "^(Path.make [chroot_dir; "projects/"])));
      ignore (Cmd.command ("cp .bf-params "^(Path.make [chroot_dir; "projects/"])));
 
-     ignore (Cmd.command ("mkdir -p "^(Path.make [chroot_dir; "/usr/bin"])));
-     ignore (Cmd.command ("cp /usr/bin/bf "^(Path.make [chroot_dir; "/usr/bin"])))
+     ignore (Cmd.command ("mkdir -p "^(Path.make [chroot_dir; "/bin"])));
+     ignore (Cmd.command ("cp /bin/bf "^(Path.make [chroot_dir; "/bin"])))
   | p -> unsupported_platform p
 
 (* Эта функция копирует компонент в директорию $chroot_name/projects *)
@@ -103,6 +103,6 @@ let buildpkg ?(os=Platform.os ()) ?(platform=Platform.current ()) chroot_name pk
 	     let name = component.name in
 	     let rules = Component.string_of_rules component.rules in
 	     (ignore (Cmd.command_log ("fakeroot fakechroot chroot " ^ chroot_path ^ " " ^
-					 "/usr/bin/bf build-component "^name^" "^rules))))
+					 "/bin/bf build-component "^name^" "^rules))))
 	    spec.components
     
