@@ -1,4 +1,3 @@
-open System
 open Ocs_env
 open Ocs_types
 
@@ -21,7 +20,7 @@ let read_from_file filename =
 			     (Ssymbol key) (Sstring value)
 	  with Not_found ->
 	    Printf.printf "ignore: %s\n%!" s)
-	 (list_of_channel ch);
+	 (System.list_of_channel ch);
        user_params
   else Hashtbl.create 0
 
@@ -49,6 +48,13 @@ let set_param ~default s =
     (Ssymbol s) (Sstring value);
   
   Hashtbl.replace user_params s value
+
+let set param value =
+  let edit_param = match Hashtbl.mem user_params param with
+    | true -> Hashtbl.replace
+    | false -> Hashtbl.add in
+  Ocs_env.set_glob Scheme.env (Ssymbol param) (Sstring value);
+  edit_param user_params param value
 
 let get_param s =
   try
@@ -124,11 +130,19 @@ let reread_params () =
   set_param ~default:"jirabot" "jira-user";
   set_param ~default:"ahng6Ije" "jira-pass";
 
-  set_param ~default:"http://mirror.yandex.ru/centos/" "centos-mirror";
+  set_param ~default:"http://mirror.yandex.ru/centos/6/os/x86_64/" "centos6-mirror";
+
   set_param ~default:"Packages" "centos-packages-dir";
+  set_param ~default:"http://mirror.yandex.ru/debian/" "debian-mirror";
+  set_param ~default:"Packages" "debian-packages-dir";
+  
   set_param ~default:"chroots" "chroots-dir";
   set_param ~default:"projects" "projects-dir";
-  
+  set_param ~default:"/usr/sbin/chroot" "chroot-path";
+  set_param ~default:"/usr/bin/sudo" "sudo-path";
+  set_param ~default:"/bin/su" "su-path";
+  set_param ~default:"true" "prefer-sudo";
+
   read_params ()
 
 (* Utils *)

@@ -97,3 +97,4 @@ let drop_second_spaces s =
 let drop_spaces s =
   drop_second_spaces (drop_first_spaces s)
 
+let string_of_char = Char.escaped

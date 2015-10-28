@@ -23,13 +23,16 @@ let extract_packbranch ~userhost pkg_path =
 	in
 	String.sub hd (succ pos) (len - pos - 1)
 
-let call_after_build ~snapshot ~location ~fullname hooks version release =
+let call_after_build ?chroot ~snapshot ~location ~fullname hooks version release =
   Plugins.load ();
   (match hooks with
     | Some file -> Scheme.eval_file file
     | None -> ());
   let full_path =  sprintf "%s/%s" location fullname in
-  let branch = extract_packbranch None full_path in
+  let branch = match chroot with
+    | None -> extract_packbranch None full_path
+    | Some _ -> "packbranch-obsolete"
+  in
   if Scheme.defined "after-build" then
     Scheme.eval_code (fun _ -> ())
       (sprintf "(after-build \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %s)"
@@ -43,26 +46,26 @@ let call_before_build ~snapshot ~pkgname ~version ~revision ~platform hooks =
     | None -> ());
   if Scheme.defined "before-build" then
     let result = ref [] in
-    Scheme.eval_code (fun v ->
-      result := Scheme.map Scheme.make_string v)
+    Scheme.eval_code (fun v -> result := Scheme.map Scheme.make_string v)
       (sprintf "(before-build \"%s\" \"%s\" \"%s\" \"%s\" %s)"
-	pkgname version revision (string_of_platform platform)
-	(if snapshot then "#t" else "#f"));
-    !result
+	pkgname version revision (string_of_platform platform) (if snapshot then "#t" else "#f"));
+    !result (* эта штука при нашем нынешнем lib.scm возвращает [] *)
   else []
       
-let build_over_rpmbuild ~snapshot params =
-  let (pkgname,platform,version,release,spec,files,findreq,hooks) = params in
+let build_over_rpmbuild ?chroot ~snapshot (pkgname,platform,version,release,spec,files,findreq,hooks) =
   let top_dir = Params.get_param "top-dir" in
   System.check_commands ["rpmbuild"];
   log_command "chmod" ["+x";findreq];
-  Rpm.copy_to_buildroot ~top_dir files;
+  Output.msg "build_over_rpmbuild" "always" "fuck1";
+  if chroot = None then
+    Rpm.copy_to_buildroot ~top_dir files;
+  Output.msg "build_over_rpmbuild" "always" "fuck2";
   let (location,fullname) =
     Rpm.build
-      ~top_dir
+      ~top_dir ?chroot
       ~pkgname ~platform ~version ~release
       ~spec ~files ~findreq ()
-  in call_after_build ~snapshot ~location ~fullname hooks version release
+  in call_after_build ?chroot ~snapshot ~location ~fullname hooks version release
 
 let check_composite_depends spec =
   let composite_depends =
@@ -97,6 +100,7 @@ let check_composite_depends spec =
       raise (Permanent_error "you must correct depends or composite files")
     end
 
+(* И что же это делает-то, блин?! *)
 let resolve_params find s =
   Pcre.substitute
     ~rex:(Pcre.regexp "%\\(.*?\\)")
@@ -140,8 +144,10 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 	      k
 	    end
 	in
+
 	let accumulate_lists add out =
 	  List.iter
+
 	    (fun c ->
 	      let name = c.name in
 	      let bf_list =
@@ -151,6 +157,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		  | None ->
 		      Filename.concat name ".bf-list"
 	      in
+
 	      let rec add_with_check () =
 		if Sys.file_exists bf_list then
 		  add out bf_list
@@ -176,9 +183,10 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		  else
 		    log_error (sprintf "bf list for (%s) is not found. Check your .bf-params and other configurations." name))
 	      in add_with_check ())
+	    
 	    (List.filter
-	      (fun c -> c.pkg = None && (not c.nopack))
-	      spec.components)
+	       (fun c -> c.pkg = None && (not c.nopack))
+	       spec.components)
 	in
 
 	Depends.print spec.depends;
@@ -195,11 +203,14 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 	in
 	
 	(match engine_of_platform platform with
-	  | Rpm_build ->
-	      let custom_pkg_files =
+
+	 (* RPM BUILD CODE ---------------------------------------- *)
+	 | Rpm_build ->
+	      let custom_pkg_files = (* обычно равно [] *)
 		call_before_build ~snapshot
 		  ~pkgname:spec.pkgname ~version ~revision:release ~platform spec.hooks in
-	      
+	      (* hooks -- это атавизм со времен specdir-v1, забить на это дело *)
+
 	      let filecount = ref 0 in
 	      let files =
 		with_out "rpmbuild.files"
@@ -215,6 +226,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		      else ""
 		    in
 		    accumulate_lists (add_bf_list make_rpm_line) out;
+		    (* обычно ничего не делает *)
 		    List.iter (fun s -> out (make_rpm_line s))
 		      custom_pkg_files)
 	      in
@@ -245,6 +257,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		    else
 		      log_message (sprintf "warning: %s is not found" freq))
 	      in
+
 	      let specify_provides l =
 		if System.arch () = "x86_64" then
 		  List.map
@@ -334,7 +347,8 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 	      
 	      build_over_rpmbuild ~snapshot
 		(spec.pkgname,platform,version,release,specfile,files,findreq,spec.hooks)
-		
+
+	 (* PKG TRANS CODE ---------------------------------------- *)
 	  | Pkg_trans ->
 	      let custom_pkg_files =
 		call_before_build ~snapshot
@@ -460,9 +474,11 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 	      log_command "mv" ["-f";pkg_file_abs;"./"];
 	      (try Sys.remove pkg_file_gz with _ -> ());
 	      log_command "gzip" [pkg_file];
-	      call_after_build ~snapshot
+	      call_after_build ?chroot:None ~snapshot
 		~location:(Sys.getcwd ())
 		~fullname:pkg_file_gz spec.hooks version release
+
+	  (* DEB BUILD CODE ---------------------------------------- *)
 	  | Deb_pkg ->
 	      let custom_pkg_files =
 		call_before_build ~snapshot

@@ -5,13 +5,37 @@ open Printf
 
 (*** Rules execution *)
 
-let rules_file name =
-  match name with
-    | None ->
-	Filename.concat (Sys.getcwd()) ".bf-rules"
-    | Some s ->
-	Filename.concat (Sys.getcwd()) (".bf-rules." ^ s)
+let with_suffix file suffix =
+  Filename.concat (Sys.getcwd())
+		  (file^(match suffix with
+			 | None -> ""
+			 | Some s -> ("."^s)))
+       
+let rules_file rules_name_opt =
+  with_suffix ".bf-rules" rules_name_opt
+    
+let build_file rules_name_opt =
+  with_suffix ".bf-build" rules_name_opt
 
+let list_file rules_name_opt =
+  with_suffix ".bf-list" rules_name_opt
+
+let install_file rules_name_opt =
+  with_suffix ".bf-install" rules_name_opt
+
+let fill_time_to_file file start_time =
+  let end_time = Unix.gettimeofday () in
+  let build_time = end_time -. start_time in
+  let ch = open_out file in
+  Printf.fprintf ch "%f\n%f\n" end_time build_time;
+  close_out ch
+  
+let fill_bf_build ?rules start_time  =
+  fill_time_to_file (build_file rules) start_time
+
+let fill_bf_install ?rules start_time =
+  fill_time_to_file (install_file rules) start_time
+	    
 let with_snapshot snapshot f =
   Ocs_env.set_glob
     Scheme.env (Ssymbol "snapshot") (if snapshot then Strue else Sfalse);

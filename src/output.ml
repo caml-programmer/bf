@@ -76,3 +76,11 @@ let string_empty s =
 
 let not_string_empty s =
   not (string_empty s)
+
+let print_endline_to_channel ch str =
+  output_string ch (str^"\n");
+  flush ch
+
+let print_to_channel ch str =
+  output_string ch str;
+  flush ch

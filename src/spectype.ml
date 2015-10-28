@@ -25,6 +25,7 @@ type provide = string
 type spec = {
   pkgname : pkg_name;
   depends : platform_depend list;
+  builddeps : platform_depend list;
   provides : provide list;
   obsoletes : provide list;
   rejects : reject list;
@@ -40,6 +41,8 @@ type spec = {
   local: bool;
   }
 
+let pkgname_of_platform_depend ((pkgname,_,_): platform_depend) = pkgname
+	      
 exception Dependency_not_found of pkg_name
 	      
 let find_dependency spec pkgname =
@@ -124,6 +127,7 @@ let system_pkg_spec pkgname version =
   {
     pkgname = pkgname;
     depends = [];
+    builddeps = [];
     provides = [];
     obsoletes = [];
     rejects = [];
@@ -388,6 +392,7 @@ let load_v2 ?(snapshot=false) ?(short_composite=false) ~version ~revision specdi
   {
     pkgname = pkgname;
     depends = depends;
+    builddeps = []; (* старым кодом не используется *)
     provides = provides;
     obsoletes = obsoletes;
     rejects = rejects;
@@ -463,6 +468,7 @@ let load_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname ver
     with System.File_not_exist _ -> None in
   let components = Composite.components "composite" in
   let depends = depload_v2_new ~platform ~os "depends" in
+  let builddeps = depload_v2_new ~platform ~os "builddeps" in
   let provides = System.list_of_file "provides" in
   let rejects = System.list_of_file "rejects" in
   let obsoletes = System.list_of_file "obsoletes" in
@@ -475,6 +481,7 @@ let load_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname ver
   {
     pkgname = pkgname;
     depends = depends;
+    builddeps = builddeps;
     provides = provides;
     obsoletes = obsoletes;
     rejects = rejects;

@@ -2,17 +2,22 @@ open Printf
 open Platform
 open Logger
 
+(* Создаёт дубликат строки и делает её первый символ заглавным *)
 let key_format s =
   let l = String.length s in
   if l > 0 then
     let r = String.sub s 0 l in
     r.[0] <- Char.uppercase r.[0]; r
   else s
-   
+
+let fullname pkgname version release rhsys arch =
+  sprintf "%s-%s-%s.%s.%s.rpm" pkgname version release rhsys arch
+	 
 let build
   ?(top_label="topdir") ?(top_dir="/tmp/rpmbuild")
   ?(nocopy="/") ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
   ?(format="%%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm")
+  ?chroot
   ~pkgname ~platform ~version ~release ~spec ~files ~findreq () =
   let args = ref [] in
   let add s = args := !args @ [s] in
@@ -25,11 +30,17 @@ let build
   add "-bb";
   add ("--target=" ^ arch);
   add spec;
+  let as_root =
+    match chroot with
+    | None -> define "buildroot" buildroot;
+	      false
+    | Some chroot -> define "buildroot" "/buildroot";
+		     add "--root"; add chroot;
+		     true in
   define "_rpmdir" location;
   define "fileslist" files; (* must be absolute *)
   define top_label top_dir;
   define "nocopy" nocopy;
-  define "buildroot" buildroot;
   define "_build_name_fmt" format;
   define "pkgname" pkgname;
   define "pkgvers" version;
@@ -38,16 +49,17 @@ let build
   define "findreq" findreq;
   define "_unpackaged_files_terminate_build" "0";
 
+  Output.msg "build" "always" "fuck";
+  
   let cmd = 
     sprintf "rpmbuild %s" 
       (String.concat " " (List.map (fun x -> "'" ^ x ^ "'") !args)) in
 
   log_message (sprintf "run: %s" cmd);
   
-  let fullname =
-    sprintf "%s-%s-%s.%s.%s.rpm"
-      pkgname version release rhsys arch in
+  let fullname = fullname pkgname version release rhsys arch in
   if Sys.file_exists (Filename.concat location fullname) then
+    (* Чёрт возьми, если файл существует, не предпринимается попытки его пересобрать! *)
     location,fullname
   else
     begin
@@ -75,13 +87,16 @@ let build
 	end
       else
 	begin
-	  let _ =
-	    Unix.execvp "rpmbuild" (Array.of_list ("rpmbuild"::!args)) in
+	  (*let _ =
+	    Unix.execvp "rpmbuild" (Array.of_list ("rpmbuild"::!args)) in*)
+	  let command = Cmd.choose_command ~as_root ~loglevel:"always" () in
+	  ignore (command cmd);
 	  exit 0
 	end
     end
 
 let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot")) ~top_dir files =
+  
   Commands.remove_directory buildroot;
   Commands.make_directory [buildroot];
   

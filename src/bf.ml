@@ -74,6 +74,8 @@ let usage () =
   print_endline "   or: bf tests";
   print_endline "   or: bf checknode <smtp-server>[:<smtp-port>] <e-mail-list>";
   print_endline "   or: bf test-deptree <pkg-name> <version> [<revision>]";
+  print_endline "   or: bf buildpkg <choot_name> <pkg_name> <version> <platform>";
+		 
   exit 1
 
 let make_int s =
@@ -481,10 +483,28 @@ let main () =
 		~smtp_port
 		emails
 	    end	    
-	| "test-chroot" ->
+	| "test-buildpkg" ->
 	   with_teleport Goto_bf_params
 	     (fun () ->
-	      ignore (Test.chroot ()))
+	      ignore (Test.chroot_buildpkg ()))
+	| "buildpkg" ->
+	   with_teleport Goto_bf_params
+	     (fun () ->
+	      if len <> 6 then
+		begin
+		  print_endline "Example: bf buildpkg centos jet-racket5 14.0.0 cent6";
+		  print_endline "";
+		  usage ()
+		end;
+	      let chroot_name = Sys.argv.(2) in
+	      let pkgname = Sys.argv.(3) in
+	      let version = Sys.argv.(4) in
+	      let platform = Platform.platform_of_string Sys.argv.(5) in
+	      let os = Platform.os_of_platform platform in
+	      let pkgspec = Spectype.newload ~os ~platform pkgname version in
+	      Chroot.buildpkg ~os ~platform chroot_name pkgspec)
+	| "test-pack" ->
+	   Test.test_packpkg ()
 	| "test-changelog" ->
 	   let package = Sys.argv.(2) in
 	   let version = Sys.argv.(3) in
@@ -507,12 +527,24 @@ let main () =
 	| "build-component" ->
 	   begin
 	     let chroot_name = Sys.argv.(2) in
+	     let component_name = Sys.argv.(3) in
 	     match len with
-	     | 3 -> Chroot.build_component chroot_name None
-	     | 4 -> let rules = Some Sys.argv.(3) in
-		    Chroot.build_component chroot_name rules
+	     | 4 -> Chroot.build_component chroot_name component_name None
+	     | 5 -> let rules = Some Sys.argv.(4) in
+		    Chroot.build_component chroot_name component_name rules
 	     | _ -> usage ()
 	   end
+	| "test-make-chroot" ->
+	   let chroot_name = Sys.argv.(2) in
+	   let chroot_platform = Platform.platform_of_string Sys.argv.(3) in
+	   Test.make_chroot chroot_name chroot_platform
+	| "copy-to-buildroot" ->
+	   if len <> 5 then
+	     usage ();
+	   let chroot_name = Sys.argv.(2) in
+	   let file_rpmbuild_files = Sys.argv.(3) in
+	   let buildroot = Sys.argv.(4) in
+	   Chroot.copy_to_buildroot chroot_name file_rpmbuild_files buildroot
 	| _ ->
 	    analyze ()
     else usage ()

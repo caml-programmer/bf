@@ -35,5 +35,5 @@ let make ?(composite=None) specdir =
   Top.make ~replace_composite:composite ~depends specdir;
   List.iter
     (fun (specdir,_,_) ->
-      Pkgbuild.build_package_file ~snapshot:true (specdir,ver,rev))
+     ignore (Pkgbuild.build_package_file ~snapshot:true (specdir,ver,rev)))
     depends

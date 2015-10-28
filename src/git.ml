@@ -36,10 +36,11 @@ let git_init () =
 let git_clone url name =
   log_command ~env "git" ["clone";"-n";"-q";url;name]
 
-let clone ?(branch="") ?(depth=0) url =
+let clone ?(as_root=false) ?(branch="") ?(depth=0) url =
   let branch_str = if (String.length branch) != 0 then (" -b "^branch) else "" in
   let depth_str = match depth with 0 -> "" | depth -> (" --depth "^(string_of_int depth)) in
-  Cmd.command_log ("git clone "^url^branch_str^depth_str)
+  let command = Cmd.choose_command ~as_root () in
+  command ("git clone "^url^branch_str^depth_str)
 
 let git_add name =
   log_command ~env "git" ["add";name]

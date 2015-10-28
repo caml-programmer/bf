@@ -204,12 +204,12 @@ let clone component =
     component.name
 
 (* from нужен для указания локального источника *)    
-let clone_last ?from component =
+let clone_last ?(as_root=false) ?from component =
   let branch = string_of_label component.label in
   let url_or_path = match from with
     | None -> (Filename.concat (git_create_url component) component.name)
     | Some url_or_path -> url_or_path in
-  Git.clone ~branch ~depth:1 url_or_path
+  Git.clone ~as_root ~branch ~depth:1 url_or_path
     
 let with_component_dir ?(low=false) ?(strict=true) component (thunk : unit -> unit) =
   let curdir = Sys.getcwd () in

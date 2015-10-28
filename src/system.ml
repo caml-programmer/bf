@@ -438,10 +438,6 @@ let rec scandir f resource =
     end
   else f resource
 
-let mkdir_if_not_exists dir =
-  if not (Sys.file_exists dir)
-  then try Unix.mkdir dir 0o755 with _ -> failwith (sprintf "Cannot make directory: %s" dir)
-
 let up_search ~default name =
   let rec search dir =
     let f = Filename.concat dir name in
@@ -453,3 +449,8 @@ let up_search ~default name =
       else
 	search (Filename.dirname dir)
   in search (Sys.getcwd ())
+
+let with_out file (func: out_channel -> 'a) =
+  let ch = open_out file in
+  func ch;
+  close_out ch
