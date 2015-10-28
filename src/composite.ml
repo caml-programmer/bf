@@ -62,7 +62,7 @@ let load ?(short_composite=false) file =
       ignore_pack components
   else []
       
-let write file components =
+let write ?(version=3) file components =
   let ch = open_out file in
   let out = output_string ch in
   let first = ref true in
@@ -94,13 +94,15 @@ let write file components =
       | Some s ->
 	  out " (rules \"";
 	  out s;
-	  out "\")");   
+	  out "\")");
     out ")";
     first := false;
   in
-  out "(define (composite)\n'(";
+  if version = 2 then
+    out "(define (composite)\n'(";
   List.iter write components;
-  out "))\n";
+  if version = 2 then
+    out "))\n";
   close_out ch
 
 let components ?(short_composite=false) ?(replace_composite=None) composite =
