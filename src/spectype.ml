@@ -45,13 +45,14 @@ let pkgname_of_platform_depend ((pkgname,_,_): platform_depend) = pkgname
 	      
 exception Dependency_not_found of pkg_name
 	      
-let find_dependency spec pkgname =
+let find_dependency ?(use_builddeps=false) spec pkgname =
+  let depends = if use_builddeps then spec.builddeps else spec.depends in
   let rec find = function
     | dep :: deps ->
        let (pkg, opver, _) = dep in
        if pkg = pkgname then opver else find deps
     | [] -> raise (Dependency_not_found pkgname) in
-  find spec.depends
+  find depends
 
 let release_of_spec spec =
   spec.version^"-"^(string_of_int spec.revision)
@@ -424,10 +425,12 @@ let load ?(snapshot=false) ~version ~revision specdir =
 
 let depload_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) depfile : platform_depend list =
   let err msg = Output.err "Spectype.depload_v2_new" msg in
+  (* Что-то типа Alist.values, в противовес Alist.keys *)
   let remove_fst_level alist = List.map (function
 					  | Spair x -> x.cdr
 					  | _ -> err "Not an alist")
 					alist in
+  (* делает platform_depend из sexp-а *)
   let make_dep dep_scm =
     let dep = Scheme.read_list dep_scm in
     let pkgname = Scheme.make_string (List.nth dep 0) in

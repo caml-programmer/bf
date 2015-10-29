@@ -39,10 +39,17 @@ let test_packpkg () =
 let make_chroot chroot_name platform =
     Chroot.make chroot_name platform
 
+(* test-deptree *)		
 let depgraph pkgname version revision_opt =
   let depgraph = Depgraph.of_pkg pkgname version revision_opt in
   print_endline (Depgraph.string_of_deptree depgraph)
 
+(* test-buildtree *)
+let buildgraph pkgname version revision_opt =
+  let depgraph = Depgraph.of_pkg ~use_builddeps:true pkgname version revision_opt in
+  print_endline (Depgraph.string_of_deptree ~use_builddeps:true depgraph)
+
+(* test-depload *)
 let depload file =
   let deplist_v1 = Spectype.depload file in
   let deplist_v2 = Spectype.depload_v2_new file in

@@ -74,6 +74,7 @@ let usage () =
   print_endline "   or: bf tests";
   print_endline "   or: bf checknode <smtp-server>[:<smtp-port>] <e-mail-list>";
   print_endline "   or: bf test-deptree <pkg-name> <version> [<revision>]";
+  print_endline "   or: bf test-buildtree <pkg-name> <version> [<revision>]";
   print_endline "   or: bf buildpkg <choot_name> <pkg_name> <version> <platform>";
 		 
   exit 1
@@ -524,6 +525,14 @@ let main () =
 	     | 5 -> Some (int_of_string Sys.argv.(4))
 	     | _ -> raise (Invalid_argument "Exhaustive") in
 	   Test.depgraph pkgname version revision_opt
+	| "test-buildtree" ->
+	   let pkgname = Sys.argv.(2) in
+	   let version = Sys.argv.(3) in
+	   let revision_opt = match len with
+	     | 4 -> None
+	     | 5 -> Some (int_of_string Sys.argv.(4))
+	     | _ -> raise (Invalid_argument "Exhaustive") in
+	   Test.buildgraph pkgname version revision_opt
 	| "build-component" ->
 	   begin
 	     (* параметры сборки компонента заполняем аналогично bf make *)

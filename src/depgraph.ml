@@ -59,7 +59,7 @@ let reg_dep depgraph head_pkg tail_pkg =
     err "reg_dep" ("Circular dependencies have occured: " ^ (find_circular_dep depgraph))
 
 (* Загрузка графа зависимостей определённой ревизии *)
-let of_pkg_with_rev pkgname version revision : depgraph =
+let of_pkg_with_rev ?(use_builddeps=false) pkgname version revision : depgraph =
   let func = "Depgraph.of_pkg_with_rev" in
   let err = Output.err func in
   let warn = Output.warn func in
@@ -94,6 +94,7 @@ let of_pkg_with_rev pkgname version revision : depgraph =
       reg_dep prevpkg pkg
     else
       let spec = specload pkg ver rev in
+      let depends = if use_builddeps then spec.builddeps else spec.depends in
       reg_pkg spec;
       (if prevpkg <> "" then reg_dep prevpkg pkg);
       let deps =
@@ -104,19 +105,22 @@ let of_pkg_with_rev pkgname version revision : depgraph =
 		  | true ->
 		     let deprev = Specdir.revision_by_pkgver deppkg depver in
 		     (deppkg, depver, deprev))
-		 spec.depends in
+		 depends in
       List.iter (fill_graph ~prevpkg:pkg) deps in
 		  
   (* Основное тело функции *)
   fill_graph (pkgname, version, revision);
   depgraph
 
-let of_pkg_only pkgname version =
+let of_pkg_only ?(use_builddeps=false) pkgname version =
   let func = "Depgraph.of_pkg_only" in
   let err = Output.err func in
   let warn = Output.warn func in
   let msg = Output.msg func in
 
+  msg "always" ("test package: "^pkgname);
+  msg "always" ("use_builddeps: "^(string_of_bool use_builddeps));
+  
   let specload pkg ver =
     if Package.is_local pkg then
       Spectype.newload pkg ver
@@ -136,24 +140,25 @@ let of_pkg_only pkgname version =
       reg_dep prevpkg pkg
     else
       let spec = specload pkg ver in
+      let depends = if use_builddeps then spec.builddeps else spec.depends in
       reg_pkg spec;
       (if prevpkg <> "" then reg_dep prevpkg pkg);
       let deps =
 	List.map (fun dep ->
 		  let (deppkg, Some (_, depver), _) = dep in
 		  (deppkg, depver))
-		 spec.depends in
+		 depends in
       List.iter (fill_graph ~prevpkg:pkg) deps in
 
   fill_graph (pkgname, version);
   depgraph
 
-let of_pkg package version revision_opt =
+let of_pkg ?(use_builddeps=false) package version revision_opt =
   match revision_opt with
-  | None -> of_pkg_only package version
-  | Some revision -> of_pkg_with_rev package version revision
+  | None -> of_pkg_only ~use_builddeps package version
+  | Some revision -> of_pkg_with_rev ~use_builddeps package version revision
 
-let string_of_deptree ?(limit_depth=1000000) (depgraph:depgraph) =
+let string_of_deptree ?(use_builddeps=false) ?(limit_depth=1000000) (depgraph:depgraph) =
   let space depth = String.make (2*depth) ' ' in
   let graph = !(digraph depgraph) in
   let root = Digraph.find_root graph in
@@ -167,7 +172,7 @@ let string_of_deptree ?(limit_depth=1000000) (depgraph:depgraph) =
 	   begin
 	     ((space depth) ^ pkg ^ (if prevpkg <> "" then
 				       let spec = get_spec depgraph prevpkg in
-				       match Spectype.find_dependency spec pkg with
+				       match Spectype.find_dependency ~use_builddeps spec pkg with
 				       | None -> ""
 				       | Some (op,ver) -> " "^(Spectype.string_of_pkg_op op)^" "^ver
 				     else
