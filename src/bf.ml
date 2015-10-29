@@ -526,6 +526,11 @@ let main () =
 	   Test.depgraph pkgname version revision_opt
 	| "build-component" ->
 	   begin
+	     (* параметры сборки компонента заполняем аналогично bf make *)
+	     Params.update_param "log-level" "high";
+	     Params.update_param "display-command-logs" "true";
+	     Params.update_param "orig-top-dir" (Params.get_param "top-dir");
+	     Params.update_param "install-dir" (Params.make_install_dir ());
 	     let chroot_name = Sys.argv.(2) in
 	     let component_name = Sys.argv.(3) in
 	     match len with
