@@ -571,7 +571,7 @@ let changelog ?(branch=None) ?(diff=false) ?(since=None) tag_a tag_b component =
   !chunks
 
 let extract_tasks s =
-  let comma = Str.regexp "," in
+  let comma = Str.regexp "[,; ]" in
   let rex =
     Re_perl.compile_pat "[^A-Z]*([A-Z]+-\\d+)[^0-9]*" in
   List.fold_left
