@@ -13,7 +13,7 @@ let ignore_list =
   if Sys.file_exists rejects_file then
     System.list_of_file rejects_file
   else
-    ["rpmlib";"/bin/bash";"/bin/sh";"perl";"make"]
+    [(*"rpmlib";"/bin/bash";"/bin/sh"*)]
 
 let valid_dep dep =
   List.for_all 
