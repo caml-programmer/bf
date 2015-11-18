@@ -9,26 +9,31 @@ open Clonetree
 let rec print_depends depth = function
   | Dep_list l ->
       List.iter (fun v -> print_depends (succ depth) v) l
-  | Dep_val (e, tree) ->
+  | Dep_val ((e,extdeps), tree) ->
       let step = String.make depth ' ' in
-      printf "%s%s %s %s %d\n" step e.pkg_name e.pkg_branch e.pkg_version e.pkg_revision;
+      printf "%s%s %s %s %d\n" step e.pkg_name e.pkg_branch
+	e.pkg_version e.pkg_revision;
+      List.iter 
+	(fun dep ->
+	  printf " - %s%s\n" step dep) extdeps;
       print_depends (succ depth) tree
 
-let print_dep_val e =
-  printf "%s-%s-%d.%s.%s %s\n"
-    e.pkg_name e.pkg_version e.pkg_revision e.pkg_arch e.pkg_extension e.pkg_branch
+let print_dep_val (e,extdeps) =
+  printf "%s-%s-%d.%s.%s %s\n%!"
+    e.pkg_name e.pkg_version e.pkg_revision e.pkg_arch e.pkg_extension e.pkg_branch;
+  List.iter (printf " %s\n%!") extdeps
 
 let rec download_packages userhost l =
   List.iter 
-    (fun e ->
+    (fun (e, _) ->
       let src =
 	sprintf "%s:%s" userhost e.pkg_path in
       Commands.send_file_over_ssh src ".") l
 
 let clone_packages l =
-  List.iter (fun e ->
+  List.iter (fun (e,_) ->
     let specdir =
-      sprintf "./pack/%s/%s" e.pkg_name e.pkg_branch in
+      sprintf "./%s/%s/%s" (Params.get_param "pack") e.pkg_name e.pkg_branch in
     ignore (Package.update ~specdir ~ver:(Some e.pkg_version) ~rev:(Some (string_of_int e.pkg_revision)) ())) l
 
 let by_pkgfile userhost pkg_path mode =

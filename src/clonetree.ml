@@ -8,8 +8,9 @@ open Output
 
 type clone_val = string * Component.version * Component.revision * spec
 
+type extdep = string
 type pkg_clone_tree =
-    Pkgpath.t deptree
+    (Pkgpath.t * extdep list) deptree
 
 type clone_tree =
     clone_val deptree
@@ -38,7 +39,7 @@ let string_of_clone_tree ?(limit_depth=None) (tree:clone_tree) =
   in
   print_tree 0 tree
      
-let new_only e =
+let new_only (e, _) =
   with_platform
     (fun os platform ->
       let pkg =
@@ -106,7 +107,7 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
     let deps = Pkgdeps.extract ~userhost pkg_path in
     Hashtbl.add pre_table e.pkg_name (e,deps);
     
-    List.iter 
+    List.iter
       (fun (pkg_name,ver_opt,rev_opt,operand_opt) ->
         (match ver_opt, rev_opt with
 	  | Some ver, Some rev ->
@@ -139,12 +140,14 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
     if Hashtbl.mem table pkg_path then
       begin
 	warning depth pkg_path;
-	Dep_val (fst (Hashtbl.find pre_table (Pkgpath.name pkg_path)), Dep_list [])
+	Dep_val ((fst (Hashtbl.find pre_table (Pkgpath.name pkg_path)),[]), Dep_list [])
       end
     else
+
       let pkg_name = Pkgpath.name pkg_path in
       let (e,deps) = Hashtbl.find pre_table pkg_name in
-      Hashtbl.add table pkg_path (e.pkg_version,e.pkg_revision);
+      
+      Hashtbl.add table pkg_path true (*e.pkg_version,e.pkg_revision*);
       
       let extract_version ver_opt =
 	match ver_opt with
@@ -162,17 +165,16 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
 	  | Some r -> Some r
 	  | None ->
 	      try
-		let (e,_) = 
+		let (e,_) =
 		  Hashtbl.find pre_table pkg_name in
 		Some e.pkg_revision
 	      with Not_found -> None in
 
-      let depend_paths =
+      let (depend_paths,ext_deps) =
 	List.fold_left
-	  (fun acc (pkg_name,ver_opt,rev_opt,operand_opt) ->
+	  (fun (paths,extdeps) (pkg_name,ver_opt,rev_opt,operand_opt) ->
 	    match extract_version ver_opt with
-	      | None ->
-		  pkg_name::acc
+	      | None -> paths, pkg_name::extdeps
 	      | Some ver ->
 		  begin
 		    match extract_revision rev_opt with
@@ -181,19 +183,27 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
 			    match operand_opt with
 			      | None -> " = "
 			      | Some op -> " " ^ op ^ " " in
-			  (sprintf "%s%s%s" pkg_name op ver)::acc
+			  (paths, ((sprintf "%s%s%s" pkg_name op ver)::extdeps))
 		      | Some rev ->
-			  (sprintf "%s/%s-%s-%d.%s.%s.%s" e.pkg_dir
+			  (((sprintf "%s/%s-%s-%d.%s.%s.%s" e.pkg_dir
 			    pkg_name ver rev
-			    (string_of_platform e.pkg_platform) e.pkg_arch e.pkg_extension)::acc
+			    (string_of_platform e.pkg_platform)
+			    e.pkg_arch e.pkg_extension)::paths), extdeps)
 		  end)
-	  [] deps
+	  ([],[]) deps
       in
+
       resolve depth pkg_path;
-      Dep_val (e, Dep_list
-	(List.fold_left
-	  (fun acc path -> (try acc @ [make (succ depth) path] with Not_found | Exit -> acc)) [] depend_paths))
-  in 
+      Dep_val
+	((e,ext_deps), Dep_list
+	  (List.fold_left
+	    (fun acc path ->
+	      (try
+		acc @ [make (succ depth) path]
+	      with
+		| Not_found
+		| Exit -> acc)) [] depend_paths))
+  in
 
   make 0 pkg_path
 
