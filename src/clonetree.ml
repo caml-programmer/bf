@@ -105,7 +105,7 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
     let e = make_pkg_record ~userhost pkg_path in
     let deps = Pkgdeps.extract ~userhost pkg_path in
     Hashtbl.add pre_table e.pkg_name (e,deps);
-
+    
     List.iter 
       (fun (pkg_name,ver_opt,rev_opt,operand_opt) ->
         (match ver_opt, rev_opt with
@@ -116,7 +116,7 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
 		  if ver <> e.pkg_version || rev <> e.pkg_revision then
 		    begin
 		      log_message (sprintf "Already registered: pkg(%s) ver(%s)/rev(%d) and next found: ver(%s)/rev(%d) not equivalent."
-		      pkg_name e.pkg_version e.pkg_revision ver rev);
+			pkg_name e.pkg_version e.pkg_revision ver rev);
 		      raise (Cannot_resolve_dependes pkg_path)
 		    end
 		end;
@@ -126,7 +126,7 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
 		scan new_path
 	  | _ ->
 	      ()))
-    deps
+      deps
   in
   scan pkg_path;
 
@@ -145,34 +145,49 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
       let pkg_name = Pkgpath.name pkg_path in
       let (e,deps) = Hashtbl.find pre_table pkg_name in
       Hashtbl.add table pkg_path (e.pkg_version,e.pkg_revision);
+      
+      let extract_version ver_opt =
+	match ver_opt with
+	  | Some v -> Some v
+	  | None ->
+	      try
+		let (e,_) =
+		  Hashtbl.find pre_table pkg_name in
+		Some e.pkg_version
+	      with Not_found -> None
+      in
+
+      let extract_revision rev_opt =
+	match rev_opt with
+	  | Some r -> Some r
+	  | None ->
+	      try
+		let (e,_) = 
+		  Hashtbl.find pre_table pkg_name in
+		Some e.pkg_revision
+	      with Not_found -> None in
 
       let depend_paths =
 	List.fold_left
 	  (fun acc (pkg_name,ver_opt,rev_opt,operand_opt) ->
-	    try
-	      let extract_version ver_opt = 
-		match ver_opt with
-		  | Some v -> v
-		  | None ->
-		      let (e,_) =
-			Hashtbl.find pre_table pkg_name in
-		      e.pkg_version
-	      in
-	      let ver = extract_version ver_opt in
-	      let rev =
-		match rev_opt with
-		  | Some r -> r
-		  | None ->
-		      let (e,_) =
-			try
-			  Hashtbl.find pre_table pkg_name
-			with Not_found ->
-			  log_message (sprintf "warning: cannot resolve revision for %s" pkg_name);
-			  raise Not_found in
-		      e.pkg_revision in
-	      (sprintf "%s/%s-%s-%d.%s.%s.%s" e.pkg_dir pkg_name ver rev
-		(string_of_platform e.pkg_platform) e.pkg_arch e.pkg_extension)::acc
-	    with Not_found -> acc) [] deps
+	    match extract_version ver_opt with
+	      | None ->
+		  pkg_name::acc
+	      | Some ver ->
+		  begin
+		    match extract_revision rev_opt with
+		      | None ->
+			  let op =
+			    match operand_opt with
+			      | None -> " = "
+			      | Some op -> " " ^ op ^ " " in
+			  (sprintf "%s%s%s" pkg_name op ver)::acc
+		      | Some rev ->
+			  (sprintf "%s/%s-%s-%d.%s.%s.%s" e.pkg_dir
+			    pkg_name ver rev
+			    (string_of_platform e.pkg_platform) e.pkg_arch e.pkg_extension)::acc
+		  end)
+	  [] deps
       in
       resolve depth pkg_path;
       Dep_val (e, Dep_list
