@@ -154,12 +154,9 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
 		match ver_opt with
 		  | Some v -> v
 		  | None ->
-		      try
-			let (e,_) =
-			  Hashtbl.find pre_table pkg_name in
-			e.pkg_version
-		      with Not_found ->
-			log_error (sprintf "cannot resolve version for %s" pkg_name)
+		      let (e,_) =
+			Hashtbl.find pre_table pkg_name in
+		      e.pkg_version
 	      in
 	      let ver = extract_version ver_opt in
 	      let rev =
