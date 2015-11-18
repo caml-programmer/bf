@@ -33,6 +33,7 @@ let print_dep_val (e,extdeps) =
 	end) extdeps
 
 let make pkg_path =
+  Params.update_param "pkg-prefix" "";
   let depends =
     tree_of_package pkg_path in
   List.iter
