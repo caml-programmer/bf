@@ -110,62 +110,70 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
     log_message (sprintf "%s warning: %s already scanned" (String.make depth ' ') s) in
   let resolve depth s =
     log_message (sprintf "%s resolve %s" (String.make depth ' ') s) in
-  let rec make depth pkg_path =
-    if Hashtbl.mem table pkg_path then
-      begin
-	warning depth pkg_path;
-	Dep_val ((fst (Hashtbl.find pre_table (Pkgpath.name pkg_path)),[]), Dep_list [])
-      end
-    else
 
-      let pkg_name = Pkgpath.name pkg_path in
-      let (e,deps) = Hashtbl.find pre_table pkg_name in
-      
-      Hashtbl.add table pkg_path true (*e.pkg_version,e.pkg_revision*);
-      
-      let extract_version ver_opt =
-	match ver_opt with
-	  | Some v -> Some v
-	  | None ->
-	      try
-		let (e,_) =
-		  Hashtbl.find pre_table pkg_name in
-		Some e.pkg_version
-	      with Not_found -> None
-      in
+  let extract_version pkg_name ver_opt =
+    match ver_opt with
+      | Some v -> Some v
+      | None ->
+	  try
+	    let (e,_) =
+	      Hashtbl.find pre_table pkg_name in
+	    Some e.pkg_version
+	  with Not_found -> None
+  in
+  
+  let extract_revision pkg_name rev_opt =
+    match rev_opt with
+      | Some r -> Some r
+      | None ->
+	  try
+	    let (e,_) =
+	      Hashtbl.find pre_table pkg_name in
+	    Some e.pkg_revision
+	  with Not_found -> None in
 
-      let extract_revision rev_opt =
-	match rev_opt with
-	  | Some r -> Some r
-	  | None ->
-	      try
-		let (e,_) =
-		  Hashtbl.find pre_table pkg_name in
-		Some e.pkg_revision
-	      with Not_found -> None in
-
-      let (depend_paths,ext_deps) =
+  let split_deps e deps =
 	List.fold_left
 	  (fun (paths,extdeps) (pkg_name,ver_opt,rev_opt,operand_opt) ->
-	    match extract_version ver_opt with
-	      | None -> paths, pkg_name::extdeps
+	    match extract_version pkg_name ver_opt with
+	      | None -> 
+		  printf "DEBUG: add extdeps: %s\n%!" pkg_name;
+		  paths, pkg_name::extdeps
 	      | Some ver ->
 		  begin
-		    match extract_revision rev_opt with
+		    match extract_revision pkg_name rev_opt with
 		      | None ->
 			  let op =
 			    match operand_opt with
 			      | None -> " = "
 			      | Some op -> " " ^ op ^ " " in
-			  (paths, ((sprintf "%s%s%s" pkg_name op ver)::extdeps))
+			  let extdep =
+			    sprintf "%s%s%s" pkg_name op ver in
+			  printf "DEBUG: add extdeps: %s\n%!" extdep;
+			  (paths, (extdep::extdeps))
 		      | Some rev ->
 			  (((sprintf "%s/%s-%s-%d.%s.%s.%s" e.pkg_dir
 			    pkg_name ver rev
 			    (string_of_platform e.pkg_platform)
 			    e.pkg_arch e.pkg_extension)::paths), extdeps)
 		  end)
-	  ([],[]) deps
-      in
+	  ([],[]) deps in
+  
+  let rec make depth pkg_path =        
+    if Hashtbl.mem table pkg_path then
+      begin
+	warning depth pkg_path;
+	let (e,deps) = 
+	  Hashtbl.find pre_table (Pkgpath.name pkg_path) in
+	Dep_val ((e,(snd (split_deps e deps))), Dep_list [])
+      end
+    else
+      let pkg_name = Pkgpath.name pkg_path in
+      let (e,deps) = Hashtbl.find pre_table pkg_name in
+      
+      Hashtbl.add table pkg_path true;
+      
+      let (depend_paths,ext_deps) = split_deps e deps in
 
       resolve depth pkg_path;
       Dep_val
