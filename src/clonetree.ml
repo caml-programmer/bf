@@ -192,7 +192,7 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
       resolve depth pkg_path;
       Dep_val (e, Dep_list
 	(List.fold_left
-	  (fun acc path -> (try acc @ [make (succ depth) path] with Exit -> acc)) [] depend_paths))
+	  (fun acc path -> (try acc @ [make (succ depth) path] with Not_found | Exit -> acc)) [] depend_paths))
   in 
 
   make 0 pkg_path
