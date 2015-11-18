@@ -137,7 +137,6 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
 	  (fun (paths,extdeps) (pkg_name,ver_opt,rev_opt,operand_opt) ->
 	    match extract_version pkg_name ver_opt with
 	      | None -> 
-		  printf "DEBUG: add extdeps: %s\n%!" pkg_name;
 		  paths, pkg_name::extdeps
 	      | Some ver ->
 		  begin
@@ -149,7 +148,6 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
 			      | Some op -> " " ^ op ^ " " in
 			  let extdep =
 			    sprintf "%s%s%s" pkg_name op ver in
-			  printf "DEBUG: add extdeps: %s\n%!" extdep;
 			  (paths, (extdep::extdeps))
 		      | Some rev ->
 			  (((sprintf "%s/%s-%s-%d.%s.%s.%s" e.pkg_dir
