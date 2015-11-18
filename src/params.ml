@@ -175,28 +175,36 @@ exception Bad_specdir of string
 exception No_pkg_prefix of string
 
 let update_for_specdir specdir =
-  match 
-    List.filter 
-      (function 
-	| ""  -> false 
-	| "." -> false 
-	| _   -> true)
-      (Strings.split '/' specdir)
-  with
-    | pack::pkgname::packbranch::_ ->
-	let pkg_prefix =
-	  try
-	    let pos = String.index pkgname '-' in
-	    String.sub pkgname 0 (pred pos)
-	  with Not_found ->
-	    raise (No_pkg_prefix pkgname) in
-	let plugins_dir = pack in
-	update_param "pkg-prefix" pkg_prefix;
-	update_param "pack" pack;
-	update_param "plugins-dir" plugins_dir	  
-    | _ ->
-	raise (Bad_specdir specdir)
-
+  let update =
+    try
+      ignore(Sys.getenv "NOT_UPDATE_BY_SPECDIR");
+      false
+    with Not_found -> true
+  in
+  if update then
+    begin
+      match
+	List.filter 
+	  (function 
+	    | ""  -> false 
+	    | "." -> false 
+	    | _   -> true)
+	  (Strings.split '/' specdir)
+      with
+	| pack::pkgname::packbranch::_ ->
+	    let pkg_prefix =
+	      try
+		let pos = String.index pkgname '-' in
+		String.sub pkgname 0 (pred pos)
+	      with Not_found ->
+		raise (No_pkg_prefix pkgname) in
+	    let plugins_dir = pack in
+	    update_param "pkg-prefix" pkg_prefix;
+	    update_param "pack" pack;
+	    update_param "plugins-dir" plugins_dir
+	| _ ->
+	    raise (Bad_specdir specdir)
+    end
 
 
 let _ =

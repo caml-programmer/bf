@@ -72,32 +72,6 @@ let compare_pkg_versions ver1 ver2 =
     (Str.split rex ver1)
     (Str.split rex ver2)
 
-(*
-let soft_dep pkg_name pkg_path ver =
-  let rex =
-    Pcre.regexp (sprintf "%s-%s" pkg_name ver) in
-  let dist_path =
-    Filename.dirname pkg_path in
-  let files =
-    List.filter
-      (Pcre.pmatch ~rex)
-      (System.list_of_directory dist_path) in
-  let dep_package = 
-    List.fold_left
-      (fun acc file ->
-	match acc with
-	  | None -> Some file
-	  | Some acc_file ->
-	      if compare_pkg_versions acc_file file > 0 then
-		acc
-	      else
-		Some file) None files in
-  match dep_package with
-    | None   -> raise (Cannot_resolve_soft_dependes pkg_name)
-    | Some p ->
-	sprintf "%s/%s" dist_path p
-*)
-
 let tree_of_package ?userhost pkg_path : pkg_clone_tree =
   let pre_table = Hashtbl.create 32 in
   
@@ -285,7 +259,7 @@ let tree_of_specdir ?(newload=false) ?(log=true) ?packdir ~vr specdir : clone_tr
 		    begin
 		      let new_specdir =
 			Specdir.of_pkg ~default_branch:(Some (Specdir.branch specdir)) pkgdir pkg in
-		      let (ver,rev) = 
+		      let (ver,rev) =
 			Release.get new_specdir in
 		      acc @ [new_specdir,ver,rev,(Version.have_revision (Version.parse_vr_opt vr_opt))] (* add specdir for post-processing *)
 		    end
@@ -314,7 +288,7 @@ let tree_of_specdir ?(newload=false) ?(log=true) ?packdir ~vr specdir : clone_tr
     try
       make 0 (specdir,ver,rev,true)
     with Exit -> checkout_pack "master";
-		 raise (Tree_error (sprintf "not found specdir (%s) for pack state: %s/%s-%d\n%!" specdir (Specdir.pkgname specdir) ver rev))
+      raise (Tree_error (sprintf "not found specdir (%s) for pack state: %s/%s-%d\n%!" specdir (Specdir.pkgname specdir) ver rev))
   in
 
   checkout_pack "master";
