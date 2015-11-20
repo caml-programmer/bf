@@ -10,8 +10,16 @@ let without_ver_require =
   Pcre.regexp "(.+)"
 
 exception Cannot_extract_revision of string
+
+type pkgname  = string
+type operator = string
+type version  = string
+type revision = int
+
+type dep =
+    pkgname * version option * revision option * operator option
   
-let extract ~userhost pkg_path =
+let extract ~userhost pkg_path : dep list =
   List.rev
     (List.fold_left
       (fun acc s ->

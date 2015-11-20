@@ -39,6 +39,9 @@ let make_id typ specdir =
 (* Monograph *)
 
 let monograph ?ver ?rev specdir =
+
+  Params.update_for_specdir specdir;
+
   let dotfile = sprintf "%s.dot" (make_id "monograph" specdir) in
   let pngfile = sprintf "%s.png" (make_id "monograph" specdir) in
 
@@ -94,6 +97,9 @@ let monograph ?ver ?rev specdir =
 (* Basegraph *)
 
 let basegraph specdir mode =
+
+  Params.update_for_specdir specdir;
+
   let dotfile = sprintf "%s.dot" (make_id "basegraph" specdir) in
   let pngfile = sprintf "%s.png" (make_id "basegraph" specdir) in
 
@@ -333,6 +339,9 @@ let html_quoting s =
   Buffer.contents b
 
 let usergraph specdir =
+
+  Params.update_for_specdir specdir;
+
   let dotfile = sprintf "%s.dot" (make_id "usergraph" specdir) in
   let pngfile = sprintf "%s.png" (make_id "usergraph" specdir) in
 

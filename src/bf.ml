@@ -56,6 +56,7 @@ let usage () =
   print_endline "   or: bf fork <specdir> <new-branch> [<single-rev-depth>]";
   print_endline "   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite|depends|packages]";
   print_endline "   or: bf clone <specdir> [overwrite] [norec] [<ver> <rev>]";
+  print_endline "   or: bf deplist <pkg-path>";
   print_endline "   or: bf snapshot <specdir> [<composite>]";
   print_endline "   or: bf link <pkg-path> [symlink]";
   print_endline "   or: bf top <specdir>";
@@ -312,6 +313,10 @@ let main () =
 	| "top" ->
 	    if Sys.file_exists Sys.argv.(2) then
 	      Top.make Sys.argv.(2)
+	    else usage ()
+	| "deplist" ->
+	    if Sys.file_exists Sys.argv.(2) then
+	      Deplist.make Sys.argv.(2)
 	    else usage ()
 	| "upgrade" ->
 	    let (upgrade_mode,default_branch) =

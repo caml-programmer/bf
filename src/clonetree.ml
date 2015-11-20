@@ -8,8 +8,9 @@ open Output
 
 type clone_val = string * Component.version * Component.revision * spec
 
+type extdep = string
 type pkg_clone_tree =
-    Pkgpath.t deptree
+    (Pkgpath.t * extdep list) deptree
 
 type clone_tree =
     clone_val deptree
@@ -38,7 +39,7 @@ let string_of_clone_tree ?(limit_depth=None) (tree:clone_tree) =
   in
   print_tree 0 tree
      
-let new_only e =
+let new_only (e, _) =
   with_platform
     (fun os platform ->
       let pkg =
@@ -71,32 +72,6 @@ let compare_pkg_versions ver1 ver2 =
     (Str.split rex ver1)
     (Str.split rex ver2)
 
-(*
-let soft_dep pkg_name pkg_path ver =
-  let rex =
-    Pcre.regexp (sprintf "%s-%s" pkg_name ver) in
-  let dist_path =
-    Filename.dirname pkg_path in
-  let files =
-    List.filter
-      (Pcre.pmatch ~rex)
-      (System.list_of_directory dist_path) in
-  let dep_package = 
-    List.fold_left
-      (fun acc file ->
-	match acc with
-	  | None -> Some file
-	  | Some acc_file ->
-	      if compare_pkg_versions acc_file file > 0 then
-		acc
-	      else
-		Some file) None files in
-  match dep_package with
-    | None   -> raise (Cannot_resolve_soft_dependes pkg_name)
-    | Some p ->
-	sprintf "%s/%s" dist_path p
-*)
-
 let tree_of_package ?userhost pkg_path : pkg_clone_tree =
   let pre_table = Hashtbl.create 32 in
   
@@ -105,8 +80,8 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
     let e = make_pkg_record ~userhost pkg_path in
     let deps = Pkgdeps.extract ~userhost pkg_path in
     Hashtbl.add pre_table e.pkg_name (e,deps);
-
-    List.iter 
+    
+    List.iter
       (fun (pkg_name,ver_opt,rev_opt,operand_opt) ->
         (match ver_opt, rev_opt with
 	  | Some ver, Some rev ->
@@ -116,7 +91,7 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
 		  if ver <> e.pkg_version || rev <> e.pkg_revision then
 		    begin
 		      log_message (sprintf "Already registered: pkg(%s) ver(%s)/rev(%d) and next found: ver(%s)/rev(%d) not equivalent."
-		      pkg_name e.pkg_version e.pkg_revision ver rev);
+			pkg_name e.pkg_version e.pkg_revision ver rev);
 		      raise (Cannot_resolve_dependes pkg_path)
 		    end
 		end;
@@ -126,7 +101,7 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
 		scan new_path
 	  | _ ->
 	      ()))
-    deps
+      deps
   in
   scan pkg_path;
 
@@ -135,53 +110,80 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
     log_message (sprintf "%s warning: %s already scanned" (String.make depth ' ') s) in
   let resolve depth s =
     log_message (sprintf "%s resolve %s" (String.make depth ' ') s) in
-  let rec make depth pkg_path =
+
+  let extract_version pkg_name ver_opt =
+    match ver_opt with
+      | Some v -> Some v
+      | None ->
+	  try
+	    let (e,_) =
+	      Hashtbl.find pre_table pkg_name in
+	    Some e.pkg_version
+	  with Not_found -> None
+  in
+  
+  let extract_revision pkg_name rev_opt =
+    match rev_opt with
+      | Some r -> Some r
+      | None ->
+	  try
+	    let (e,_) =
+	      Hashtbl.find pre_table pkg_name in
+	    Some e.pkg_revision
+	  with Not_found -> None in
+
+  let split_deps e deps =
+	List.fold_left
+	  (fun (paths,extdeps) (pkg_name,ver_opt,rev_opt,operand_opt) ->
+	    match extract_version pkg_name ver_opt with
+	      | None -> 
+		  paths, pkg_name::extdeps
+	      | Some ver ->
+		  begin
+		    match extract_revision pkg_name rev_opt with
+		      | None ->
+			  let op =
+			    match operand_opt with
+			      | None -> " = "
+			      | Some op -> " " ^ op ^ " " in
+			  let extdep =
+			    sprintf "%s%s%s" pkg_name op ver in
+			  (paths, (extdep::extdeps))
+		      | Some rev ->
+			  (((sprintf "%s/%s-%s-%d.%s.%s.%s" e.pkg_dir
+			    pkg_name ver rev
+			    (string_of_platform e.pkg_platform)
+			    e.pkg_arch e.pkg_extension)::paths), extdeps)
+		  end)
+	  ([],[]) deps in
+  
+  let rec make depth pkg_path =        
     if Hashtbl.mem table pkg_path then
       begin
 	warning depth pkg_path;
-	Dep_val (fst (Hashtbl.find pre_table (Pkgpath.name pkg_path)), Dep_list [])
+	let (e,deps) = 
+	  Hashtbl.find pre_table (Pkgpath.name pkg_path) in
+	Dep_val ((e,(snd (split_deps e deps))), Dep_list [])
       end
     else
       let pkg_name = Pkgpath.name pkg_path in
       let (e,deps) = Hashtbl.find pre_table pkg_name in
-      Hashtbl.add table pkg_path (e.pkg_version,e.pkg_revision);
+      
+      Hashtbl.add table pkg_path true;
+      
+      let (depend_paths,ext_deps) = split_deps e deps in
 
-      let depend_paths =
-	List.fold_left
-	  (fun acc (pkg_name,ver_opt,rev_opt,operand_opt) ->
-	    try
-	      let extract_version ver_opt = 
-		match ver_opt with
-		  | Some v -> v
-		  | None ->
-		      try
-			let (e,_) =
-			  Hashtbl.find pre_table pkg_name in
-			e.pkg_version
-		      with Not_found ->
-			log_error (sprintf "cannot resolve version for %s" pkg_name)
-	      in
-	      let ver = extract_version ver_opt in
-	      let rev =
-		match rev_opt with
-		  | Some r -> r
-		  | None ->
-		      let (e,_) =
-			try
-			  Hashtbl.find pre_table pkg_name
-			with Not_found ->
-			  log_message (sprintf "warning: cannot resolve revision for %s" pkg_name);
-			  raise Not_found in
-		      e.pkg_revision in
-	      (sprintf "%s/%s-%s-%d.%s.%s.%s" e.pkg_dir pkg_name ver rev
-		(string_of_platform e.pkg_platform) e.pkg_arch e.pkg_extension)::acc
-	    with Not_found -> acc) [] deps
-      in
       resolve depth pkg_path;
-      Dep_val (e, Dep_list
-	(List.fold_left
-	  (fun acc path -> (try acc @ [make (succ depth) path] with Exit -> acc)) [] depend_paths))
-  in 
+      Dep_val
+	((e,ext_deps), Dep_list
+	  (List.fold_left
+	    (fun acc path ->
+	      (try
+		acc @ [make (succ depth) path]
+	      with
+		| Not_found
+		| Exit -> acc)) [] depend_paths))
+  in
 
   make 0 pkg_path
 
@@ -263,7 +265,7 @@ let tree_of_specdir ?(newload=false) ?(log=true) ?packdir ~vr specdir : clone_tr
 		    begin
 		      let new_specdir =
 			Specdir.of_pkg ~default_branch:(Some (Specdir.branch specdir)) pkgdir pkg in
-		      let (ver,rev) = 
+		      let (ver,rev) =
 			Release.get new_specdir in
 		      acc @ [new_specdir,ver,rev,(Version.have_revision (Version.parse_vr_opt vr_opt))] (* add specdir for post-processing *)
 		    end
@@ -292,7 +294,7 @@ let tree_of_specdir ?(newload=false) ?(log=true) ?packdir ~vr specdir : clone_tr
     try
       make 0 (specdir,ver,rev,true)
     with Exit -> checkout_pack "master";
-		 raise (Tree_error (sprintf "not found specdir (%s) for pack state: %s/%s-%d\n%!" specdir (Specdir.pkgname specdir) ver rev))
+      raise (Tree_error (sprintf "not found specdir (%s) for pack state: %s/%s-%d\n%!" specdir (Specdir.pkgname specdir) ver rev))
   in
 
   checkout_pack "master";

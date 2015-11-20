@@ -21,7 +21,7 @@ let make ~hard pkg_path =
     Clonetree.tree_of_package pkg_path in
   let pkg_dir = Filename.dirname pkg_path in
   List.iter 
-    (fun e ->
+    (fun (e,_) ->
       let name = 
 	sprintf "%s-%s-%d.%s.%s.%s"
 	  e.pkg_name e.pkg_version 

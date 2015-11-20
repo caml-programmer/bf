@@ -41,7 +41,7 @@ let test_packpkg () =
 let make_chroot chroot_name platform =
     Chroot.make chroot_name platform
 
-(* test-deptree *)		
+(* test-deptree *)
 let depgraph pkgname version revision_opt =
   let depgraph = Depgraph.of_pkg pkgname version revision_opt in
   print_endline (Depgraph.string_of_deptree depgraph)
