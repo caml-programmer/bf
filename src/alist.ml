@@ -1,7 +1,10 @@
 
 exception Key_already_exists
 exception Key_not_found
-				  
+
+let create = []
+let create () = []
+	       
 let assoc = List.assoc
 
 let has_key = List.mem_assoc
@@ -31,4 +34,3 @@ let update ?(create=false) key value alist =
     else
       raise Key_not_found
     
-

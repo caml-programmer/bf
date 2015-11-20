@@ -1,6 +1,19 @@
 exception Bad_version of string
 exception Bad_version_for_major_increment of string
 
+let of_release release =
+  List.hd (Output.string_list_of_string ~separator:"-" release)
+
+let chop_suffix_of_revision release =
+  List.hd (Output.string_list_of_string ~separator:"\\." release)
+
+let ver_rev_of_release release =
+  let err = Output.err "Version.ver_rev_of_release" in
+  match Output.string_list_of_string ~separator:"-" release with
+  | [ver;rev] -> (ver,(chop_suffix_of_revision rev))
+  | [ver] -> (ver,"")
+  | _ -> err ("Bad release: "^release)
+
 let clear s =
   let b = Buffer.create 32 in
   String.iter

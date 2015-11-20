@@ -6,7 +6,7 @@ let make dir_list =
 	remove_double_slash (Str.global_replace double_slash_regexp "/" str)
     with Not_found -> str in
   remove_double_slash (String.concat "/" dir_list)
-		     
+
 let is_absolute path =
   let first_symbol = String.sub path 0 1 in
   first_symbol = "/"

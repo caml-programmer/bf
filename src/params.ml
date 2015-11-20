@@ -143,6 +143,8 @@ let reread_params () =
   set_param ~default:"/bin/su" "su-path";
   set_param ~default:"true" "prefer-sudo";
 
+  set_param ~default:"pool" "pool-dir";
+  
   read_params ()
 
 (* Utils *)

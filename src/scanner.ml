@@ -52,7 +52,7 @@ let strip_destdir s =
     else s
   else s
    
-let generate_changes rules top_dir a b =
+let generate_changes ?(devlist=false) rules top_dir a b =
   let string_of_fs_entry = function
     | File s -> "f " ^ (strip_destdir s)
     | Dir s  -> "d " ^ (strip_destdir s)
@@ -79,9 +79,11 @@ let generate_changes rules top_dir a b =
 	      out b_entry))
 	  b;
 	let ch = open_out
-	  (match rules with
-	    | Some alt -> (".bf-list." ^ alt)
-	    | None     ->  ".bf-list")
+		   (match (rules,devlist) with
+		    | (None, false) -> ".bf-list"
+		    | (Some alt, false) -> ".bf-list" ^ alt
+		    | (None, true) -> ".bf-devlist"
+		    | (Some alt, true) -> ".bf-devlist" ^ alt)
 	in
 	output_string ch
 	  (sprintf "d %s\n" top_dir);

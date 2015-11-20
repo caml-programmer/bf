@@ -23,28 +23,30 @@ type platform_depend = pkg_name * (pkg_op * pkg_ver) option * pkg_desc option
 type reject = string (* зависимости, которые не надо включать в require (специфика rpmbuild) *)
 type provide = string
 type spec = {
-  pkgname : pkg_name;
-  depends : platform_depend list;
-  builddeps : platform_depend list;
-  provides : provide list;
-  obsoletes : provide list;
-  rejects : reject list;
-  components : component list;
-  pre_install : string option;
-  pre_update : string option;
-  pre_uninstall : string option;
-  post_install : string option;
-  params : (string,string) Hashtbl.t;
-  hooks : string option;
-  version: pkg_ver;
-  revision: int;
-  local: bool;
+    pkgname : pkg_name;
+    depends : platform_depend list;
+    devdeps : platform_depend list;
+    builddeps : platform_depend list;
+    provides : provide list;
+    obsoletes : provide list;
+    rejects : reject list;
+    components : component list;
+    pre_install : string option;
+    pre_update : string option;
+    pre_uninstall : string option;
+    post_install : string option;
+    params : (string,string) Hashtbl.t;
+    hooks : string option; (* атавизм со времён spec-v1*)
+    version: pkg_ver;
+    revision: int;
+    local: bool; (* true = пакет считается локальным -- то есть не внешним, не системным *)
+    nodev: bool; (* true = dev-пакет не создаётся, а содержимое dev-dir пакуется в исходный пакет *)
   }
 
 let pkgname_of_platform_depend ((pkgname,_,_): platform_depend) = pkgname
-	      
+
 exception Dependency_not_found of pkg_name
-	      
+
 let find_dependency ?(use_builddeps=false) spec pkgname =
   let depends = if use_builddeps then spec.builddeps else spec.depends in
   let rec find = function
@@ -129,6 +131,7 @@ let system_pkg_spec pkgname version =
     pkgname = pkgname;
     depends = [];
     builddeps = [];
+    devdeps = [];
     provides = [];
     obsoletes = [];
     rejects = [];
@@ -142,6 +145,7 @@ let system_pkg_spec pkgname version =
     version = version;
     revision = 0;
     local = false;
+    nodev = false;
   }
 
 			
@@ -394,6 +398,7 @@ let load_v2 ?(snapshot=false) ?(short_composite=false) ~version ~revision specdi
     pkgname = pkgname;
     depends = depends;
     builddeps = []; (* старым кодом не используется *)
+    devdeps = [];
     provides = provides;
     obsoletes = obsoletes;
     rejects = rejects;
@@ -404,9 +409,10 @@ let load_v2 ?(snapshot=false) ?(short_composite=false) ~version ~revision specdi
     post_install = post_install;
     params = params;
     hooks = hooks;
-    version = ""; (* старым кодом не используется *)
-    revision = 0; (* старым кодом не используется *)
-    local = true; (* старым кодом не используется *)
+    version = "";  (* старым кодом не используется *)
+    revision = 0;  (* старым кодом не используется *)
+    local = true;  (* старым кодом не используется *)
+    nodev = false; (* старым кодом не используется *)
   }
 
 let load_v3 ?(snapshot=false) ~version ~revision specdir =
@@ -472,6 +478,7 @@ let load_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname ver
   let components = Composite.components "composite" in
   let depends = depload_v2_new ~platform ~os "depends" in
   let builddeps = depload_v2_new ~platform ~os "builddeps" in
+  let devdeps = depload_v2_new ~platform ~os "devdeps" in
   let provides = System.list_of_file "provides" in
   let rejects = System.list_of_file "rejects" in
   let obsoletes = System.list_of_file "obsoletes" in
@@ -480,10 +487,12 @@ let load_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname ver
   let pre_uninstall = load_file "pre-uninstall" in
   let post_install = load_file "post-install" in
   let params = Params.read_from_file "params" in
+  let nodev = Sys.file_exists "nodev" in
   let (_,revision) = Specdir.ver_rev_by_specdir "." in
   {
     pkgname = pkgname;
     depends = depends;
+    devdeps = devdeps;
     builddeps = builddeps;
     provides = provides;
     obsoletes = obsoletes;
@@ -498,6 +507,7 @@ let load_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname ver
     version = version;
     revision = revision;
     local = true;
+    nodev = nodev;
   }
 
 let newload ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname version =

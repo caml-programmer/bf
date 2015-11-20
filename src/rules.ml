@@ -20,7 +20,10 @@ let build_file rules_name_opt =
 let list_file rules_name_opt =
   with_suffix ".bf-list" rules_name_opt
 
-let install_file rules_name_opt =
+let devlist_file rules_name_opt =
+  with_suffix ".bf-devlist" rules_name_opt
+	      
+let bf_install_file rules_name_opt =
   with_suffix ".bf-install" rules_name_opt
 
 let fill_time_to_file file start_time =
@@ -34,7 +37,7 @@ let fill_bf_build ?rules start_time  =
   fill_time_to_file (build_file rules) start_time
 
 let fill_bf_install ?rules start_time =
-  fill_time_to_file (install_file rules) start_time
+  fill_time_to_file (bf_install_file rules) start_time
 	    
 let with_snapshot snapshot f =
   Ocs_env.set_glob
@@ -159,14 +162,3 @@ let install_file file dir =
 	Sys.remove dest_file;
       log_message ~logger ("installing " ^ file ^ " to " ^ dest_file);
       System.copy_file file dest_file)
-
-  
-  
-  
-
-
-
-
-
-
-

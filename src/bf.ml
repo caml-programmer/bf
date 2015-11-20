@@ -76,7 +76,8 @@ let usage () =
   print_endline "   or: bf test-deptree <pkg-name> <version> [<revision>]";
   print_endline "   or: bf test-buildtree <pkg-name> <version> [<revision>]";
   print_endline "   or: bf buildpkg <choot_name> <pkg_name> <version> <platform>";
-		 
+  print_endline "   or: bf packpkg <choot_name> <pkg_name> <version> <platform>";
+				
   exit 1
 
 let make_int s =
@@ -504,6 +505,25 @@ let main () =
 	      let os = Platform.os_of_platform platform in
 	      let pkgspec = Spectype.newload ~os ~platform pkgname version in
 	      Chroot.buildpkg ~os ~platform chroot_name pkgspec)
+	| "packpkg" ->
+	   (* это действие нужно в основном для отладки: оно позволяет
+	   перепаковать пакет, если есть в наличии chroot-окружение, в
+	   котором он был собран*)
+	   with_teleport Goto_bf_params
+	     (fun () ->
+	      if len <> 6 then
+		begin
+		  print_endline "Example: bf packpkg centos jet-racket5 14.0.0 cent6";
+		  print_endline "";
+		  usage ()
+		end;
+	      let chroot_name = Sys.argv.(2) in
+	      let pkgname = Sys.argv.(3) in
+	      let version = Sys.argv.(4) in
+	      let platform = Platform.platform_of_string Sys.argv.(5) in
+	      let os = Platform.os_of_platform platform in
+	      let pkgspec = Spectype.newload ~os ~platform pkgname version in
+	      Chroot.pack ~os ~platform chroot_name pkgspec)
 	| "test-pack" ->
 	   Test.test_packpkg ()
 	| "test-changelog" ->

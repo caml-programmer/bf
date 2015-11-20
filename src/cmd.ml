@@ -1,18 +1,48 @@
 open Printf
 
-let command ?(env=Unix.environment()) ?(ignore_errors=false) ?(filter=(fun _ -> true)) command =
+(* честно утащил из ds-config *)
+let read_descriptors fdlist =
+  let buffer_map = List.map (fun fd -> Unix.set_nonblock fd;
+				       (fd,(Buffer.create 32)))
+			    fdlist in
+  let data = String.create 1024 in
+  let append fd len =
+    let chunk =
+      String.sub data 0 len in
+    let buf =
+      List.assoc fd buffer_map in
+    if Buffer.length buf + len < Sys.max_string_length then
+      Buffer.add_string buf chunk 
+  in
+  let rec read l =
+    if l <> [] then
+      let (rl,_,_) = Unix.select l [] [] 0.1 in
+      let ready =
+	List.fold_left
+	  (fun acc fd ->
+	    let n = Unix.read fd data 0 1024 in
+	    if n = 0 then
+	      begin
+		fd::acc
+	      end
+	    else
+	      begin
+		append fd n;
+		acc
+	      end) [] rl
+      in
+      read (List.filter (fun fd -> not (List.mem fd ready)) l)
+    else () in
+  read fdlist;
+  List.map (fun (_,b) -> Buffer.contents b) buffer_map
+
+let command ?(rt=false) ?(env=Unix.environment()) ?(ignore_errors=false) command =
   let msg str = Output.msg "command" "always" str in
   msg ("Run \"" ^ command ^ "\"");
   let (pout,pin,perr) = Unix.open_process_full command env in
-  let rec read acc ch =
-    try
-      let s = input_line ch in
-      if filter s
-      then read (s::acc) ch
-      else read acc ch
-    with End_of_file -> acc in
-  let outputs = String.concat "\n" (List.rev (read [] pout)) in
-  let errors = String.concat "\n" (List.rev (read [] perr)) in
+  let pout_fd = Unix.descr_of_in_channel pout in
+  let perr_fd = Unix.descr_of_in_channel perr in
+  let [outputs; errors] = read_descriptors [pout_fd; perr_fd] in
   let status = Unix.close_process_full (pout,pin,perr) in
   match status with
   | Unix.WEXITED st -> if ignore_errors || st = 0
@@ -21,9 +51,9 @@ let command ?(env=Unix.environment()) ?(ignore_errors=false) ?(filter=(fun _ -> 
   | Unix.WSIGNALED signal -> failwith (sprintf "Command '%s' was killed by signal: %d" command signal)
   | Unix.WSTOPPED signal -> failwith (sprintf "Command '%s' was stopped by signal: %d" command signal)
 
-let command_log ?(loglevel="always") ?(env=Unix.environment()) ?(ignore_errors=false) ?(filter=(fun _ -> true)) cmd_str =
+let command_log ?(rt=false) ?(loglevel="always") ?(env=Unix.environment()) ?(ignore_errors=false) cmd_str =
   let msg str = Output.msg "command" loglevel str in
-  let (st,outputs,errors) = command ~env ~ignore_errors:true ~filter cmd_str in
+  let (st,outputs,errors) = command ~env ~ignore_errors:true cmd_str in
   msg (Output.prefix_textblock "STDOUT: " outputs);
   msg (Output.prefix_textblock "STDERR: " errors);
   msg ("DONE: exit code "^(string_of_int st));
@@ -71,13 +101,13 @@ let root_command ?loglevel cmd =
        let su_command = "su -c \""^cmd^"\"" in
        command su_command
     | _,false,false -> raise Nor_su_nor_sudo
-
+			     
 let choose_command ?(as_root=false) ?loglevel () =
   match as_root with
   | true -> root_command ?loglevel
   | false -> (match loglevel with
-	      | None -> command ?env:None ?ignore_errors:None ?filter:None
-	      | _ -> command_log ?env:None ?ignore_errors:None ?filter:None ?loglevel)
+	      | None -> command ~rt:false ?env:None ?ignore_errors:None
+	      | _ -> command_log ~rt:false ?env:None ?ignore_errors:None ?loglevel)
 
 			     
 let mkdir ?(as_root=false) ?loglevel dir =

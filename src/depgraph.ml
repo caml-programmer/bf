@@ -71,7 +71,7 @@ let of_pkg_with_rev ?(use_builddeps=false) pkgname version revision : depgraph =
   коммитов, произошедших между установками тегов зависимого и базового
   пакетов. *)
   let specload pkg ver rev =
-    if Package.is_local pkg then
+    if Pkg.is_local pkg then
       let tag = Tag.make pkg ver rev in
       msg "high" ("Checkout to tag "^tag);
       Pack.checkout tag;
@@ -100,7 +100,7 @@ let of_pkg_with_rev ?(use_builddeps=false) pkgname version revision : depgraph =
       let deps =
 	List.map (fun dep ->
 		  let (deppkg, Some (_, depver), _) = dep in
-		  match Package.is_local deppkg with
+		  match Pkg.is_local deppkg with
 		  | false -> (deppkg, depver, 0)
 		  | true ->
 		     let deprev = Specdir.revision_by_pkgver deppkg depver in
@@ -122,7 +122,7 @@ let of_pkg_only ?(use_builddeps=false) pkgname version =
   msg "always" ("use_builddeps: "^(string_of_bool use_builddeps));
   
   let specload pkg ver =
-    if Package.is_local pkg then
+    if Pkg.is_local pkg then
       Spectype.newload pkg ver
     else
       Spectype.system_pkg_spec pkg ver in
@@ -174,7 +174,12 @@ let string_of_deptree ?(use_builddeps=false) ?(limit_depth=1000000) (depgraph:de
 				       let spec = get_spec depgraph prevpkg in
 				       match Spectype.find_dependency ~use_builddeps spec pkg with
 				       | None -> ""
-				       | Some (op,ver) -> " "^(Spectype.string_of_pkg_op op)^" "^ver
+				       | Some (op,ver) ->
+					  let spec = get_spec depgraph pkg in
+					  let rev = spec.revision in
+					  let rev = if rev = 0 then ""
+						    else "-"^(string_of_int rev) in
+					  " "^(Spectype.string_of_pkg_op op)^" "^ver^rev
 				     else
 				       let spec = get_spec depgraph pkg in
 				       "/"^(Spectype.release_of_spec spec)

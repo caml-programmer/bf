@@ -25,6 +25,8 @@ let chroot_buildpkg () =
   Chroot.buildpkg ~os ~platform chroot_name pkgspec;
   ()
 
+
+    
 let test_packpkg () =
   let os = Platform.Linux in
   let platform = Platform.Cent6 in

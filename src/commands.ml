@@ -199,9 +199,9 @@ let scm_get_env name =
 let scm_read_command cmd =
   scm_make_list (fun s -> Sstring s)
     (read_command (Scheme.string_of_sval cmd))
-
+    
 let scm_command cmd =
-  let (status,outputs,errors) = Cmd.command (Scheme.string_of_sval cmd) in
+  let (status,outputs,errors) = Cmd.command_log ~env:(Env.component ()) (Scheme.string_of_sval cmd) in
   Spair {car = Sint status;
 	 cdr =
 	   Spair {car = Sstring outputs;
