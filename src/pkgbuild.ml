@@ -56,10 +56,8 @@ let build_over_rpmbuild ?chroot ~snapshot (pkgname,platform,version,release,spec
   let top_dir = Params.get_param "top-dir" in
   System.check_commands ["rpmbuild"];
   log_command "chmod" ["+x";findreq];
-  Output.msg "build_over_rpmbuild" "always" "fuck1";
   if chroot = None then
     Rpm.copy_to_buildroot ~top_dir files;
-  Output.msg "build_over_rpmbuild" "always" "fuck2";
   let (location,fullname) =
     Rpm.build
       ~top_dir ?chroot

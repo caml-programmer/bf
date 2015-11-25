@@ -186,8 +186,6 @@ let build
   define "findreq" findreq;
   define "_unpackaged_files_terminate_build" "0";
 
-  Output.msg "build" "always" "fuck";
-  
   let cmd = 
     sprintf "rpmbuild %s" 
       (String.concat " " (List.map (fun x -> "'" ^ x ^ "'") !args)) in

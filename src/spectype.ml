@@ -41,6 +41,7 @@ type spec = {
     revision: int;
     local: bool; (* true = пакет считается локальным -- то есть не внешним, не системным *)
     nodev: bool; (* true = dev-пакет не создаётся, а содержимое dev-dir пакуется в исходный пакет *)
+    chroot: string; (* имя chroot-окружения, которое будет использоваться при сборке *)
   }
 
 let pkgname_of_platform_depend ((pkgname,_,_): platform_depend) = pkgname
@@ -97,7 +98,7 @@ let op_of_string = function
   | ">=" -> Pkg_ge
   | ">" -> Pkg_gt
   | _ as op -> Output.err "Spectype.op_of_string" ("Undefined operator: "^op)
-	     
+
 let string_of_spec spec =
   string_of_string_list (
       List.filter
@@ -146,9 +147,9 @@ let system_pkg_spec pkgname version =
     revision = 0;
     local = false;
     nodev = false;
+    chroot = "";
   }
 
-			
 (* функция загрузки depends *)
 
 exception No_pkg_prefix of string
@@ -413,6 +414,7 @@ let load_v2 ?(snapshot=false) ?(short_composite=false) ~version ~revision specdi
     revision = 0;  (* старым кодом не используется *)
     local = true;  (* старым кодом не используется *)
     nodev = false; (* старым кодом не используется *)
+    chroot = "" ;  (* старым кодом не используется *)
   }
 
 let load_v3 ?(snapshot=false) ~version ~revision specdir =
@@ -488,6 +490,9 @@ let load_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname ver
   let post_install = load_file "post-install" in
   let params = Params.read_from_file "params" in
   let nodev = Sys.file_exists "nodev" in
+  let chroot_name = if Sys.file_exists "chroot"
+		    then List.hd (System.list_of_file "chroot")
+		    else failwith ("No 'chroot' file in specdir for "^pkgname^"("^version^")") in
   let (_,revision) = Specdir.ver_rev_by_specdir "." in
   {
     pkgname = pkgname;
@@ -508,6 +513,7 @@ let load_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname ver
     revision = revision;
     local = true;
     nodev = nodev;
+    chroot = chroot_name;
   }
 
 let newload ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname version =

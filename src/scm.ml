@@ -176,8 +176,10 @@ let read_record : Ocs_types.sval -> (string * Ocs_types.sval) list =
   map (function
     | Spair v -> 
 	(match v.car with 
-	  | Ssymbol s -> s 
-	  | v -> raise (Bad_sexp (string_of_sval v))), car v.cdr
+	  | Ssymbol s -> s
+	  | Sstring s -> s
+	  | v -> raise (Bad_sexp (string_of_sval v))),
+	car v.cdr
     | v       -> raise (Bad_sexp (string_of_sval v)))
 
 let read_tag v =

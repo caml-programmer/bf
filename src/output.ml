@@ -24,6 +24,10 @@ let string_list_of_string ?(separator="\n") string =
 let string_of_string_list ?(separator="\n") strings =
   String.concat separator strings
 
+let join_with_spaces = string_of_string_list ~separator:" "
+
+let surrount_dquotes x = "\"" ^ x "\""
+					     
 let prefix_textblock prefix string =
   let strings = string_list_of_string string in
   string_of_string_list (List.map (fun str -> prefix ^ str) strings)

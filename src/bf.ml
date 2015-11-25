@@ -76,7 +76,7 @@ let usage () =
   print_endline "   or: bf checknode <smtp-server>[:<smtp-port>] <e-mail-list>";
   print_endline "   or: bf test-deptree <pkg-name> <version> [<revision>]";
   print_endline "   or: bf test-buildtree <pkg-name> <version> [<revision>]";
-  print_endline "   or: bf buildpkg <choot_name> <pkg_name> <version> <platform>";
+  print_endline "   or: bf buildpkg <pkg_name> <version> <platform>";
   print_endline "   or: bf packpkg <choot_name> <pkg_name> <version> <platform>";
 				
   exit 1
@@ -497,19 +497,18 @@ let main () =
 	| "buildpkg" ->
 	   with_teleport Goto_bf_params
 	     (fun () ->
-	      if len <> 6 then
+	      if len <> 5 then
 		begin
-		  print_endline "Example: bf buildpkg centos jet-racket5 14.0.0 cent6";
+		  print_endline "Example: bf buildpkg jet-racket5 14.0.0 cent6";
 		  print_endline "";
 		  usage ()
 		end;
-	      let chroot_name = Sys.argv.(2) in
-	      let pkgname = Sys.argv.(3) in
-	      let version = Sys.argv.(4) in
-	      let platform = Platform.platform_of_string Sys.argv.(5) in
+	      let pkgname = Sys.argv.(2) in
+	      let version = Sys.argv.(3) in
+	      let platform = Platform.platform_of_string Sys.argv.(4) in
 	      let os = Platform.os_of_platform platform in
 	      let pkgspec = Spectype.newload ~os ~platform pkgname version in
-	      Chroot.buildpkg ~os ~platform chroot_name pkgspec)
+	      Chroot.buildpkg ~os ~platform pkgspec)
 	| "packpkg" ->
 	   (* это действие нужно в основном для отладки: оно позволяет
 	   перепаковать пакет, если есть в наличии chroot-окружение, в
@@ -584,6 +583,8 @@ let main () =
 	   let file_rpmbuild_files = Sys.argv.(3) in
 	   let buildroot = Sys.argv.(4) in
 	   Chroot.copy_to_buildroot chroot_name file_rpmbuild_files buildroot
+	| "load-chroot-cfg" ->
+	   Test.load_chroot_cfg ()
 	| _ ->
 	    analyze ()
     else usage ()

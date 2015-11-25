@@ -144,6 +144,8 @@ let reread_params () =
   set_param ~default:"true" "prefer-sudo";
 
   set_param ~default:"pool" "pool-dir";
+  set_param ~default:"chroot-spec" "chroot-spec";
+  set_param ~default:"~/mount-supplies" "mount-supplies-path";
   
   read_params ()
 

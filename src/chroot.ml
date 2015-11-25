@@ -3,6 +3,109 @@ open Platform
 open Printf
 open Component
 open Spectype
+open Ocs_types
+       
+type mount_point = {
+    src : string;
+    dst : string;
+    options : string list;
+    fstype : string option;
+  }
+
+(* по факту это спек для chroot-окружений *)
+type chroot = {
+    name : string;
+    mutable path : string;
+    mount : mount_point list;
+  }
+
+let mount_point_cmd chroot point =
+  let opts = match point.options with
+    | [] -> ""
+    | _ as opts -> "-o " ^ (String.concat "," opts) in
+  let fstype = match point.fstype with
+    | None -> ""
+    | Some t -> "-t " ^ t in
+  let src = point.src in
+  let dst = chroot.path ^ point.dst in
+  join_with_spaces ["mount"; fstype; opts; src; dst]
+
+let umount_point_cmd chroot point =
+  let dst = chroot.path ^ point.dst in
+  join_with_spaces ["umount"; dst]
+
+let mount_all_points chroot =
+  List.iter (fun point -> ignore (Cmd.root_command ~loglevel:"low" (mount_point_cmd chroot point)))
+	    chroot.mount
+
+let umount_all_points chroot =
+  List.iter (fun point -> ignore (Cmd.root_command ~loglevel:"low" (umount_point_cmd chroot point)))
+	    chroot.mount
+		   
+let string_of_chroot chroot_spec =
+  string_of_string_list
+    [("Chroot name: "^chroot_spec.name);
+     ("Chroot path: "^chroot_spec.path);
+     "Chroot mounts:";
+     (prefix_textblock "  "
+	(string_of_string_list
+	   (List.map (mount_point_cmd chroot_spec)
+		     chroot_spec.mount)))]
+
+let find_mount_supply supply =
+  let supplies_dir = Params.get_param "mount-supplies-path" in
+  let supply = (Path.expand_globs supply) in
+  let supply = if supply.[0] == '/' then supply
+	       else Path.make [(Path.expand_globs supplies_dir); supply] in
+  if not (Sys.file_exists supply) then
+    err "find_mount_supply" ("Mount supply not found: " ^ supply);
+  supply
+
+(* если src отсутствует, значит "none",
+ * dst -- это путь относительно chroot-окружения, если не абсолютный
+ * если options отсутствуют, значит [],
+ * если type отсутствует, значит None
+ *)
+let load_chroot_cfg chroot_name platform =
+  let err = Output.err "load_chroot_cfg" in
+  let platform = Platform.string_of_platform platform in
+  let read_string_value sexp errmsg =
+    match sexp with
+    | Sstring x -> x
+    | _ as x -> Scheme.print x; err errmsg in
+  System.with_dir (Params.get_param "chroot-spec")
+    (fun () ->
+     if Sys.file_exists chroot_name
+     then let fullcfg = Scm.read_record (Scm.read_file chroot_name) in
+	  let cfg = Scm.read_record (List.assoc platform fullcfg) in
+	  let path = match List.assoc "path" cfg with
+	    | Sstring p -> p
+	    | _ as p -> Scheme.print p; err "Bad path" in
+	  let mpoints_sexp = try List.assoc "mount" cfg with
+			     | Not_found -> Snull in
+	  let mpoint_sexp_list = Scm.read_list mpoints_sexp in
+	  let mpoints =
+	    List.map
+	      (fun p ->
+	       let p = Scm.read_record p in
+	       let src = try read_string_value (List.assoc "src" p) "Bad source"
+			 with Not_found -> "none" in
+	       let src = if src = "none" then src else find_mount_supply src in
+	       let dst = try read_string_value (List.assoc "dst" p) "Bad destination"
+			 with Not_found -> err "destination not found" in
+	       let fstype = try Some (read_string_value (List.assoc "type" p) "Bad fstype")
+			    with Not_found -> None in
+	       let opts = try List.map Scm.make_string (Scm.read_list (List.assoc "opts" p))
+			  with Not_found -> [] in
+	       { src = (Path.expand_globs src);
+		 dst = (Path.expand_globs dst);
+		 options = opts;
+		 fstype = fstype; })
+	      mpoint_sexp_list in
+	  { name = chroot_name;
+	    path = (Path.expand_globs path);
+	    mount = mpoints; }
+     else err ("Can't find chroot spec for: "^chroot_name))
 
 exception No_chroot_command
 
@@ -276,7 +379,7 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
   let file_rpmbuild_files = "rpmbuild.files" in
   msg "always" ("Generating file "^file_rpmbuild_files);
   List.iter
-    (fun component ->
+    (fun (component : Component.component) ->
      System.with_dir (Path.make [projects_path; component.name])
        (fun () ->
 	let reg_file bf_list_file =
@@ -438,18 +541,28 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
   ignore (Cmd.root_command ~loglevel:"always" ("mv "^pkgfile^" "^pool^"/"));
 
   if (not devf) && (not nodev)  then pack_rpm ~devf:true ~os ~platform chroot_name pkgspec
-  
+
 let pack ?(os=Platform.os ()) ?(platform=Platform.current ()) chroot_name pkgspec =
   match Platform.engine_of_platform platform with
   | Rpm_build -> pack_rpm ~os ~platform chroot_name pkgspec;
   | _ -> err "Chroot.pack" ("Unsopported platform: "^(Platform.string_of_platform platform))
-  
+
 (* Эта функция копирует все компоненты пакета в chroot-окружение и запускает их сборку *)
-let buildpkg ?(os=Platform.os ()) ?(platform=Platform.current ()) chroot_name pkgspec =
+let buildpkg ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgspec =
   let msg = Output.msg "Chroot.buildpkg" in
   let pkgname = pkgspec.pkgname in
   let version = pkgspec.version in
+
+  (* надо загрузить конфигурацию чрута *)
+  let chroot = load_chroot_cfg pkgspec.chroot platform in
+  let chroot_name = Filename.basename chroot.path in
+  msg "always" ("Choosed chroot environment: "^pkgspec.chroot^" -> "^chroot.path);
+  msg "always" ("NODEV "^(if pkgspec.nodev then "enabled" else "disabled"));
+  (* раньше не было абстракции chroot-окружения, и имя было именем
+  директории, в которой содержалось окружение *)
   let new_chroot_name = chroot_name^"--"^pkgname in
+  (* подменяем путь чрута *)
+  chroot.path <- Path.make [(Filename.dirname chroot.path); new_chroot_name];
   delete_if_exists new_chroot_name;
   copy chroot_name new_chroot_name;
   let chroot_name = new_chroot_name in (* гарантируем, что базовый chroot не будет затронут *)
@@ -462,36 +575,38 @@ let buildpkg ?(os=Platform.os ()) ?(platform=Platform.current ()) chroot_name pk
   msg "always" "Install build dependencies... ";
   depinstall ~os ~platform chroot_name pkgspec;
 
-  msg "always" "Check versions of installed dependencies...";
-  
-  msg "always" "Building components in chroot...";
-  let chroot_proc_path = (compose_chroot_path chroot_name)^"/proc" in
-  ignore (Cmd.root_command ~loglevel:"low" ("mount -t proc none "^chroot_proc_path));
-  (* на случай нажатия C-c во время сборки, чтобы отмонтировался /proc *)
-  let cancel_behaviour = Sys.Signal_handle (fun _ ->
-    msg "always" "Build has been cancelled!";
-    ignore (Cmd.root_command ~loglevel:"low" ("umount "^chroot_proc_path));
-    exit 13) in
-  Sys.set_signal Sys.sigterm cancel_behaviour;
-  Sys.set_signal Sys.sigint cancel_behaviour;
-  (* всё, будет отмонтироваться*)
+  msg "always" "Check versions of installed dependencies... (dummy)";
+
   begin
     try
-      List.iter (fun component ->
+      msg "always" "Mount supplies..."; 
+      mount_all_points chroot;
+
+      (* на случай нажатия C-c во время сборки, чтобы отмонтировались supplies *)
+      let cancel_behaviour = Sys.Signal_handle
+			       (fun _ ->
+				msg "always" "Build has been cancelled!";
+				msg "always" "Unmount supplies..."; umount_all_points chroot;
+				exit 13) in
+      Sys.set_signal Sys.sigterm cancel_behaviour;
+      Sys.set_signal Sys.sigint cancel_behaviour;
+      (* всё, будет отмонтироваться*)
+
+      msg "always" "Building components in chroot...";
+      List.iter (fun (component : Component.component) ->
 		 let name = component.name in
 		 let rules = Component.string_of_rules component.rules in
 		 ignore (Cmd.root_command ~loglevel:"low"
-			  ("/bin/bf build-component "^chroot_name^" "^name^" "^rules)))
+					  ("/bin/bf build-component "^chroot_name^" "^name^" "^rules)))
 		spec.components;
     with _ as exn ->
       msg "always" "Build has been failed!";
-      ignore (Cmd.root_command ~loglevel:"low" ("umount "^chroot_proc_path));
+      msg "always" "Unmount supplies..."; umount_all_points chroot;
       raise exn
   end;
-  ignore (Cmd.root_command ~loglevel:"low" ("umount "^chroot_proc_path));
-      
+  msg "always" "Unmount supplies..."; umount_all_points chroot;
 
   msg "always" ("Pack package '"^pkgname^"'"); 
   pack ~os ~platform chroot_name pkgspec;
-  
+
   msg "always" ("Build of '"^pkgname^"' is complete!")

@@ -1,5 +1,6 @@
 open Component
-
+open Chroot
+       
 let test name call =
   Printf.printf "Test %s: %b\n" name (call ())
 
@@ -17,12 +18,11 @@ let chroot_buildpkg () =
 
   let os = Platform.Linux in
   let platform = Platform.Cent6 in
-  let chroot_name = "centos" in
   let pkgname = "jet-racket5" in
   let version = "14.0.0" in
   let pkgspec = Spectype.newload ~os ~platform pkgname version in
   
-  Chroot.buildpkg ~os ~platform chroot_name pkgspec;
+  Chroot.buildpkg ~os ~platform pkgspec;
   ()
 
 
@@ -61,5 +61,11 @@ let depload file =
   print_endline ("---------- DEPS V2 ----------");
   print_endline (Output.string_of_string_list
 		   (List.map Spectype.string_of_platform_depend deplist_v2))
+
+(* load-chroot-cfg *)
+let load_chroot_cfg () =
+  let chroot = Chroot.load_chroot_cfg "centos6-for-java" Platform.Cent6 in
+  print_endline (string_of_chroot chroot)
+		
 
 
