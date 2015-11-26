@@ -81,9 +81,9 @@ let generate_changes ?(devlist=false) rules top_dir a b =
 	let ch = open_out
 		   (match (rules,devlist) with
 		    | (None, false) -> ".bf-list"
-		    | (Some alt, false) -> ".bf-list" ^ alt
+		    | (Some alt, false) -> ".bf-list." ^ alt
 		    | (None, true) -> ".bf-devlist"
-		    | (Some alt, true) -> ".bf-devlist" ^ alt)
+		    | (Some alt, true) -> ".bf-devlist." ^ alt)
 	in
 	output_string ch
 	  (sprintf "d %s\n" top_dir);
