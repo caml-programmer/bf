@@ -24,8 +24,6 @@ let chroot_buildpkg () =
   
   Chroot.buildpkg ~os ~platform pkgspec;
   ()
-
-
     
 let test_packpkg () =
   let os = Platform.Linux in
@@ -51,6 +49,16 @@ let buildgraph pkgname version revision_opt =
   let depgraph = Depgraph.of_pkg ~use_builddeps:true pkgname version revision_opt in
   print_endline (Depgraph.string_of_deptree ~use_builddeps:true depgraph)
 
+(* test-deplist *)
+let deplist pkgname version =
+  let depgraph = Depgraph.of_pkg pkgname version None in
+  print_endline (Depgraph.string_of_deplist depgraph)
+
+(* test-rec-complist *)
+let rec_complist pkgname version =
+  let depgraph = Depgraph.of_pkg pkgname version None in
+  print_endline (Depgraph.string_of_component_list depgraph)
+		
 (* test-depload *)
 let depload file =
   let deplist_v1 = Spectype.depload file in

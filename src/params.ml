@@ -146,6 +146,8 @@ let reread_params () =
   set_param ~default:"pool" "pool-dir";
   set_param ~default:"chroot-spec" "chroot-spec";
   set_param ~default:"~/mount-supplies" "mount-supplies-path";
+
+  set_param ~default:"false" "omit-chroot-while-specload";
   
   read_params ()
 

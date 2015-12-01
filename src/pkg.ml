@@ -3,5 +3,6 @@ let is_local pkg_name =
   let pkg_name = if Filename.check_suffix pkg_name dev_suffix then
 		   Filename.chop_suffix pkg_name dev_suffix
 		 else pkg_name in
-  let pkg_dir = Path.make ["pack";pkg_name] in
+  let pack_param = Params.get "pack" in
+  let pkg_dir = Path.make [pack_param;pkg_name] in
   (Sys.file_exists pkg_dir) && (Sys.is_directory pkg_dir)

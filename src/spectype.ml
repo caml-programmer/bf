@@ -473,11 +473,11 @@ let depload_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) depfile 
        List.map make_dep deps
   else []
 
-let load_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname version =
+let load_v2_new ?(short_composite=false) ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname version =
   let load_file file =
     try Some (System.string_of_file file)
     with System.File_not_exist _ -> None in
-  let components = Composite.components "composite" in
+  let components = Composite.components ~short_composite "composite" in
   let depends = depload_v2_new ~platform ~os "depends" in
   let builddeps = depload_v2_new ~platform ~os "builddeps" in
   let devdeps = depload_v2_new ~platform ~os "devdeps" in
@@ -490,9 +490,12 @@ let load_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname ver
   let post_install = load_file "post-install" in
   let params = Params.read_from_file "params" in
   let nodev = Sys.file_exists "nodev" in
-  let chroot_name = if Sys.file_exists "chroot"
-		    then List.hd (System.list_of_file "chroot")
-		    else failwith ("No 'chroot' file in specdir for "^pkgname^"("^version^")") in
+  let chroot_name =
+    if (Params.get_param "omit-chroot-while-specload") <> "false" then ""
+    else
+      if Sys.file_exists "chroot"
+      then List.hd (System.list_of_file "chroot")
+      else failwith ("No 'chroot' file in specdir for "^pkgname^"("^version^")") in
   let (_,revision) = Specdir.ver_rev_by_specdir "." in
   {
     pkgname = pkgname;
@@ -516,11 +519,16 @@ let load_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname ver
     chroot = chroot_name;
   }
 
+let load_v3_new ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname version =
+  load_v2_new ~short_composite:true ~os ~platform pkgname version
+    
 let newload ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname version =
+  (*print_endline ("load spec: "^pkgname^" "^version);*)
   System.with_dir (Specdir.specdir_by_version pkgname version)
     (fun () ->
      match Specdir.get_version "version" with
      | "2.0" -> load_v2_new pkgname version ~platform ~os
-     | _ -> failwith "Not now"
+     | "3.0" -> load_v3_new pkgname version ~platform ~os
+     | _ as ver -> failwith ("newload can't load this version of spec: "^ver)
     )
 

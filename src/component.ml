@@ -16,7 +16,7 @@ type forkmode =
 
 type component = {
   name  : string;
-  label : label;
+  label : label; (* для бранча *)
   pkg : string option;
   rules : string option;
   nopack: bool;

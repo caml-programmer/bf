@@ -557,6 +557,14 @@ let main () =
 	     | 5 -> Some (int_of_string Sys.argv.(4))
 	     | _ -> raise (Invalid_argument "Exhaustive") in
 	   Test.buildgraph pkgname version revision_opt
+	| "test-deplist" ->
+	   let pkgname = Sys.argv.(2) in
+	   let version = Sys.argv.(3) in
+	   Test.deplist pkgname version
+	| "test-rec-complist" ->
+	   let pkgname = Sys.argv.(2) in
+	   let version = Sys.argv.(3) in
+	   Test.rec_complist pkgname version	   
 	| "build-component" ->
 	   begin
 	     (* параметры сборки компонента заполняем аналогично bf make *)

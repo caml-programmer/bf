@@ -1,6 +1,7 @@
 open Output
 open Spectype
-
+open Component
+       
 exception Pkg_already_regestered of pkg_name
 exception Pkg_not_exists of pkg_name
 exception Dependency_on_different_versions of (pkg_name * string * string)
@@ -53,10 +54,13 @@ let find_circular_dep depgraph =
   string_of_string_list ~separator:" -> " path
 
 let reg_dep depgraph head_pkg tail_pkg =
+  let err = Output.err "reg_dep" in
+  let msg = Output.msg "reg_dep" in
   let digraph = digraph depgraph in
+  msg "high" ("New edge: "^head_pkg^" -> "^tail_pkg);
   digraph := Digraph.insert_edge !digraph head_pkg tail_pkg;
   if has_circular_dep depgraph then
-    err "reg_dep" ("Circular dependencies have occured: " ^ (find_circular_dep depgraph))
+    err ("Circular dependencies have occured: " ^ (find_circular_dep depgraph))
 
 (* Загрузка графа зависимостей определённой ревизии *)
 let of_pkg_with_rev ?(use_builddeps=false) pkgname version revision : depgraph =
@@ -190,4 +194,30 @@ let string_of_deptree ?(use_builddeps=false) ?(limit_depth=1000000) (depgraph:de
 	   end) in
   print_dep 0 (Digraph.get_vertex graph root)
 
+let hashtbl_keys table =
+  Hashtbl.fold (fun key _ acc -> key :: acc) table []
+		
 	    
+let string_of_deplist ?(limit_depth=1000000) (depgraph:depgraph) =
+  let spectable = spectable depgraph in
+  let pkgnames = hashtbl_keys spectable in
+  Output.string_of_string_list
+    (List.map (fun pkgname ->
+	       let spec = Hashtbl.find spectable pkgname in
+	       let version = spec.version in
+	       pkgname^"-"^version)
+	      pkgnames)
+		 
+		 
+let string_of_component_list (depgraph:depgraph) =
+  let spectable = spectable depgraph in
+  let pkgnames = hashtbl_keys spectable in
+  Output.string_of_string_list
+    (List.flatten (List.map (fun pkgname ->
+			     let spec = Hashtbl.find spectable pkgname in
+			     List.map (fun component ->
+				       component.name ^
+					 " ("^(string_of_label component.label)^")")
+				      spec.components)
+			    pkgnames))
+			  

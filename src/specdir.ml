@@ -79,7 +79,8 @@ let ver_rev_by_specdir specdir =
 let specdir_by_version pkg_name version =
   let err msg = err "specdir_by_version" msg in
   let warn msg = warn "specdir_by_version" msg in
-  let pkg_dir = Path.make ["pack";pkg_name] in
+  let pack_param = Params.get "pack" in
+  let pkg_dir = Path.make [pack_param;pkg_name] in
   let specdirs = List.map (fun dir -> Path.make [pkg_dir;dir])
 			  (System.list_of_directory pkg_dir) in
   let rec check_specdir_version specdirs =
@@ -104,7 +105,8 @@ let revision_by_pkgver pkgname version =
 let find_max_version pkg_name =
   let err msg = err "specdir_by_version" msg in
   let warn msg = warn "specdir_by_version" msg in
-  let pkg_dir = Path.make ["pack";pkg_name] in
+  let pack_param = Params.get "pack" in
+  let pkg_dir = Path.make [pack_param;pkg_name] in
   let specdirs = List.map (fun dir -> Path.make [pkg_dir;dir])
 			  (System.list_of_directory pkg_dir) in
   let rec search maxver = function
