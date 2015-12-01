@@ -344,6 +344,13 @@ let make_rpm_findreq_line ((pkgname, opver_opt, _) : platform_depend) =
 let make_reject_template rejects =
   Output.string_of_string_list ~separator:"|" rejects
 
+let compose_pkgpack_dir pkgname =
+  let pkgpack_dir = Params.get "pkg-pack-dir" in
+  Cmd.mkdir_if_not_exists pkgpack_dir;
+  let dirname = Path.make [pkgpack_dir; pkgname] in
+  Cmd.mkdir_if_not_exists dirname;
+  dirname
+			       
 let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current ())
 		 chroot_name pkgspec =
   let msg = Output.msg "Chroot.pack_rpm" in
@@ -367,6 +374,13 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
 
   let components = List.filter (fun c -> c.pkg = None && (not c.nopack)) pkgspec.components in
 
+  
+  let pkgpack_dir = compose_pkgpack_dir pkgname in
+
+  let file_rpmbuild_files = Path.make [pkgpack_dir; "rpmbuild.files"] in
+  let file_rpmbuild_findreq = Path.make [pkgpack_dir; "rpmbuild.findreq"] in
+  let file_rpmbuild_spec = Path.make [pkgpack_dir; "rpmbuild.spec"] in
+
   (* В текущей реализации поле custom_pkg_files никак не обрабатывается
    * Какова была его изначальная задумка, мне не понятно.
    * Возможно, какие-то файлы пакета, которые заполняются при помощи хуков. *)
@@ -376,7 +390,7 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
 			   ~platform None in
   
   (* генерируем список файлов *)
-  let file_rpmbuild_files = "rpmbuild.files" in
+  
   msg "always" ("Generating file "^file_rpmbuild_files);
   List.iter
     (fun (component : Component.component) ->
@@ -404,10 +418,9 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
   let rpmbuild_files = make_rpmbuild_files bf_files in
   System.with_out file_rpmbuild_files
     (fun ch -> Output.print_endline_to_channel ch rpmbuild_files);
-  let file_rpmbuild_files = Path.make [(Sys.getcwd ()); file_rpmbuild_files] in
 
   (* генерируем findreq -- скрипт, определяющий в rpmbuild список зависимостей *)
-  let file_rpmbuild_findreq = "rpmbuild.findreq" in
+  
   msg "always" ("Generating file "^file_rpmbuild_findreq);
   System.with_out file_rpmbuild_findreq
     (fun ch ->
@@ -429,10 +442,9 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
 	   prin ("| grep -v '"^reject_tmpl^"'")
        end
      else msg "always" (find_requires^" is not found!"));
-  let file_rpmbuild_findreq = Path.make [(Sys.getcwd ()); file_rpmbuild_findreq] in
 	  
   (* генерируем spec-файл для rpmbuild *)
-  let file_rpmbuild_spec = "rpmbuild.spec" in
+  
   msg "always" ("Generating file "^file_rpmbuild_spec);
   let provides_with_arch libraries = (* здесь можно указать тип библиотек*)
     if System.arch () = "x86_64" then
@@ -511,14 +523,13 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
 	 print_endline preun;
 	 print_endline "fi")
     );
-  let file_rpmbuild_spec = Path.make [(Sys.getcwd ()); file_rpmbuild_spec] in
 
   (* Копируем в $chroot/buildroot файлы *)
   ignore (command ~loglevel:"always" chroot_name
 	    "sh -c 'test -d /buildroot && rm -rf /buildroot || true'");
   ignore (Cmd.root_command ~loglevel:"always"
 	    ("/bin/bf copy-to-buildroot "^chroot_name^" "^file_rpmbuild_files^" /buildroot"));
-  
+
   (* Запускаем сборку пакета! *)
   msg "always" "Start pack process";
   Pkgbuild.build_over_rpmbuild
@@ -527,7 +538,7 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
 		     file_rpmbuild_spec,file_rpmbuild_files,file_rpmbuild_findreq,
 		     None);
   (* Последний параметр -- hooks. Устарел. *)
-
+  
   (* устанавливаем правильные права на файл *)
   let user = Unix.getlogin () in
   let pkgfile = Rpm.fullname pkgname version (string_of_int revision)

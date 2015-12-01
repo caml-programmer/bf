@@ -135,19 +135,36 @@ let reread_params () =
   set_param ~default:"Packages" "centos-packages-dir";
   set_param ~default:"http://mirror.yandex.ru/debian/" "debian-mirror";
   set_param ~default:"Packages" "debian-packages-dir";
-  
+
+  (* в этой директории лежат chroot-окружения*)
   set_param ~default:"chroots" "chroots-dir";
-  set_param ~default:"projects" "projects-dir";
-  set_param ~default:"/usr/sbin/chroot" "chroot-path";
-  set_param ~default:"/usr/bin/sudo" "sudo-path";
-  set_param ~default:"/bin/su" "su-path";
-  set_param ~default:"true" "prefer-sudo";
-
-  set_param ~default:"pool" "pool-dir";
+  (* в этой директории лежат описания chroot-окружений *)
   set_param ~default:"chroot-spec" "chroot-spec";
+  (* в эту директорию в chroot-окружении копируются снимки репозиториев для сборки*)
+  set_param ~default:"projects" "projects-dir";
+  (* в этой переменной указан полный путь до chroot *)
+  set_param ~default:"/usr/sbin/chroot" "chroot-path";
+  (* в этой переменной указан полный путь до sudo *)
+  set_param ~default:"/usr/bin/sudo" "sudo-path";
+  (* в этой переменной указан полный путь до su *)
+  set_param ~default:"/bin/su" "su-path";
+  (* если этот параметр установлен в true, то в случае одновременного
+  наличия в системе su и sudo предпочтение отдаётся sudo *)
+  set_param ~default:"true" "prefer-sudo";
+  (* в эту директорию складируются собранные пакеты, и в ней же ищутся
+  пакеты, удовлетворяющие сборочные зависимости *)
+  set_param ~default:"pool" "pool-dir";
+  (* в этой директории находятся каталоги, которые опционально (в
+  зависимости от chroot-spec) монтируются в chroot-окружения *)
   set_param ~default:"~/mount-supplies" "mount-supplies-path";
-
+  (* этот параметр полезен, пока не все specdir-ы содержат файл
+  chroot, из-за отсутствия которого загрузка spec-а пакета при помощи
+  newload рушится *)
   set_param ~default:"false" "omit-chroot-while-specload";
+  (* в этой директории создаются диретории с именами собирающихся
+  пакетов, в которых создаются файлы для пакетирования при помощи,
+  например, rpmbuild *)
+  set_param ~default:"pkgpack" "pkg-pack-dir"; 
   
   read_params ()
 
