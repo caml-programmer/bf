@@ -350,7 +350,7 @@ let compose_pkgpack_dir pkgname =
   let dirname = Path.make [pkgpack_dir; pkgname] in
   Cmd.mkdir_if_not_exists dirname;
   dirname
-			       
+
 let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current ())
 		 chroot_name pkgspec =
   let msg = Output.msg "Chroot.pack_rpm" in
@@ -380,7 +380,8 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
   let file_rpmbuild_files = Path.make [pkgpack_dir; "rpmbuild.files"] in
   let file_rpmbuild_findreq = Path.make [pkgpack_dir; "rpmbuild.findreq"] in
   let file_rpmbuild_spec = Path.make [pkgpack_dir; "rpmbuild.spec"] in
-
+  let buildroot = "buildroot" in
+  
   (* В текущей реализации поле custom_pkg_files никак не обрабатывается
    * Какова была его изначальная задумка, мне не понятно.
    * Возможно, какие-то файлы пакета, которые заполняются при помощи хуков. *)
@@ -461,7 +462,7 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
     | "name" -> pkgname
     | "version" -> version
     | "release" | "revision"  -> (string_of_int revision) ^ "." ^ (string_of_platform platform)
-    | "buildroot" -> "buildroot"
+    | "buildroot" -> buildroot
     | "provides" ->
        String.concat ", " (provides_with_arch pkgspec.provides)
     | "obsoletes" ->
@@ -528,7 +529,7 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
   ignore (command ~loglevel:"always" chroot_name
 	    "sh -c 'test -d /buildroot && rm -rf /buildroot || true'");
   ignore (Cmd.root_command ~loglevel:"always"
-	    ("/bin/bf copy-to-buildroot "^chroot_name^" "^file_rpmbuild_files^" /buildroot"));
+	    ("/bin/bf copy-to-buildroot "^chroot_name^" "^file_rpmbuild_files^" "^buildroot));
 
   (* Запускаем сборку пакета! *)
   msg "always" "Start pack process";
