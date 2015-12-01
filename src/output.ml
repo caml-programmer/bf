@@ -9,6 +9,7 @@ let int_of_log_level loglevel =
   | "always" | "error" -> 0
   | "low" -> 1
   | "high" | "warning" -> 2
+  | "veryhigh" | "very-high" -> 3
   | "debug" | "all" -> 999
   | "never" -> 1000000
   | _ -> failwith "Unknown log-level"

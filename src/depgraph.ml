@@ -57,7 +57,7 @@ let reg_dep depgraph head_pkg tail_pkg =
   let err = Output.err "reg_dep" in
   let msg = Output.msg "reg_dep" in
   let digraph = digraph depgraph in
-  msg "high" ("New edge: "^head_pkg^" -> "^tail_pkg);
+  msg "very-high" ("New edge: "^head_pkg^" -> "^tail_pkg);
   digraph := Digraph.insert_edge !digraph head_pkg tail_pkg;
   if has_circular_dep depgraph then
     err ("Circular dependencies have occured: " ^ (find_circular_dep depgraph))
