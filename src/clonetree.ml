@@ -15,6 +15,12 @@ type pkg_clone_tree =
 type clone_tree =
     clone_val deptree
 
+let debug =
+  try
+    ignore(Sys.getenv "DEBUG");
+    true
+  with Not_found -> false
+
 let string_of_clone_val (specdir, ver, rev, spec) =
   "SPECINFO: " ^ specdir ^ " " ^ ver ^ "-" ^ (string_of_int rev) ^ "\n"
   ^ "SPEC:\n"
@@ -72,11 +78,12 @@ let compare_pkg_versions ver1 ver2 =
     (Str.split rex ver1)
     (Str.split rex ver2)
 
-let tree_of_package ?userhost pkg_path : pkg_clone_tree =
+let tree_of_package ?userhost ?(log=true) pkg_path : pkg_clone_tree =
   let pre_table = Hashtbl.create 32 in
   
   let rec scan pkg_path =
-    log_message (sprintf "scanning %s" pkg_path);
+    if debug then
+      log_message (sprintf "scanning %s" pkg_path);
     let e = make_pkg_record ~userhost pkg_path in
     let deps = Pkgdeps.extract ~userhost pkg_path in
     Hashtbl.add pre_table e.pkg_name (e,deps);
@@ -90,8 +97,9 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
 		  let (e,_) = Hashtbl.find pre_table pkg_name in
 		  if ver <> e.pkg_version || rev <> e.pkg_revision then
 		    begin
-		      log_message (sprintf "Already registered: pkg(%s) ver(%s)/rev(%d) and next found: ver(%s)/rev(%d) not equivalent."
-			pkg_name e.pkg_version e.pkg_revision ver rev);
+		      if log then
+			log_message (sprintf "Already registered: pkg(%s) ver(%s)/rev(%d) and next found: ver(%s)/rev(%d) not equivalent."
+			  pkg_name e.pkg_version e.pkg_revision ver rev);
 		      raise (Cannot_resolve_dependes pkg_path)
 		    end
 		end;
@@ -107,9 +115,11 @@ let tree_of_package ?userhost pkg_path : pkg_clone_tree =
 
   let table = Hashtbl.create 32 in
   let warning depth s =
-    log_message (sprintf "%s warning: %s already scanned" (String.make depth ' ') s) in
+    if log then
+      log_message (sprintf "%s warning: %s already scanned" (String.make depth ' ') s) in
   let resolve depth s =
-    log_message (sprintf "%s resolve %s" (String.make depth ' ') s) in
+    if log then
+      log_message (sprintf "%s resolve %s" (String.make depth ' ') s) in
 
   let extract_version pkg_name ver_opt =
     match ver_opt with

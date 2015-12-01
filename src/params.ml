@@ -5,6 +5,12 @@ exception Unknown_parameter of string
 
 let user_params = Hashtbl.create 32;;
 
+let debug =
+  try
+    ignore(Sys.getenv "DEBUG");
+    true
+  with Not_found -> false
+
 let read_from_file filename =
   let rex = Re_perl.compile_pat "^([^\\s]+)\\s+(.*)\\s*$" in
   if Sys.file_exists filename
@@ -34,7 +40,8 @@ let read_params () =
   match System.up_search ~default ".bf-params" with
     | None -> Hashtbl.create 32
     | Some filename ->
-	Printf.printf "loading %s\n%!" filename;
+	if debug then
+	  Printf.printf "loading %s\n%!" filename;
 	read_from_file filename
 
 let set_param ~default s =

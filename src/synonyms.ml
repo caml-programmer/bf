@@ -14,11 +14,12 @@ let parse add s =
     | l ->
 	List.iter print_endline l
 
-let load () =
+let load ?(log=false) () =
   let file = ".bf-synonyms" in
   if Sys.file_exists file then
     begin
-      log_message (sprintf "loading %s\n%!" file);
+      if log then
+	log_message (sprintf "loading %s\n%!" file);
       let data = ref [] in
       let ch = open_in file in
       try
