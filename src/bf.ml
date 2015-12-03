@@ -56,7 +56,7 @@ let usage () =
   print_endline "   or: bf fork <specdir> <new-branch> [<single-rev-depth>]";
   print_endline "   or: bf clone <ssh-user>@<ssh-host> <pkg-path> [overwrite|depends|packages]";
   print_endline "   or: bf clone <specdir> [overwrite] [norec] [<ver> <rev>]";
-  print_endline "   or: bf deplist <pkg-path>";
+  print_endline "   or: bf deplist (<pkg-path>|<specdir>)";
   print_endline "   or: bf snapshot <specdir> [<composite>]";
   print_endline "   or: bf link <pkg-path> [symlink]";
   print_endline "   or: bf top <specdir>";
@@ -78,7 +78,7 @@ let usage () =
   print_endline "   or: bf test-buildtree <pkg-name> <version> [<revision>]";
   print_endline "   or: bf buildpkg <pkg_name> <version> <platform>";
   print_endline "   or: bf packpkg <choot_name> <pkg_name> <version> <platform>";
-				
+
   exit 1
 
 let make_int s =

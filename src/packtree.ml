@@ -7,17 +7,20 @@ type pack_tree =
 
 exception No_specdir of string
 
-let create ~default_branch specdir : pack_tree =
+let create ?(log=true) ~default_branch specdir : pack_tree =
   let table = Hashtbl.create 32 in
   let pkgdir =
     Filename.dirname (Filename.dirname specdir) in
   let warning depth specdir =
-    log_message (sprintf "%s warning: %s already scanned" (String.make depth ' ') specdir) in
+    if log then
+      log_message (sprintf "%s warning: %s already scanned" (String.make depth ' ') specdir) in
   let resolve depth specdir =
-    log_message (sprintf "%s resolve %s" (String.make depth ' ') specdir) in
+    if log then
+      log_message (sprintf "%s resolve %s" (String.make depth ' ') specdir) in
   let ignore depth pkg =
-    log_message (sprintf "%s ignore %s" (String.make depth ' ') pkg) in
-  let rec make depth value =    
+    if log then
+      log_message (sprintf "%s ignore %s" (String.make depth ' ') pkg) in
+  let rec make depth value =
     let specdir = fst value in
     if Hashtbl.mem table specdir then
       begin
@@ -44,7 +47,8 @@ let create ~default_branch specdir : pack_tree =
 		    acc
 		  end
 	      with exn ->
-		log_message (sprintf "Warning: deptree_of_pack problem: %s\n" (Printexc.to_string exn));
+		if log then
+		  log_message (sprintf "Warning: deptree_of_pack problem: %s\n" (Printexc.to_string exn));
 		acc)
 	      [] (Spectype.depload ~ignore_last:false depfile)
 	  in
