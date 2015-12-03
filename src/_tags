@@ -1,2 +1,4 @@
 <*.ml> : package(unix,yojson)
+<bf2.ml> : package(cmdliner)
 <bf.native> : package(unix,num,str,yojson)
+<bf2.native> : package(cmdliner,str,unix,yojson,num)

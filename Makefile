@@ -7,17 +7,10 @@ all: build
 build:
 	./compile
 
-environment:
-	opam init -y
-	eval `opam config env`
-	opam install ocamlfind -y
-	opam install yojson -y
-	echo 'Environment created'
-
 install:
-	install -m 755 -d $(PREFIX) $(PREFIX)/bin
 	install -m 755 _build/src/bf.native $(PREFIX)/bin/bf
 	install -m 755 tools/make-autologin $(PREFIX)/bin/make-autologin
+	install -m 755 _build/src/bf2.native $(PREFIX)/bin/bf2
 
 test:
 	mkdir -p .tests && cd .tests && ../_build/src/bf.native tests

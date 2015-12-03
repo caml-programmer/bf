@@ -11,3 +11,5 @@ B _build/smtp
 B _build/regexp
 B _build/plugins
 B _build/ocs
+
+PKG cmdliner

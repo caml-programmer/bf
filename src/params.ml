@@ -1,6 +1,7 @@
 open Ocs_env
 open Ocs_types
-
+open String_ext
+       
 exception Unknown_parameter of string
 
 let user_params = Hashtbl.create 32;;
@@ -19,8 +20,8 @@ let read_from_file filename =
 	    Ocs_env.set_glob Scheme.env
 			     (Ssymbol key) (Sstring value)
 	  with Not_found ->
-	    Printf.printf "ignore: %s\n%!" s)
-	 (System.list_of_channel ch);
+	    Printf.printf "ignore: \"%s\"\n%!" s)
+	 (List.filter String.not_empty (System.list_of_channel ch));
        user_params
   else Hashtbl.create 0
 
@@ -34,7 +35,7 @@ let read_params () =
   match System.up_search ~default ".bf-params" with
     | None -> Hashtbl.create 32
     | Some filename ->
-	Printf.printf "loading %s\n%!" filename;
+       (*Printf.printf "loading %s\n%!" filename;*)
 	read_from_file filename
 
 let set_param ~default s =
@@ -49,12 +50,20 @@ let set_param ~default s =
   
   Hashtbl.replace user_params s value
 
+let exists param =
+  Hashtbl.mem user_params param
+		  
 let set param value =
-  let edit_param = match Hashtbl.mem user_params param with
-    | true -> Hashtbl.replace
-    | false -> Hashtbl.add in
+  if not (exists param) then
+    raise (Unknown_parameter param);
   Ocs_env.set_glob Scheme.env (Ssymbol param) (Sstring value);
-  edit_param user_params param value
+  Hashtbl.replace user_params param value
+
+let create param value =
+  if exists param then
+    failwith ("Parameter already exists: "^param);
+  Ocs_env.set_glob Scheme.env (Ssymbol param) (Sstring value);
+  Hashtbl.add user_params param value
 
 let get_param s =
   try
@@ -165,8 +174,8 @@ let reread_params () =
   пакетов, в которых создаются файлы для пакетирования при помощи,
   например, rpmbuild *)
   set_param ~default:"pkgpack" "pkg-pack-dir"; 
+  ()
   
-  read_params ()
 
 (* Utils *)
 
@@ -231,4 +240,5 @@ let update_for_specdir specdir =
 
 
 let _ =
-  reread_params ()
+  reread_params ();
+  read_params ()
