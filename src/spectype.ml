@@ -491,11 +491,9 @@ let load_v2_new ?(short_composite=false) ?(os=Platform.os ()) ?(platform=Platfor
   let params = Params.read_from_file "params" in
   let nodev = Sys.file_exists "nodev" in
   let chroot_name =
-    if (Params.get_param "omit-chroot-while-specload") <> "false" then ""
-    else
-      if Sys.file_exists "chroot"
-      then List.hd (System.list_of_file "chroot")
-      else failwith ("No 'chroot' file in specdir for "^pkgname^"("^version^")") in
+    if Sys.file_exists "chroot"
+    then List.hd (System.list_of_file "chroot")
+    else "minimal" in
   let (_,revision) = Specdir.ver_rev_by_specdir "." in
   {
     pkgname = pkgname;

@@ -6,7 +6,7 @@ let current_log_level () =
 
 let int_of_log_level loglevel =
   match loglevel with
-  | "always" | "error" -> 0
+  | "always" | "error" | "normal" -> 0
   | "low" -> 1
   | "high" | "warning" -> 2
   | "veryhigh" | "very-high" -> 3

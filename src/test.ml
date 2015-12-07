@@ -58,6 +58,8 @@ let deplist pkgname version =
 let rec_complist pkgname version =
   let depgraph = Depgraph.of_pkg pkgname version None in
   print_endline (Depgraph.string_of_component_list depgraph)
+
+let depcomps = rec_complist
 		
 (* test-depload *)
 let depload file =
