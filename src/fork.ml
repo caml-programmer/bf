@@ -401,7 +401,14 @@ let make ?(interactive=true) ?(depth=0) top_specdir dst =
 	  | Increment_branch | Extend_branch ->
 	      write_release (destination "release")
 		(change_release mode dst_capacity capacity_reduction depth local_depth specdir)
-      end
+      end;
+	
+    (* fork info *)
+
+    System.write ((string_of_float (Unix.time ())) ^ "\n")
+      (destination "branch-date");
+    System.write (src ^ "\n")
+      (destination "branch-parent");
   in
 
   List.iter check depends;
