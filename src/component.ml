@@ -41,9 +41,9 @@ let string_of_label = function
   | Current -> ""
 
 let forkmode_of_string = function
-  | "do-branch" | "branch" | "branching" -> Branching
-  | "fixtag" | "tag" | "tagging"         -> Tagging
-  | "inherit"                            -> Inherit
+  | "branching" -> Branching
+  | "tagging"   -> Tagging
+  | "inherit"   -> Inherit
   | x -> raise (Bad_forkmode x)
 
 let string_of_forkmode = function
@@ -645,8 +645,7 @@ let component_of_sval s =
 			    | None   -> nopack := true;
 			    | Some s ->
 				raise (Nopack_mode_conflict_with_package s))
-		      | Ssymbol "fork"
-		      | Ssymbol "on-fork" ->
+		      | Ssymbol "fork" ->
 			  forkmode := forkmode_of_string
 			    (match fst x.cdr with
 			      | Ssymbol s -> s
