@@ -144,6 +144,9 @@ let projects_path () =
 let compose_projects_path chroot_name =
   Path.make [(compose_chroot_path chroot_name); (projects_path ())]
 
+let chroot_shell chroot_path shell =
+  Unix.execvp "chroot" [|"chroot"; chroot_path; shell|]
+	    
 let command ?(loglevel="always") chroot_name command =
   if not chroot_cmd_exists then raise No_chroot_command;
   let chroot_cmd_path = Params.get "chroot-path" in

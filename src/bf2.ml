@@ -1,6 +1,7 @@
 open Cmdliner
 open Cfg
 open Params
+open Chroot
 
 (* Перезагрузка конфигурации описана в модуле Cfg *)
 let () = reload_cfg ();;
@@ -175,7 +176,7 @@ let packpkg_cmd =
   let man = help_secs in
 
   let chroot_name =
-    Arg.(required & pos 0 (some string) None & info [] ~docv:"CHROOT_DIR") in
+    Arg.(required & pos 0 (some string) None & info [] ~docv:"CHROOT_NAME") in
   let pkgname =
     Arg.(required & pos 1 (some string) None & info [] ~docv:"PKGNAME") in
   let version =
@@ -191,7 +192,27 @@ let packpkg_cmd =
 	$ chroot_name $ pkgname $ version $ platform),
   Term.info "packpkg" ~doc ~man;;
 regcmd packpkg_cmd
-  
+
+(* chroot-shell *)
+let chroot_shell_cmd =
+  let doc = "Open a shell in the chroot environment" in
+  let man = help_secs in
+
+  let chroot_name =
+    Arg.(required & pos 0 (some string) None & info [] ~docv:"CHROOT_NAME") in
+  let platform =
+    Arg.(required & pos 1 (some string) None & info [] ~docv:"PLATFORM") in
+  let shell =
+    Arg.(value & pos 2 string "/bin/bash" & info [] ~docv:"SHELL") in
+
+  Term.(pure (fun chroot_name platform shell ->
+	      let platform = Platform.platform_of_string platform in
+	      let chroot = Chroot.load_chroot_cfg chroot_name platform in
+	      Chroot.chroot_shell chroot.path shell)
+	$ chroot_name $ platform $ shell),
+  Term.info "chroot-shell" ~doc ~man;;
+regcmd chroot_shell_cmd
+
 (* непосредственно старт программы *)
 let () = match Term.eval_choice default_cmd (cmds ()) with
   | `Error _ -> exit 1
