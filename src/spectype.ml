@@ -6,6 +6,7 @@ open String
 open Output
 open Logger
 open Ocs_types
+open String_ext
        
 (* описание типов *)
 
@@ -45,6 +46,7 @@ type spec = {
   }
 
 let pkgname_of_platform_depend ((pkgname,_,_): platform_depend) = pkgname
+
 
 exception Dependency_not_found of pkg_name
 
@@ -522,7 +524,7 @@ let load_v3_new ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname ver
     
 let newload ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgname version =
   (*print_endline ("load spec: "^pkgname^" "^version);*)
-  System.with_dir (Specdir.specdir_by_version pkgname version)
+  System.with_dir (Specdir.specdir_by_version (String.chop_suffix pkgname "-dev") version)
     (fun () ->
      match Specdir.get_version "version" with
      | "2.0" -> load_v2_new pkgname version ~platform ~os

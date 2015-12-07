@@ -5,7 +5,8 @@ open Component
 exception Pkg_already_regestered of pkg_name
 exception Pkg_not_exists of pkg_name
 exception Dependency_on_different_versions of (pkg_name * string * string)
-       
+exception Dependency_not_found of (pkg_name * pkg_name)
+						
 type spectable = (pkg_name, spec) Hashtbl.t
 type depgraph = pkg_name Digraph.t ref * spectable
 
@@ -18,11 +19,12 @@ let has_pkg depgraph pkgname =
 
 let get_spec depgraph pkgname =
   Hashtbl.find (spectable depgraph) pkgname
-		     
+
 let reg_pkg depgraph spec =
   if has_pkg depgraph spec.pkgname then
     raise (Pkg_already_regestered spec.pkgname)
   else
+    Output.msg "reg_pkg" "very-high" ("New pkg: "^spec.pkgname);
     let digraph = digraph depgraph in
     let spectable = spectable depgraph in
     digraph := Digraph.insert_vertex !digraph spec.pkgname;
@@ -220,4 +222,54 @@ let string_of_component_list (depgraph:depgraph) =
 					 " ("^(string_of_label component.label)^")")
 				      spec.components)
 			    pkgnames))
-			  
+
+let get_dep ?(use_builddeps=false) (depgraph:depgraph) head tail =
+  Output.msg "get-dep" "very-high" (head^" -> "^tail);
+  let spec = get_spec depgraph head in
+  find_dependency ~use_builddeps spec tail
+    
+let draw ?(use_builddeps=false) (depgraph:depgraph) file =
+  let ch = if (file = "stdout") || (file = "-")
+	   then stdout
+	   else open_out file in
+  let print = output_string ch in
+  let print_endline str = print (str^"\n") in
+
+  print_endline "digraph g {";
+  (*print_endline "forcelabels = true;";*)
+  print_endline "graph [ rankdir = \"LR\" ];";
+  print_endline "node  [ fontname = \"Arial\", fontsize = \"10\" ];"; (* , //shape = record  *)
+  print_endline "edge  [ labelfontname = \"Arial\", labelfontsize = \"10\" ];";  (* , //style = dashed *)
+
+  let graph = !(digraph depgraph) in
+  
+  (* вершины *)
+  List.iter
+    (fun pkg ->
+     let color = if Pkg.is_local pkg
+		 then "#77CC77"
+		 else "#FFFFFF" in
+     print_endline ("\""^pkg^"\"\n"^"[shape=box,style=\"rounded,filled\",fillcolor=\""^color^"\"]"))
+    (Digraph.vertices graph);
+
+  (* рёбра *)
+  List.iter
+    (fun (head, tail) ->
+     let dep_opver = get_dep ~use_builddeps depgraph head tail in
+     let label = 
+       match dep_opver with
+       | Some (op, ver) -> let opstr = string_of_pkg_op op in opstr^" "^ver
+       | None -> " " in
+     let non_strict = match dep_opver with
+       | Some (op, ver) when ((op <> Pkg_eq) && (op <> Pkg_last)) -> ", style=\"dashed\""
+       | _ -> "" in
+     print_endline ("\""^head^"\" -> \""^tail^"\" [label=\""^label^"\", color=\"black\""^non_strict^"]"))
+    (Digraph.edges graph);
+
+  print_endline "}";
+  close_out ch;
+
+  (* всякая ерунда, типа вывести на экран картинку *)
+  let pngfile = (file^".png") in
+  Graph.make_image file pngfile;
+  Graph.view_image pngfile

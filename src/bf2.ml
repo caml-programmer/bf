@@ -118,6 +118,34 @@ let buildtree_cmd =
   Term.info "buildtree" ~doc ~man;;
 regcmd buildtree_cmd
 
+(* Нарисовать граф run-time зависимостей *)
+let draw_depgraph_cmd =
+  let doc = "Draw an image of run-time dependency graph" in
+  let man = help_secs in
+
+  let pkgname =
+    Arg.(required & pos 0 (some string) None & info [] ~docv:"PKGNAME") in
+  let version =
+    Arg.(required & pos 1 (some string) None & info [] ~docv:"VERSION") in
+
+  Term.(pure Test.draw_depgraph $ pkgname $ version),
+  Term.info "draw-depgraph" ~doc ~man;;
+regcmd draw_depgraph_cmd
+
+(* Нарисовать граф build-зависимостей *)
+let draw_buildgraph_cmd =
+  let doc = "Draw an image of build-dependency graph" in
+  let man = help_secs in
+
+  let pkgname =
+    Arg.(required & pos 0 (some string) None & info [] ~docv:"PKGNAME") in
+  let version =
+    Arg.(required & pos 1 (some string) None & info [] ~docv:"VERSION") in
+
+  Term.(pure Test.draw_buildgraph $ pkgname $ version),
+  Term.info "draw-buildgraph" ~doc ~man;;
+regcmd draw_buildgraph_cmd
+       
 (* Вывести на экран список пакетов, являющихся зависимостями данного *)
 let deplist_cmd =
   let doc = "Print run-time dependency list" in

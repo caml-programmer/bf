@@ -154,7 +154,6 @@ let basegraph specdir mode =
 	List.iter (write_links parent) l
   in
 
-
   write_links None tree;
   
   out "}\n";

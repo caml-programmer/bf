@@ -77,5 +77,12 @@ let load_chroot_cfg () =
   let chroot = Chroot.load_chroot_cfg "centos6-for-java" Platform.Cent6 in
   print_endline (string_of_chroot chroot)
 		
+(* depgraph *)
+let draw_depgraph pkgname version =
+  let depgraph = Depgraph.of_pkg pkgname version None in
+  Depgraph.draw depgraph "graph.dot"
 
-
+(* buildgraph *)
+let draw_buildgraph pkgname version =
+  let depgraph = Depgraph.of_pkg ~use_builddeps:true pkgname version None in
+  Depgraph.draw ~use_builddeps:true depgraph "graph.dot"
