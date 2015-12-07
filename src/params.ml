@@ -61,6 +61,7 @@ let exists param =
   Hashtbl.mem user_params param
 		  
 let set param value =
+  (*print_endline ("Set param: "^param^" -> "^value);*)
   if not (exists param) then
     raise (Unknown_parameter param);
   Ocs_env.set_glob Scheme.env (Ssymbol param) (Sstring value);
@@ -180,7 +181,10 @@ let reread_params () =
   (* в этой директории создаются диретории с именами собирающихся
   пакетов, в которых создаются файлы для пакетирования при помощи,
   например, rpmbuild *)
-  set_param ~default:"pkgpack" "pkg-pack-dir"; 
+  set_param ~default:"pkgpack" "pkg-pack-dir";
+  (* этот параметр указывает на версию bf, которая в данный момент
+  используется *)
+  set_param ~default:"1" "bf-version";
   ()
   
 
