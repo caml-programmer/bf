@@ -389,6 +389,12 @@ let scm_git_push_tag_cycle url tag depth =
   Snull
 ;;
 
+let scm_print_endline = function
+  | Sstring str -> print_endline str; Snull
+  | Ssymbol str -> print_endline str; Snull
+  | _ -> failwith "Not a symbol or string"
+;;
+  
 (* Register global functions *)
 
 Ocs_env.set_pfn Scheme.env scm_prepare "prepare-components";;
@@ -451,3 +457,4 @@ Ocs_env.set_pf2 Scheme.env scm_git_push_cycle "git-push-cycle";;
 Ocs_env.set_pf3 Scheme.env scm_git_push_tag_cycle "git-push-tag-cycle";;
 
 Ocs_env.set_pfn Scheme.env scm_jira_fix_issue "jira-fix-issue";;
+Ocs_env.set_pf1 Scheme.env scm_print_endline "print-endline";;
