@@ -1,3 +1,5 @@
+open Ext
+
 type 'a digraph = ('a * 'a list) list
 type 'a t = 'a digraph
 				 
@@ -61,8 +63,7 @@ let remove_edge graph h t =
 
 let get_tails g v = Alist.assoc v g
 let get_vertex g v = v,(get_tails g v)
-  
-				
+
 let find_path ?(ignore_start=false) (graph: 'a digraph) start destination : 'a list =
   let rec find path tails =
     if List.mem destination tails then
@@ -121,6 +122,18 @@ let find_leaves graph =
   | [] -> raise Leaves_not_found
   | _ -> leaves
 
+let rec union = function
+  | [] -> []
+  | g1 :: [] -> g1
+  | g1 :: g2 :: graphs ->
+     let vertices = List.remove_duplicates ((vertices g1) @ (vertices g2)) in
+     let edges = List.remove_duplicates ((edges g1) @ (edges g2)) in
+     let (heads,tails) = List.split edges in
+     let g = create () in
+     let g = List.fold_left insert_vertex g vertices in
+     let g = List.fold_left2 insert_edge g heads tails in
+     union (g::graphs)
+	   
 (*
 let _ =
   let g = create () in

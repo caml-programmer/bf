@@ -1,7 +1,9 @@
 open Output
 open Spectype
 open Component
-       
+open Hashtbl_ext
+open String_ext
+  
 exception Pkg_already_regestered of pkg_name
 exception Pkg_not_exists of pkg_name
 exception Dependency_on_different_versions of (pkg_name * string * string)
@@ -227,8 +229,8 @@ let get_dep ?(use_builddeps=false) (depgraph:depgraph) head tail =
   Output.msg "get-dep" "very-high" (head^" -> "^tail);
   let spec = get_spec depgraph head in
   find_dependency ~use_builddeps spec tail
-    
-let draw ?(use_builddeps=false) (depgraph:depgraph) file =
+
+let draw ?(use_builddeps=false) ?(local_only=false) (depgraph:depgraph) file =
   let ch = if (file = "stdout") || (file = "-")
 	   then stdout
 	   else open_out file in
@@ -246,10 +248,21 @@ let draw ?(use_builddeps=false) (depgraph:depgraph) file =
   (* вершины *)
   List.iter
     (fun pkg ->
-     let color = if Pkg.is_local pkg
-		 then "#77CC77"
-		 else "#FFFFFF" in
-     print_endline ("\""^pkg^"\"\n"^"[shape=box,style=\"rounded,filled\",fillcolor=\""^color^"\"]"))
+     if Pkg.is_local pkg then
+       let color = "#77CC77" in
+       print_endline ("\""^pkg^"\"\n"^"[shape=box,style=\"rounded,filled\",fillcolor=\""^color^"\"]");
+       if Pkg.is_devel pkg then
+	 let pkg_dev = pkg in
+	 let pkg = Pkg.chop_devel_suffix pkg in
+	 print_endline ("subgraph cluster_"^(String.unprintable_to_underline pkg)^" {");
+	 print_endline ("style=filled;color=lightgrey;");
+	 print_endline ("\""^pkg^"\"");
+	 print_endline ("\""^pkg_dev^"\"");
+	 print_endline "}"
+     else
+       if not local_only then
+	 let color = "#FFFFFF" in
+	 print_endline ("\""^pkg^"\"\n"^"[shape=box,style=\"rounded,filled\",fillcolor=\""^color^"\"]"))
     (Digraph.vertices graph);
 
   (* рёбра *)
@@ -258,12 +271,16 @@ let draw ?(use_builddeps=false) (depgraph:depgraph) file =
      let dep_opver = get_dep ~use_builddeps depgraph head tail in
      let label = 
        match dep_opver with
-       | Some (op, ver) -> let opstr = string_of_pkg_op op in opstr^" "^ver
+       | Some (op, ver) -> let opstr = string_of_op op in opstr^" "^ver
        | None -> " " in
      let non_strict = match dep_opver with
        | Some (op, ver) when ((op <> Pkg_eq) && (op <> Pkg_last)) -> ", style=\"dashed\""
        | _ -> "" in
-     print_endline ("\""^head^"\" -> \""^tail^"\" [label=\""^label^"\", color=\"black\""^non_strict^"]"))
+     if local_only then
+       (if (Pkg.is_local tail) && (Pkg.is_local head) then
+	  print_endline ("\""^head^"\" -> \""^tail^"\" [label=\""^label^"\", color=\"black\""^non_strict^"]"))
+     else
+       print_endline ("\""^head^"\" -> \""^tail^"\" [label=\""^label^"\", color=\"black\""^non_strict^"]"))
     (Digraph.edges graph);
 
   print_endline "}";
@@ -272,4 +289,23 @@ let draw ?(use_builddeps=false) (depgraph:depgraph) file =
   (* всякая ерунда, типа вывести на экран картинку *)
   let pngfile = (file^".png") in
   Graph.make_image file pngfile;
-  Graph.view_image pngfile
+  try Graph.view_image pngfile
+  with _ -> Output.warn "draw" "Can't start graphical viewer"
+
+let union (depgraphs:depgraph list)= match depgraphs with
+  | [] -> create ()
+  | depgraph :: [] -> depgraph
+  | depgraphs ->
+     let depgraph = create () in
+     (digraph depgraph) := Digraph.union (List.map (fun dg -> !(digraph dg)) depgraphs);
+     Hashtbl.union_to (List.map spectable depgraphs) (spectable depgraph);
+     depgraph
+
+let subtree_buildgraph package version =
+  let depgraph = of_pkg package version None in
+  let depgraphs = Hashtbl.fold (fun pkgname spec acc ->
+				(of_pkg ~use_builddeps:true pkgname spec.version None)::acc)
+			       (spectable depgraph) [] in
+  union depgraphs
+  
+			       

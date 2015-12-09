@@ -146,6 +146,20 @@ let draw_buildgraph_cmd =
   Term.info "draw-buildgraph" ~doc ~man;;
 regcmd draw_buildgraph_cmd
        
+(* draw-subtree-buildgraph *)
+let draw_subtree_buildgraph =
+  let doc = "Draw a subtree buildgraph" in
+  let man = help_secs in
+
+  let pkgname =
+    Arg.(required & pos 0 (some string) None & info [] ~docv:"PKGNAME") in
+  let version =
+    Arg.(required & pos 1 (some string) None & info [] ~docv:"VERSION") in
+
+  Term.(pure Test.draw_subtree_buildgraph $ pkgname $ version),
+  Term.info "draw-subtree-buildgraph" ~doc ~man;;
+regcmd draw_subtree_buildgraph
+
 (* Вывести на экран список пакетов, являющихся зависимостями данного *)
 let deplist_cmd =
   let doc = "Print run-time dependency list" in
@@ -241,6 +255,10 @@ let chroot_shell_cmd =
   Term.info "chroot-shell" ~doc ~man;;
 regcmd chroot_shell_cmd
 
+
+  
+
+       
 (* непосредственно старт программы *)
 let () = match Term.eval_choice default_cmd (cmds ()) with
   | `Error _ -> exit 1

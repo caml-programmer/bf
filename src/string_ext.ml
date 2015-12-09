@@ -12,4 +12,7 @@ module String = struct
 	Filename.chop_suffix str suff
       else str
 
+    let unprintable_to_underline str =
+      Str.global_replace (Str.regexp "[-]") "_" str
+	     
   end

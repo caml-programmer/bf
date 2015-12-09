@@ -1,5 +1,6 @@
 open Component
 open Chroot
+open Ldigraph
        
 let test name call =
   Printf.printf "Test %s: %b\n" name (call ())
@@ -86,3 +87,9 @@ let draw_depgraph pkgname version =
 let draw_buildgraph pkgname version =
   let depgraph = Depgraph.of_pkg ~use_builddeps:true pkgname version None in
   Depgraph.draw ~use_builddeps:true depgraph "graph.dot"
+
+(* subtree-buildgraph*)
+let draw_subtree_buildgraph pkgname version =
+  let depgraph = Depgraph.subtree_buildgraph pkgname version in
+  Depgraph.draw ~use_builddeps:true ~local_only:true depgraph "graph.dot"
+
