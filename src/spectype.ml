@@ -20,7 +20,8 @@ type pkg_op =
   | Pkg_ge
   | Pkg_gt
   | Pkg_last
-type platform_depend = pkg_name * (pkg_op * pkg_ver) option * pkg_desc option
+type pkg_opver = pkg_op * pkg_ver
+type platform_depend = pkg_name * pkg_opver option * pkg_desc option
 type reject = string (* зависимости, которые не надо включать в require (специфика rpmbuild) *)
 type provide = string
 type spec = {
@@ -81,6 +82,9 @@ let string_of_op = function
   | Pkg_last -> "last"
   | v -> string_of_pkg_op v
 
+let string_of_opver ((op, ver): pkg_opver) =
+  (string_of_op op)^" "^ver
+			  
 let string_of_platform_depend (dependency:platform_depend) =
   let (pkg_name, dep, _) = dependency in
   string_of_string_list ~separator:" "
@@ -129,7 +133,7 @@ let string_of_spec spec =
 
 (* Загрузка spec-а системного пакета. В некотором роде хак, чтобы
 рассматривать системные зависимости также, как и локальные *)
-let system_pkg_spec pkgname version =
+let system_pkg_spec ?os ?platform pkgname version =
   {
     pkgname = pkgname;
     depends = [];

@@ -21,7 +21,8 @@ exception Path_not_found
 exception Circular_path_not_found
 exception Weight_not_found
 	    
-type ('a,'b) ldigraph = {
+type ('a,'b) ldigraph =
+  {
     mutable vertices: 'a list;
     mutable edges: ('a * 'a) list;
     weights: (('a*'a),'b) Hashtbl.t;
@@ -37,25 +38,17 @@ let create () =
   }
 
 let vertices g = g.vertices
-
 let edges g = g.edges
-
 let weights g = g.weights
 		
-let weight g e =
-  try Hashtbl.find g.weights e
-  with Not_found -> raise Weight_not_found
-
 let has_vertex g v =  List.mem v g.vertices
-
 let has_edge g e = List.mem e g.edges
-
 let has_weight g e = Hashtbl.mem g.weights e
 	   
 let insert_vertex g v =
   g.vertices <- v :: g.vertices
 
-let insert_edge g h t =
+let insert_edge g (h,t) =
   if not (has_vertex g h) then raise Head_not_found;
   if not (has_vertex g t) then raise Tail_not_found;
   g.edges <- (h,t) :: g.edges
@@ -67,9 +60,8 @@ let set_weight g e w =
 	    else Hashtbl.add g.weights e in
   set w
 
-let unset_weight g e =
-  Hashtbl.remove g.weights e
-
+let weight g e = Hashtbl.find g.weights e
+      
 let vertex_edges g v =
   List.filter (fun (h,t) -> (h = v) || (t = v)) (edges g)
 
@@ -79,20 +71,27 @@ let in_edges g v =
 let out_edges g v =
   List.filter (fun (h,t) -> h = v) (edges g)
 
-let count_in_ednges g v =
+let in_weights g v =
+  let edges = in_edges g v in
+  List.map (weight g) edges
+	      
+let count_in_edges g v =
   List.length (in_edges g v)
 
 let count_out_edges g v =
   List.length (out_edges g v)
 
 let roots g =
-  List.filter (fun v -> (count_in_ednges g v) = 0)
+  List.filter (fun v -> (count_in_edges g v) = 0)
 	      (vertices g)
 	      
 let leaves g =
   List.filter (fun v -> (count_out_edges g v) = 0)
 	      (vertices g)
-	      
+
+let unset_weight g e =
+  Hashtbl.remove g.weights e
+
 let del_edge g e =
   unset_weight g e;
   g.edges <- List.remove_elt e g.edges

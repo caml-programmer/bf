@@ -26,11 +26,13 @@ let reg_pkg depgraph spec =
   if has_pkg depgraph spec.pkgname then
     raise (Pkg_already_regestered spec.pkgname)
   else
-    Output.msg "reg_pkg" "very-high" ("New pkg: "^spec.pkgname);
-    let digraph = digraph depgraph in
-    let spectable = spectable depgraph in
-    digraph := Digraph.insert_vertex !digraph spec.pkgname;
-    Hashtbl.add spectable spec.pkgname spec
+    begin
+      Output.msg "reg_pkg" "very-high" ("New pkg: "^spec.pkgname);
+      let digraph = digraph depgraph in
+      let spectable = spectable depgraph in
+      digraph := Digraph.insert_vertex !digraph spec.pkgname;
+      Hashtbl.add spectable spec.pkgname spec
+    end
 
 let upd_pkg depgraph spec =
   if has_pkg depgraph spec.pkgname then

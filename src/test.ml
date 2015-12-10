@@ -1,6 +1,5 @@
 open Component
 open Chroot
-open Ldigraph
        
 let test name call =
   Printf.printf "Test %s: %b\n" name (call ())
@@ -79,9 +78,12 @@ let load_chroot_cfg () =
   print_endline (string_of_chroot chroot)
 		
 (* depgraph *)
-let draw_depgraph pkgname version =
+(*let draw_depgraph pkgname version =
   let depgraph = Depgraph.of_pkg pkgname version None in
-  Depgraph.draw depgraph "graph.dot"
+  Depgraph.draw depgraph "graph.dot"*)
+let draw_depgraph pkgname version =
+  let depgraph = Depgraph2.of_pkg pkgname version in
+  Depgraph2.draw ~local_only:false depgraph
 
 (* buildgraph *)
 let draw_buildgraph pkgname version =
@@ -90,6 +92,6 @@ let draw_buildgraph pkgname version =
 
 (* subtree-buildgraph*)
 let draw_subtree_buildgraph pkgname version =
-  let depgraph = Depgraph.subtree_buildgraph pkgname version in
-  Depgraph.draw ~use_builddeps:true ~local_only:true depgraph "graph.dot"
+  let depgraph = Depgraph2.subtree_buildgraph pkgname version in
+  Depgraph2.draw ~local_only:true depgraph
 

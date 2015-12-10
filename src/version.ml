@@ -151,6 +151,11 @@ let max v1 v2 =
   | -1 -> v2
   | _ -> failwith "Will never happen"
 
+let cmp v1 v2 =
+  let v1_list = parse v1 in
+  let v2_list = parse v2 in
+  compare v1_list v2_list
+
 let less v1 v2 =
   let v1_list = parse v1 in
   let v2_list = parse v2 in
@@ -167,3 +172,5 @@ let greater v1 v2 =
 
 let equal v1 v2 =
   v1 = v2
+
+
