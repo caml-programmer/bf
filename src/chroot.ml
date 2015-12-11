@@ -4,6 +4,7 @@ open Printf
 open Component
 open Spectype
 open Ocs_types
+open Ext
        
 type mount_point = {
     src : string;
@@ -139,7 +140,7 @@ let compose_chroot_path chroot_name =
   else Path.make [(chroots_dir ()); chroot_name]
 
 let projects_path () =
-  Params.get_param "projects-dir"
+  Path.make ["/"; Params.get_param "projects-dir"]
 		 
 let compose_projects_path chroot_name =
   Path.make [(compose_chroot_path chroot_name); (projects_path ())]
@@ -237,6 +238,8 @@ let build_component chroot_name component_name rules =
      (* для сборки -dev пакетов *)
      let dev_dir_orig = Params.get "dev-dir" in
      let dev_dir = "/opt/dev" in (* пусть внутри chroot-окружений она всегда будет такой *)
+     if dev_dir = "/" then err "dev-dir can't be /"; (* залог на будущее *)
+
      Params.update_param "dev-dir" dev_dir;
      Cmd.mkdir_if_not_exists dev_dir;
 
@@ -254,23 +257,51 @@ let build_component chroot_name component_name rules =
      let top_dir = Params.get_param "top-dir" in
      let dest_dir = Params.get_param "dest-dir" in
      let install_dir = Params.make_install_dir () in
-     
+
      Params.update_param "orig-top-dir" top_dir;
      Cmd.mkdir_if_not_exists top_dir;
      Params.update_param "install-dir" install_dir;
      Cmd.mkdir_if_not_exists install_dir;
 
-     let oldstate = Scanner.create_top_state install_dir in
-     let oldstate_dev = Scanner.create_top_state dev_dir in
-     if dest_dir <> "" then
+     print_endline ("TOP-DIR: "^top_dir);
+     print_endline ("DEV-DIR: "^dev_dir);
+     print_endline ("INS-DIR: "^install_dir);
+     print_endline ("PROJECT: "^projects_relative_path);
+     
+     let oldstate = Chroot_scanner.filter
+		      (fun path -> not (String.have_prefix projects_relative_path path))
+		      (Chroot_scanner.scan "/") in
+
+     if dest_dir <> "" then 
        Params.update_param "top-dir" install_dir; (* Deprecated: use install-dir *)
      Rules.install_rules rules;
+
+     let newstate = Chroot_scanner.filter
+		      (fun path -> not (String.have_prefix projects_relative_path path))
+		      (Chroot_scanner.scan "/") in
+
      Params.update_param "top-dir" top_dir;
      Params.update_param "dev-dir" dev_dir_orig;
-     let newstate = Scanner.create_top_state install_dir in
-     let newstate_dev = Scanner.create_top_state dev_dir in
-     Scanner.generate_changes rules top_dir oldstate newstate;
-     Scanner.generate_changes ~devlist:true rules dev_dir oldstate_dev newstate_dev;
+     
+     let changes = Chroot_scanner.changes oldstate newstate in
+
+     print_endline "\nCHANGES\n";
+     List.iter print_endline (Chroot_scanner.files changes);
+     
+     let files_dev = Chroot_scanner.filter (String.have_prefix dev_dir) changes in
+     let files_top =
+       Chroot_scanner.filter
+	 (String.have_prefix install_dir)
+	 (Chroot_scanner.filter (fun path -> not (String.have_prefix dev_dir path)) changes) in
+
+     let list_file = Rules.list_file rules in
+     let devlist_file = Rules.devlist_file rules in
+
+     System.with_out list_file
+       (fun ch -> output_string ch ((Chroot_scanner.gen_bflist_content files_top)^"\n"));
+     System.with_out devlist_file
+       (fun ch -> output_string ch ((Chroot_scanner.gen_bflist_content files_dev)^"\n"));
+
      msg "always" ("install "^component_name^" has been finished");
      Rules.fill_bf_install ?rules start_time
     )
@@ -403,9 +434,10 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
 	let reg_file bf_list_file =
 	  let bf_list = System.list_of_file bf_list_file in
 	  List.iter (fun str ->
-		     let ftype = str.[0] in
-		     let fname = String.sub str 2 ((String.length str) - 2) in
-		     reg fname ftype)
+		     if str <> "" then
+		       let ftype = str.[0] in
+		       let fname = String.sub str 2 ((String.length str) - 2) in
+		       reg fname ftype)
 		    bf_list in
 	if nodev then (* если nodev, то всё пихаем dev-dir в базовый пакет *)
 	  begin

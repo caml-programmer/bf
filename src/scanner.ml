@@ -85,8 +85,7 @@ let generate_changes ?(devlist=false) rules top_dir a b =
 		    | (None, true) -> ".bf-devlist"
 		    | (Some alt, true) -> ".bf-devlist." ^ alt)
 	in
-	output_string ch
-	  (sprintf "d %s\n" top_dir);
+	output_string ch (sprintf "d %s\n" top_dir);
 	List.iter
 	  (fun e ->
 	    output_string ch (string_of_fs_entry e);
