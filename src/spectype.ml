@@ -448,10 +448,13 @@ let depload_v2_new ?(os=Platform.os ()) ?(platform=Platform.current ()) depfile 
   let make_dep dep_scm =
     let dep = Scheme.read_list dep_scm in
     let pkgname = Scheme.make_string (List.nth dep 0) in
-    let op_ver_scm = List.nth dep 1 in
-    let pkgop = op_of_string (Scheme.make_string (Scheme.first op_ver_scm)) in
-    let pkgver = Scheme.make_string (Scheme.second op_ver_scm) in
-    let op_ver_opt = Some (pkgop, pkgver) in
+    let op_ver_opt =
+      if (List.length dep) > 1 then
+	let op_ver_scm = List.nth dep 1 in
+	let pkgop = op_of_string (Scheme.make_string (Scheme.first op_ver_scm)) in
+	let pkgver = Scheme.make_string (Scheme.second op_ver_scm) in
+	Some (pkgop, pkgver)
+      else None in
     let desc_scm_opt = try Some (List.nth dep 2) with _ -> None in
     let desc_opt = match desc_scm_opt with
       | Some desc_scm -> Some (Scheme.make_string (Scheme.second desc_scm))

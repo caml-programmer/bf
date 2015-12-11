@@ -625,3 +625,15 @@ let buildpkg ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgspec =
   pack ~os ~platform chroot_name pkgspec;
 
   msg "always" ("Build of '"^pkgname^"' is complete!")
+
+(* Эта функция строит дерево сборочных зависимостей ветви и
+ * последовательно собирает листья. Разумеется, она запускает
+ * несколько подпроцессов, которые выполняют основную работу и
+ * сигнализируют ей о результатах.
+ *)
+(*let build_subtree ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgspec =
+  let pkgname = pkgspec.pkgname in
+  let version = pkgspec.version in
+  let dg = Depgraph2.subtree_buildgraph pkgname version in
+  *)  
+  

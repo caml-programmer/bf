@@ -1,6 +1,11 @@
-(define (build args)
-    (log-command "./configure")
-  (log-command "make"))
+(let* ((ocaml-dir "/opt/dev/ocaml")
+       (bindir (path-concat ocaml-dir "bin"))
+       (libdir (path-concat ocaml-dir "lib")))
+  (add-path bindir)
 
-(define (install args)
-    (log-command "make" "install"))
+  (define (build args)
+      (log-command "./configure")
+    (log-command "make"))
+
+  (define (install args)
+      (log-command "make" "install")))
