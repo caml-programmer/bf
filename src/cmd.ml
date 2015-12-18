@@ -36,7 +36,7 @@ let read_descriptors fdlist =
   read fdlist;
   List.map (fun (_,b) -> Buffer.contents b) buffer_map
 
-let command ?(rt=false) ?(env=Unix.environment()) ?(ignore_errors=false) command =
+let command ?(env=Unix.environment()) ?(ignore_errors=false) command =
   let msg str = Output.msg "command" "always" str in
   msg ("Run \"" ^ command ^ "\"");
   let (pout,pin,perr) = Unix.open_process_full command env in
@@ -51,7 +51,7 @@ let command ?(rt=false) ?(env=Unix.environment()) ?(ignore_errors=false) command
   | Unix.WSIGNALED signal -> failwith (sprintf "Command '%s' was killed by signal: %d" command signal)
   | Unix.WSTOPPED signal -> failwith (sprintf "Command '%s' was stopped by signal: %d" command signal)
 
-let command_log ?(rt=false) ?(loglevel="always") ?(env=Unix.environment()) ?(ignore_errors=false) cmd_str =
+let command_log ?(loglevel="always") ?(env=Unix.environment()) ?(ignore_errors=false) cmd_str =
   let msg str = Output.msg "command" loglevel str in
   let (st,outputs,errors) = command ~env ~ignore_errors:true cmd_str in
   msg (Output.prefix_textblock "STDOUT: " outputs);
@@ -61,6 +61,13 @@ let command_log ?(rt=false) ?(loglevel="always") ?(env=Unix.environment()) ?(ign
   then (st,outputs,errors)
   else failwith (sprintf "Command '%s' exited with non-nil status: %d" cmd_str st)
 
+
+
+
+
+		
+
+			  
 let cpu_number () =
   let channel = open_in "/sys/devices/system/cpu/present" in
   let present_cores = input_line channel in
@@ -106,8 +113,8 @@ let choose_command ?(as_root=false) ?loglevel () =
   match as_root with
   | true -> root_command ?loglevel
   | false -> (match loglevel with
-	      | None -> command ~rt:false ?env:None ?ignore_errors:None
-	      | _ -> command_log ~rt:false ?env:None ?ignore_errors:None ?loglevel)
+	      | None -> command ?env:None ?ignore_errors:None
+	      | _ -> command_log ?env:None ?ignore_errors:None ?loglevel)
 
 			     
 let mkdir ?(as_root=false) ?loglevel dir =

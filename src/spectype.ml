@@ -10,6 +10,7 @@ open String_ext
        
 (* описание типов *)
 
+type pkg_rev = int
 type pkg_name = string
 type pkg_desc = string
 type pkg_ver = string

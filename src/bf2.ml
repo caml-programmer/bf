@@ -13,56 +13,63 @@ let bugs_secs = [
     `S "BUGS";
     `P "Send bug reports to freehck@freehck.ru";]
        
-let copts_sect = "COMMON OPTIONS"
+let copts_sect = "OPTIONS"
 
 let help_secs = [
- `S copts_sect;
- `P "These options are common to all commands.";
  `S "MORE HELP";
- `P "Use `$(mname) $(i,COMMAND) --help' for help on a single command."]
+ `P "Use `$(mname) $(i,COMMAND) --help' for help on a single command."; `Noblank;
+ `P "Use `$(mname) [--help] to see all the commands.";
+  ]
 
-let copts loglevel = loglevel
-
+let copts table = table
+  
 let copts_t =
   let docs = copts_sect in
-  let verbosity =
+  let copts_table = Hashtbl.create 0 in
+  
+  let verbosity_name = "verbose" in
+  let verbosity_arg =
     let doc = "Set verbosity level." in
-    Arg.(value & flag & info ["v"; "verbose"] ~docs ~doc)
-  in
-  Term.(pure copts $ verbosity)
+    Arg.(value & flag & info ["v"; verbosity_name] ~docs ~doc) in
+  Hashtbl.add copts_table verbosity_name verbosity_arg;
+
+  Term.(pure copts $ pure copts_table)
 
 (* Перегрузка параметров *)
 
-let params_table = Hashtbl.create 32
+type copts =
+  {
+    topdir: string option;
+    devdir: string option;
+  }
 
-let reg_param_opt pname doc =
-  let arg = Arg.(value & opt string "" & info [pname] ~docs:copts_sect ~doc) in
-  Term.(pure Hashtbl.add $ pure params_table $ pure pname $ arg)
-  
-let apply_param_opts () =
-  Hashtbl.iter (fun param value ->
-		if value <> "" then
-		  Params.set param value)
-	       params_table
+let copts topdir devdir =
+  {
+    topdir = topdir;
+    devdir = devdir
+  }
+    
+let str_of_opt converter = function None -> "" | Some v -> (converter v)
+let str_of_opt_str = str_of_opt (fun s -> s)
 
-	       (*
-let param_opts_term =
+let parse_copts copts =
+  let getval = str_of_opt_str in
+  let setparam pname value =
+    if value <> None then Params.set pname (getval value) in
+  setparam "top-dir" copts.topdir;
+  setparam "dev-dir" copts.devdir;
+  ()
+
+let copts_t =
   let docs = copts_sect in
-  let loglevel_param = "log-level" in
-  let loglevel_arg =
-    let doc = "Variates log-level option\nCould be: always, low, high, very[-]high, all" in
-    Arg.(value & opt string "" & info [loglevel_param] ~docs ~doc) in
-  let params = [(loglevel_param, loglevel_arg)] in
-  Term.(pure apply_param_opts $ pure params)
+  let topdir =
+    let doc = "Set top-dir for current run" in
+    Arg.(value & opt (some string) None & info ["top-dir"] ~docv:"DIR" ~docs ~doc) in
+  let devdir =
+    let doc = "Set dev-dir for current run" in
+    Arg.(value & opt (some string) None & info ["dev-dir"] ~docv:"DIR" ~docs ~doc) in
+  Term.(pure copts $ topdir $ devdir)
       
-let loglevel_opt =
-  let docs = copts_sect in
-  let doc = "Variates loglevel option\nCould be: always, low, high, very[-]high, all" in
-  Arg.(value & opt string "" & info ["log-level"] ~docs ~doc);;
-
-Term.(pure set_param_with_option $ pure "log-level" $ loglevel_opt)
-		*)
-	       
 (* ДЕЙСТВИЯ *)
       
 (* Действие по умолчанию -- вычисление терма документации к программе *)
@@ -81,7 +88,7 @@ let cmds () = !cmds
 let params_cmd =
   let doc = "Print current state for all configuration parameters" in
   let man = help_secs in
-  Term.(pure Params.print_params $ pure ()),
+  Term.(pure (fun copts -> parse_copts copts; Params.print_params ()) $ copts_t),
   Term.info "params" ~sdocs:copts_sect ~doc ~man;;
 regcmd params_cmd
 
@@ -202,12 +209,12 @@ let buildpkg_cmd =
   let platform =
     Arg.(required & pos 2 (some string) None & info [] ~docv:"PLATFORM") in
 
-  Term.(pure (fun pkgname version platform ->
+  Term.(pure (fun (*copts*) pkgname version platform ->
 	      let platform = Platform.platform_of_string platform in
 	      let os = Platform.os_of_platform platform in
 	      let pkgspec = Spectype.newload ~os ~platform pkgname version in
 	      Chroot.buildpkg ~os ~platform pkgspec)
-	$ pkgname $ version $ platform),
+	(*$ copts_t*) $ pkgname $ version $ platform),
   Term.info "buildpkg" ~doc ~man;;
 regcmd buildpkg_cmd
 
@@ -235,6 +242,24 @@ let packpkg_cmd =
   Term.info "packpkg" ~doc ~man;;
 regcmd packpkg_cmd
 
+let build_component_cmd =
+  let doc = "Build component in a chroot environment" in
+  let man = help_secs in
+  
+  let chroot_name =
+    Arg.(required & pos 0 (some string) None & info [] ~docv:"CHROOT_NAME") in
+  let component_name =
+    Arg.(required & pos 1 (some string) None & info [] ~docv:"COMPONENT") in
+  let rules_opt =
+    Arg.(value & pos 2 (some string) None & info [] ~docv:"RULES") in
+  
+  Term.(pure (fun copts chroot_name component_name rules_opt ->
+	      parse_copts copts;
+	      Chroot.build_component chroot_name component_name rules_opt)
+	$ copts_t $ chroot_name $ component_name $ rules_opt),
+  Term.info "build-component" ~doc ~man;;
+regcmd build_component_cmd
+       
 (* chroot-shell *)
 let chroot_shell_cmd =
   let doc = "Open a shell in the chroot environment" in

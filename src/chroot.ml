@@ -318,10 +318,12 @@ let depinstall ?(os=Platform.os ()) ?(platform=Platform.current ()) chroot_name 
     begin
       let pool_dir = Path.make [(Params.get "pool-dir"); "/"] in
       let local_pkgs = Rpm.resolve_ldeps ~os ~platform pkgspec.builddeps in
-      let full_pkgs = List.map (fun pkg -> Path.make [pool_dir; pkg]) local_pkgs in
+      let full_pkgs = List.remove_duplicates
+			(List.map (fun pkg -> Path.make [pool_dir; pkg]) local_pkgs) in
       let full_pkgs_str = Output.string_of_string_list ~separator:" " full_pkgs in
       ignore (Cmd.root_command ~loglevel:"always" ("cp "^full_pkgs_str^" "^chroot_dir^"/"));
-      let pkgs = List.map (fun pkg -> Path.make ["/"; pkg]) local_pkgs in
+      let pkgs = List.remove_duplicates
+		   (List.map (fun pkg -> Path.make ["/"; pkg]) local_pkgs) in
       let pkgs_str = Output.string_of_string_list ~separator:" " pkgs in
       let localinstall_command = match engine_of_platform platform with
 	| Rpm_build -> "yum localinstall -y "^pkgs_str
@@ -615,6 +617,9 @@ let buildpkg ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgspec =
   let chroot_name = new_chroot_name in (* гарантируем, что базовый chroot не будет затронут *)
   let spec = Spectype.newload ~os ~platform pkgname version in
 
+  let topdir_opt = try (" --top-dir="^(Hashtbl.find spec.params "top-dir"))
+		   with _ -> "" in
+  
   msg "always" "Clone components into chroot...";
   List.iter (fun component -> ignore (clone_component chroot_name component))
 	    spec.components;
@@ -644,7 +649,8 @@ let buildpkg ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgspec =
 		 let name = component.name in
 		 let rules = Component.string_of_rules component.rules in
 		 ignore (Cmd.root_command ~loglevel:"low"
-					  ("/bin/bf build-component "^chroot_name^" "^name^" "^rules)))
+					  ("/bin/bf2 build-component "^chroot_name^" "^name^" "^rules
+					   ^topdir_opt)))
 		spec.components;
     with _ as exn ->
       msg "always" "Build has been failed!";
@@ -663,9 +669,278 @@ let buildpkg ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgspec =
  * несколько подпроцессов, которые выполняют основную работу и
  * сигнализируют ей о результатах.
  *)
-(*let build_subtree ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgspec =
-  let pkgname = pkgspec.pkgname in
+
+type job_desc =
+  {
+    out: Buffer.t;
+    err: Buffer.t;
+    job: Shell_sys.job;
+  }
+
+type instance = Shell_sys.job_instance
+
+type build_state = Build_success | Build_failure
+      
+let build_subtree ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgspec =
+  let msg = Output.msg "build_subtree" in
+  let err = Output.err "build_subtree" in
+  let warn = Output.warn "build_subtree" in
+
+  let top_pkg = pkgspec.pkgname in
   let version = pkgspec.version in
-  let dg = Depgraph2.subtree_buildgraph pkgname version in
-  *)  
+
+  (* граф сборочных зависимостей ветви + интерфейсы к нему *)
+  let dg = Depgraph2.subtree_buildgraph top_pkg version in
+  let unreg_pkg pkg = Depgraph2.unreg_pkg dg pkg in
+
+  let specs = Depgraph2.copy_spectable dg in
+  let jobs = ((Hashtbl.create 0) : (pkg_name,job_desc) Hashtbl.t) in
+  let instances = ((Hashtbl.create 0) : (pkg_name,instance) Hashtbl.t) in
+  let status = ((Hashtbl.create 0) : (pkg_name, build_state) Hashtbl.t) in
+
+  let pkg_spec pkg = Hashtbl.find specs pkg in
+  let pkg_jdesc pkg = Hashtbl.find jobs pkg in
+
+  let get_status pkg = Hashtbl.find status pkg in
+  let build_ok pkg = (get_status pkg) = Build_success in
+  let build_err pkg = (get_status pkg) = Build_failure in
+  let set_status pkg st = Hashtbl.add status pkg st in
+  let set_ok pkg = set_status pkg Build_success in
+  let set_err pkg = set_status pkg Build_failure in
   
+  let new_job pkg =
+    let spec = pkg_spec pkg in
+    let ver = spec.version in
+    let platform = string_of_platform platform in
+    let params = spec.params in
+    let topdir = try ["--top-dir"; (Hashtbl.find params "top-dir")] with Not_found -> [] in
+    let devdir = try ["--dev-dir"; (Hashtbl.find params "dev-dir")] with Not_found -> [] in
+    let args = ["buildpkg"; pkg; ver; platform] @ topdir @ devdir in
+    let command = Shell.cmd "bf2" args in
+    let outbuf = Buffer.create 0 in
+    let errbuf = Buffer.create 0 in
+    (* судя по всему она сразу открывает дескрипторы, что не очень хорошо *)
+    let (job,_) = Shell.setup_job ~stdout:(Shell.to_buffer outbuf)
+				   ~stderr:(Shell.to_buffer errbuf)
+				   [command] in
+    let job = {out = outbuf; err = errbuf; job = job} in
+    Hashtbl.add jobs pkg job in
+
+  let start_job pkg =
+    let jdesc = pkg_jdesc pkg in
+    let job = jdesc.job in
+    let inst = Shell_sys.call_job ~forward_signals:true job in
+    Hashtbl.add instances pkg inst in
+
+  let stop_job pkg =
+    let inst = Hashtbl.find instances pkg in
+    let status = Shell_sys.job_status inst in
+    match status with
+    | Shell_sys.Job_ok ->
+       msg "always" ("Build success: "^pkg);
+       Hashtbl.remove instances pkg;
+       unreg_pkg pkg;
+       set_ok pkg
+    | Shell_sys.Job_error ->
+       msg "always" ("Build failure: "^pkg);
+       Hashtbl.remove instances pkg;
+       unreg_pkg pkg;
+       set_err pkg
+    | _ -> err ("") in
+  
+  
+  ()
+		
+    
+    
+  
+(*
+type process_fds = (Unix.file_descr * Unix.file_descr * Unix.file_descr)
+let fdin ((fd, _, _) : process_fds) = fd
+let fdout ((_, fd, _) : process_fds) = fd
+let fderr ((_, _, fd) : process_fds) = fd
+		     
+type process_id = int
+type build_status = Built of pkg_rev | (* собрано с ревизией *)
+		    Building of process_id | (* в процессе сборки *)
+		    Failed of Unix.process_status | (* сборка провалилась *)
+		    Waiting (* ожидает сборки *)
+
+exception Process_finished of process_id
+exception Found
+				
+let build_subtree ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgspec =
+  let msg = Output.msg "build_subtree" in
+  let err = Output.err "build_subtree" in
+  let warn = Output.warn "build_subtree" in
+
+  let top_pkg = pkgspec.pkgname in
+  let version = pkgspec.version in
+
+  (* таблица буферов считывания из файловых дескрипторов *)
+  let fd_table = ((Hashtbl.create 0) : (Unix.file_descr, Buffer.t) Hashtbl.t) in
+  let reg_fd fd =
+    Hashtbl.add fd_table fd (Buffer.create 0) in
+  let unreg_fd fd =
+    let buf = Hashtbl.find fd_table fd in
+    Hashtbl.remove fd_table fd; buf in
+  let fd_buf fd = Hashtbl.find fd_table fd in
+  let append_buf fd chunk len =
+    let buf = fd_buf fd in
+    if len <> 0 then Buffer.add_string buf chunk in
+
+  (* таблица процессов и связанных с ними файловых дескрипторов *)
+  let process_table = ((Hashtbl.create 0) : (process_id, process_fds) Hashtbl.t) in
+  let get_fds pid = Hashtbl.find process_table pid in
+  let reg_process (pid,fds) =
+    Hashtbl.add process_table pid fds;
+    reg_fd (fdout fds);
+    reg_fd (fderr fds) in
+  let unreg_process pid =
+    let (fdin,fdout,fderr) = get_fds pid in
+    Hashtbl.remove process_table pid;
+    let outputs = unreg_fd fdout in
+    let errors = unreg_fd fderr in
+    let status = Cmd.async_status pid in
+    Unix.close fdin; Unix.close fdout; Unix.close fderr;
+    (status, outputs, errors) in
+
+  let fd_pid = Hashtbl.fold
+		 (fun pid fds
+  
+  (* граф сборочных зависимостей ветви + интерфейсы к нему *)
+  let dg = Depgraph2.subtree_buildgraph top_pkg version in
+  let pkg_spec pkg = Depgraph2.pkg_spec dg pkg in
+  let unreg_pkg pkg = Depgraph2.unreg_pkg dg pkg in
+
+  (* таблица статусов обработки пакетов дерева сборочных зависимостей *)
+  let build_table = ((Hashtbl.create 0) : (spec, build_status) Hashtbl.t) in
+  let set_status pkg status =
+    let spec = pkg_spec pkg in
+    Hashtbl.add build_table spec status in
+  let get_status pkg =
+    let spec = pkg_spec pkg in
+    Hashtbl.find build_table spec in
+  
+  (* дополнительные функции *)
+  (* возвращает истину, если сборка всех пакетов завершена *)
+  let build_finished () =
+    Hashtbl.fold (fun pkgspec status finp ->
+		  let pkg_finp = match status with
+		    | Built _ | Failed _ -> true
+		    | Building _ | Waiting -> false in
+		  finp && pkg_finp)
+		 build_table true in
+  (* возвращает истину, если сборка ещё идёт *)
+  let build_in_process () = not (build_finished ()) in
+  (* возвращает список пакетов, которые можно начать собирать *)
+  let ready_to_start_pkgs () = Depgraph2.leaves dg in
+  (* возвращает список пакетов, находящихся в процессе сборки *)
+  let pkgs_that_are_building () =
+    Hashtbl.fold (fun spec status acc ->
+		  match status with
+		  | Building _ -> spec.pkgname :: acc
+		  | _ -> acc)
+		 build_table [] in
+
+  
+  (* ищет, какой пакет собирал pid *)
+  let pid_pkg pid =
+    let pkg =
+      Hashtbl.fold
+	(fun spec status result ->
+	 if result <> "" then result
+	 else match status with
+	      | Building pid_to_check ->
+		 if pid = pid_to_check then spec.pkgname else ""
+	      | _ -> "")
+	build_table "" in
+    if pkg <> "" then pkg else raise Not_found in
+  
+  (* запускает новую сборку, требует от sudo сохранения HOME (херня, да) *)
+  let start_build pkg =
+    if (get_status pkg) <> Waiting then
+      err ("package '"^pkg^"' does not need building");
+    try let version = (pkg_spec pkg).version in
+	let platform_str = string_of_platform platform in
+	let (pid,fds) = Cmd.async_command ("sudo bf2 buildpkg "^pkg^" "^version^" "^platform_str) in
+	reg_process (pid,fds);
+	set_status pkg (Building pid)
+    with Unix.Unix_error (err, func, arg) ->
+      warn (Output.string_of_string_list
+	      [("Unix error: "^(Unix.error_message err));
+	       ("Function: "^func); ("Argument: "^arg)]) in
+
+  (* завершает сборку *)
+  let finish_build pkg =
+    let rev = succ (pkg_spec pkg).revision in
+    match get_status pkg with
+    | Building pid ->
+       let (pstatus, outputs, errors) = unreg_process pid in
+       unreg_pkg pkg; (* удаление из графа *)
+       set_status pkg (Built rev);
+       (pstatus, outputs, errors)
+    | _ -> err ("package '"^pkg^"' is not building now!") in
+       
+  (* устанавливаем всем пакетам статус Waiting *)
+  List.iter (fun pkg -> set_status pkg Waiting) (Depgraph2.pkgs dg);
+
+  (* вычитывает содержимое пайпов из соответствующих файловых
+  дескрипторов в ассоциированные с ними буферы. кидает
+  Process_finished если процесс завершился *)
+  let select_timeout = 0.1 in
+  let chunk_size = 4 * int_of_float(2.**8.) in
+  let chunk = Bytes.create 0 in
+
+  let read_fd_to_end fd =
+    let n = ref 0 in
+    n := Unix.read fd chunk 0 chunk_size;
+    while !n <> 0 do
+      append_buf fd chunk;
+      n := Unix.read fd chunk 0 chunk_size
+    done in
+
+  let ipc () =
+    (*pkgs_that_are_building ()*)
+
+    List.iter
+      (fun pkg ->
+       let status = get_status pkg in
+       match status with
+       | Building pid ->
+	  begin
+	    let (infd, outfd, errfd) = get_fds pid in
+	    let ready_fds = Unix.select [outfd; errfd] [] [] select_timeout in
+	    let output_finished_p = ref false in
+	    let error_finishd_p = ref false in
+	    (* считываем кусок для outfd *)
+	    let n = Unix.read outfd chunk 0 chunk_size in
+	    if n = 0 then output_finished_p := true
+	    else append_buf outfd chunk n;
+	    (* считываем кусок для errfd *)
+	    let n = Unix.read errfd chunk 0 chunk_size in
+	    if n = 0 then error_finishd_p := true
+	    else append_buf errfd chunk n;
+	    (* если один дескриптор дочитан, дочитываем и второй *)
+	    match !output_finished_p, !error_finishd_p with
+	    | false,false  | true, true -> ()
+	    | true,false -> read_fd_to_end errfd; raise (Process_finished pid)
+	    | false, true -> read_fd_to_end outfd; raise (Process_finished pid)
+	  end
+       | _ -> ())
+      (pkgs_that_are_building ()) in
+
+    
+  
+  
+
+  let rec build_loop () =
+    if build_in_process () then
+      try
+	List.iter start_build (ready_to_start_pkgs ());
+      with
+      | Process_finished pid ->
+	 let pkg = pid_pkg pid in
+       *)
+
+      

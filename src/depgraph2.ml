@@ -28,7 +28,13 @@ let create () =
 		  
 let graph dg = dg.graph
 let spectable dg = dg.spectable
-
+let copy_spectable dg = Hashtbl.copy (spectable dg)
+let copy dg =
+  {
+    graph = Ldigraph.copy (graph dg);
+    spectable = copy_spectable dg;
+  }
+				     
 let pkgs dg = Ldigraph.vertices (graph dg)
 let deps dg = Ldigraph.edges (graph dg)
 let depinfo dg dep =
@@ -79,11 +85,6 @@ let roots dg = Ldigraph.roots (graph dg)
 let leaves dg = Ldigraph.leaves (graph dg)
 let dep_head = Ldigraph.edge_head
 let dep_tail = Ldigraph.edge_tail
-
-
-
-
-
 
 (*		 
 let upd_pkg dg spec =

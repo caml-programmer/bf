@@ -1,4 +1,4 @@
-<*.ml> : package(unix,yojson)
+<*.ml> : package(unix,yojson,shell)
 <bf2.ml> : package(cmdliner)
-<bf.native> : package(unix,num,str,yojson)
-<bf2.native> : package(cmdliner,str,unix,yojson,num)
+<bf.native> : package(unix,num,str,yojson,shell)
+<bf2.native> : package(cmdliner,str,unix,yojson,num,shell)
