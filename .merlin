@@ -13,3 +13,5 @@ B _build/plugins
 B _build/ocs
 
 PKG cmdliner
+PKG bytes
+PKG shell

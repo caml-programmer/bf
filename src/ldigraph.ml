@@ -40,7 +40,14 @@ let create () =
 let vertices g = g.vertices
 let edges g = g.edges
 let weights g = g.weights
-		
+
+let copy g =
+  {
+    vertices = vertices g;
+    edges = edges g;
+    weights = Hashtbl.copy (weights g)
+  }
+		  
 let has_vertex g v =  List.mem v g.vertices
 let has_edge g e = List.mem e g.edges
 let has_weight g e = Hashtbl.mem g.weights e
