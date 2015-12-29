@@ -27,7 +27,7 @@ type platform =
   | Solaris9
   | Solaris10
   | Debian
-  | Astra
+  | Astra1_4
   | Gentoo
   | Unknown_linux
 
@@ -49,7 +49,7 @@ let os_of_platform = function
   | Cent7          -> Linux
   | Fedora10       -> Linux
   | Alt            -> Linux
-  | Astra          -> Linux
+  | Astra1_4       -> Linux
   | Arch           -> Linux
   | Debian         -> Linux
   | Gentoo         -> Linux
@@ -75,7 +75,7 @@ let engine_of_platform = function
   | Solaris9  -> Pkg_trans
   | Solaris10 -> Pkg_trans
   | Debian    -> Deb_pkg
-  | Astra     -> Deb_pkg
+  | Astra1_4  -> Deb_pkg
   | Gentoo | Unknown_linux
       -> raise Pkg_engine_not_found
 
@@ -96,7 +96,7 @@ let string_of_platform = function
   | Solaris9  -> "sol9"
   | Solaris10 -> "sol10"
   | Debian    -> "deb"
-  | Astra     -> "deb"
+  | Astra1_4  -> "astra1_4"
   | Gentoo    -> "gentoo"
   | Unknown_linux -> "linux"
 
@@ -117,7 +117,7 @@ let platform_of_string = function
   | "sol9"  -> Solaris9
   | "sol10" -> Solaris10
   | "deb"   -> Debian
-  | "deb"   -> Astra
+  | "astra1_4" -> Astra1_4
   | "gentoo" -> Gentoo
   | "linux" -> Unknown_linux
   |  s -> log_error (sprintf "Unsupported platform (%s)" s)
@@ -153,7 +153,7 @@ let linux_platform_mapping =
     "/etc/arch-release", ["^.*",Arch];
     "/etc/debian_version",
     [
-        "^SE?1.4*(smolensk)",Astra14
+        "^SE.*?1.4.*(smolensk)",Astra1_4
     ];
     "/etc/gentoo-release",["^.*",Gentoo];
 
