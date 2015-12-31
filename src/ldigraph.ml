@@ -152,3 +152,8 @@ let rec union = function
        weights = Hashtbl.union (List.map weights graphs);
      }
 				  
+let filter f g =
+  let g = copy g in
+  List.iter (fun v -> if not (f v) then del_vertex g v)
+	    (vertices g);
+  g

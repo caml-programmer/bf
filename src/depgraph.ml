@@ -303,6 +303,10 @@ let union (depgraphs:depgraph list)= match depgraphs with
      Hashtbl.union_to (List.map spectable depgraphs) (spectable depgraph);
      depgraph
 
+let filter (depgraphs:depgraph list) =
+  
+    
+       
 let subtree_buildgraph package version =
   let depgraph = of_pkg package version None in
   let depgraphs = Hashtbl.fold (fun pkgname spec acc ->

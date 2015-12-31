@@ -267,6 +267,46 @@ let git_tag_list () =
     read_lines ~env "git tag -l"
   with System.Error s -> log_error s
 
+(* возвращает список тегов, в котором есть слово word *)
+let git_tag_lookup word =
+  try read_lines ~env ("git tag -l '*"^word^"*'")
+  with System.Error s -> log_error s
+
+(* возвращает время, когда был поставлен тег *)
+let git_tag_timestamp tag =
+  try (match read_lines ~env ("git log -1 --format=\"%at\" "^tag) with
+       | [] -> failwith "git log has failed"
+       | time :: _ -> int_of_string time)
+  with System.Error s -> log_error s
+
+(* ищет последний по времени тэг, в котором есть word *)
+let git_tag_lookup_last word =
+  let tags = git_tag_lookup word in
+  if tags = [] then raise Not_found;
+  let rec find maxtime maxtag = function
+    | [] -> maxtag
+    | tag :: tags ->
+       let time = git_tag_timestamp tag in
+       if maxtime > time then
+	 find maxtime maxtag tags
+       else
+	 find time tag tags in
+  find 0 "" tags
+
+(* возвращает коммит тэга *)
+let git_tag_commit tag =
+  try (match read_lines ~env ("git rev-list -1 "^tag) with
+       | commit :: _ -> commit
+       | [] -> failwith "Tag not found?")
+  with System.Error s -> log_error s
+
+(* возвращает хэш последнего коммита *)
+let git_last_commit () =
+  try (match read_lines ~env ("git log -1 --format=%H") with
+       | commit :: _ -> commit
+       | [] -> failwith "Impossible?")
+  with System.Error s -> log_error s
+				   
 let git_key_list () =
   (git_branch ()) @ (git_branch ~remote:true ()) @ (git_tag_list ())
 
@@ -354,5 +394,4 @@ let check_component_url url name =
       ignore(input_line ch);
     done; check ()
   with End_of_file -> check ())
-
 

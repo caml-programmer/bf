@@ -29,7 +29,7 @@ let rec mtime file =
   (lstat file).st_mtime
 
 (*let mtime file = (stat file).st_mtime*)
-				 
+
 let scan dir =
   let state = create_state () in
   let reg = reg_fstate state in
@@ -38,7 +38,10 @@ let scan dir =
     List.iter (fun file ->
 	       let mtime = mtime file in
 	       if System.is_directory file then
-		 (reg file (Dir,mtime); scan file)
+		 begin
+		   if not (List.mem file ["/proc"; "/sys";]) then
+		     (reg file (Dir,mtime); scan file)
+		 end
 	       else
 		 (reg file (File,mtime)))
 	      files in
@@ -51,27 +54,31 @@ let changes (st1:fs_state) (st2:fs_state) =
 	     let fst2 = get_fstate st2 file in
 	     if has_file st1 file then
 	       let fst1 = get_fstate st1 file in
-	       (*
+	       
 	       let t_fst1 = get_ftype fst1 in
 	       let t_fst2 = get_ftype fst2 in
 	       let mt_fst1 = get_mtime fst1 in
 	       let mt_fst2 = get_mtime fst2 in
-		*)
+		
 	       if not (((get_ftype fst1) = (get_ftype fst2))) then
-		 ((*print_endline (file^" :: type "^(tts t_fst1)^" -> "^(tts t_fst2));*)
-		   (* а может тут error кидать, а? это ж хрень какая-то *)
+		 (print_endline (file^" :: type "^(tts t_fst1)^" -> "^(tts t_fst2));
+		  (* а может тут error кидать, а? это ж хрень какая-то *)
 		  reg file (get_fstate st2 file))
 	       else
 		 if not ((get_mtime fst1) = (get_mtime fst2)) then
-		   ((*print_endline (file^" :: time "^(mtts mt_fst1)^" -> "^(mtts mt_fst2));*)
+		   (print_endline (file^" :: time "^(mtts mt_fst1)^" -> "^(mtts mt_fst2));
 		    reg file (get_fstate st2 file))
 		 else ()
 	     else
-	       ((*print_endline (file^" :: new file");*)
-		reg file (get_fstate st2 file)))
+	       (match get_ftype fst2 with
+		| File -> print_endline (file^" :: new file");
+			  reg file (get_fstate st2 file)
+		| Dir -> print_endline (file^" :: new dir");
+			 reg file (get_fstate st2 file)
+	       ))
 	    (files st2);
   state
-    
+
 let gen_bflist_content (st:fs_state) =
   Output.string_of_string_list
     (List.map (fun file ->

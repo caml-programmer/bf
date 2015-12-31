@@ -185,6 +185,10 @@ let reread_params () =
   (* этот параметр указывает на версию bf, которая в данный момент
   используется *)
   set_param ~default:"1" "bf-version";
+  (* префикс тэга (сам тэг имеет вид: [prefix][pkg]/[ver]-[rev] *)
+  set_param ~default:"" "tag-prefix";
+  (* директория с компонентами *)
+  set_param ~default:"." "components-dir";
   ()
   
 

@@ -27,7 +27,7 @@ let string_of_string_list ?(separator="\n") strings =
 
 let join_with_spaces = string_of_string_list ~separator:" "
 
-let surrount_dquotes x = "\"" ^ x "\""
+let surrount_dquotes x = "\"" ^ x ^ "\""
 					     
 let prefix_textblock prefix string =
   let strings = string_list_of_string string in
