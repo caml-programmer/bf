@@ -27,6 +27,7 @@ type platform =
   | Solaris9
   | Solaris10
   | Debian
+  | Astra1_4
   | Gentoo
   | Unknown_linux
 
@@ -48,13 +49,14 @@ let os_of_platform = function
   | Cent7          -> Linux
   | Fedora10       -> Linux
   | Alt            -> Linux
+  | Astra1_4       -> Linux
   | Arch           -> Linux
   | Debian         -> Linux
   | Gentoo         -> Linux
   | Unknown_linux  -> Linux
   | Solaris8       -> SunOS
   | Solaris9       -> SunOS
-  | Solaris10      -> SunOS    
+  | Solaris10      -> SunOS
 
 let engine_of_platform = function
   | Rhel3     -> Rpm_build
@@ -73,6 +75,7 @@ let engine_of_platform = function
   | Solaris9  -> Pkg_trans
   | Solaris10 -> Pkg_trans
   | Debian    -> Deb_pkg
+  | Astra1_4  -> Deb_pkg
   | Gentoo | Unknown_linux
       -> raise Pkg_engine_not_found
 
@@ -93,6 +96,7 @@ let string_of_platform = function
   | Solaris9  -> "sol9"
   | Solaris10 -> "sol10"
   | Debian    -> "deb"
+  | Astra1_4  -> "astra1_4"
   | Gentoo    -> "gentoo"
   | Unknown_linux -> "linux"
 
@@ -113,6 +117,7 @@ let platform_of_string = function
   | "sol9"  -> Solaris9
   | "sol10" -> Solaris10
   | "deb"   -> Debian
+  | "astra1_4" -> Astra1_4
   | "gentoo" -> Gentoo
   | "linux" -> Unknown_linux
   |  s -> log_error (sprintf "Unsupported platform (%s)" s)
@@ -126,7 +131,7 @@ let string_of_os = function
   | Linux -> "linux"
   | SunOS -> "sunos"
   | _ -> Output.err "Platform.string_of_os" "Unknown OS"
-		   
+
 let os_as_string = System.uname
 
 let os () =
@@ -146,48 +151,52 @@ let linux_platform_mapping =
       "^ALT Linux",Alt
     ];
     "/etc/arch-release", ["^.*",Arch];
-    "/etc/debian_version",["^.*",Debian];
+    "/etc/debian_version",
+    [
+        "^SE.*?1.4.*(smolensk)",Astra1_4
+    ];
     "/etc/gentoo-release",["^.*",Gentoo];
+
   ]
 
 let rec select_platforms acc = function
   | [] -> acc
   | (file,mapping)::tl ->
       if Sys.file_exists file then
-	begin
-	  let s = System.read_file ~file in
-	  let l = 
-	    List.filter
-	      (fun (pat,_) -> Pcre.pmatch ~rex:(Pcre.regexp pat) s) mapping in
-	  (match l with
-	    | (_,platform)::_ -> 
-		select_platforms (acc @ [platform]) tl
-	    | _ -> 
-		select_platforms acc tl)
-	end
+    begin
+      let s = System.read_file ~file in
+      let l =
+        List.filter
+          (fun (pat,_) -> Pcre.pmatch ~rex:(Pcre.regexp pat) s) mapping in
+      (match l with
+        | (_,platform)::_ ->
+        select_platforms (acc @ [platform]) tl
+        | _ ->
+        select_platforms acc tl)
+    end
       else select_platforms acc tl
 
 let current () =
   match select_platforms [] linux_platform_mapping with
   | [] -> Unknown_linux
   | p::_ -> p
-			    
+
 let sunos_platfrom () =
   match System.uname ~flag:'r' () with
     | "5.8"  -> Solaris8
     | "5.9"  -> Solaris9
     | "5.10" -> Solaris10
-    |  s     ->	log_error (sprintf "Unsupported SunOS (%s)" s)
+    |  s     -> log_error (sprintf "Unsupported SunOS (%s)" s)
 
 let with_platform (f : os -> platform -> 'a) =
   let os = os () in
   match os with
     | Linux ->
-	let platform =
-	  (match select_platforms [] linux_platform_mapping with
-	    | [] -> Unknown_linux
-	    | p::_ -> p)
-	in f os platform
+    let platform =
+      (match select_platforms [] linux_platform_mapping with
+        | [] -> Unknown_linux
+        | p::_ -> p)
+    in f os platform
     | SunOS ->
-	f os (sunos_platfrom ())
+    f os (sunos_platfrom ())
 
