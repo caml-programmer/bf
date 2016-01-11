@@ -227,7 +227,17 @@ let union (depgraphs:depgraph list) = match depgraphs with
        spectable = Hashtbl.union (List.map spectable dgs);
      }
 
-let subtree_buildgraph pkg ver =
+(* f: pkg_name -> bool *)
+let filter f dg =
+  let dg = copy dg in
+  let graph = Ldigraph.filter f (graph dg) in
+  let spectable = Hashtbl.filter_keys (spectable dg) f in
+  {
+    graph = graph;
+    spectable = spectable;
+  }
+       
+let subtree_buildgraph ?(local_only=false) pkg ver =
   let dg = of_pkg pkg ver in
   (* удаляем из графа все зависимости, кроме last *)
   List.iter (fun dep ->
@@ -244,4 +254,7 @@ let subtree_buildgraph pkg ver =
 		     pkgvers in
 
   (* объединяем исходный граф с остальными сборочными *)
-  union (dg :: dgs)
+  let dg = union (dg :: dgs) in
+  if not local_only then dg
+  else filter Pkg.is_local dg
+						  

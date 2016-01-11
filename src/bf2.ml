@@ -209,14 +209,42 @@ let buildpkg_cmd =
   let platform =
     Arg.(required & pos 2 (some string) None & info [] ~docv:"PLATFORM") in
 
-  Term.(pure (fun (*copts*) pkgname version platform ->
+  Term.(pure (fun copts pkgname version platform ->
 	      let platform = Platform.platform_of_string platform in
 	      let os = Platform.os_of_platform platform in
 	      let pkgspec = Spectype.newload ~os ~platform pkgname version in
+	      parse_copts copts;
 	      Chroot.buildpkg ~os ~platform pkgspec)
-	(*$ copts_t*) $ pkgname $ version $ platform),
+	$ copts_t $ pkgname $ version $ platform),
   Term.info "buildpkg" ~doc ~man;;
 regcmd buildpkg_cmd
+
+(* build-subtree *)
+let build_subtree_cmd =
+  let doc = "Build package and all its run-time dependencies.\n"^
+	      "The graph of these-dependencies could be viewed by\n"^
+		"draw-subtree-buildgraph subcommand" in
+  let man = help_secs in
+
+  let pkgname =
+    Arg.(required & pos 0 (some string) None & info [] ~docv:"PKGNAME") in
+  let version =
+    Arg.(required & pos 1 (some string) None & info [] ~docv:"VERSION") in
+  let platform =
+    Arg.(required & pos 2 (some string) None & info [] ~docv:"PLATFORM") in
+  let threads =
+    let doc = "Build with NUM threads" in
+    Arg.(value & opt int 6 & info ["j"; "threads"] ~docv:"NUM" ~doc) in
+
+  Term.(pure (fun copts threads pkgname version platform ->
+	      let platform = Platform.platform_of_string platform in
+	      let os = Platform.os_of_platform platform in
+	      let pkgspec = Spectype.newload ~os ~platform pkgname version in
+	      parse_copts copts;
+	      Chroot.build_subtree ~threads ~os ~platform pkgspec)
+	$ copts_t $ threads $ pkgname $ version $ platform),
+  Term.info "build-subtree" ~doc ~man;;
+regcmd build_subtree_cmd
 
 (* packpkg *)
 

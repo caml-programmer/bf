@@ -243,17 +243,6 @@ let build_component chroot_name component_name rules =
      Params.update_param "dev-dir" dev_dir;
      Cmd.mkdir_if_not_exists dev_dir;
 
-     (* build *)
-     msg "always" ("switch to component path: "^project_path);
-     let start_time = Unix.gettimeofday () in
-     msg "always" ("build "^component_name^" started");
-     Rules.build_rules rules;
-     msg "always" ("build "^component_name^" has been finished");
-     Rules.fill_bf_build ?rules start_time;
-
-     (* install *)
-     msg "always" ("install "^component_name^" started");
-     let start_time = Unix.gettimeofday () in
      let top_dir = Params.get_param "top-dir" in
      let dest_dir = Params.get_param "dest-dir" in
      let install_dir = Params.make_install_dir () in
@@ -267,6 +256,19 @@ let build_component chroot_name component_name rules =
      print_endline ("DEV-DIR: "^dev_dir);
      print_endline ("INS-DIR: "^install_dir);
      print_endline ("PROJECT: "^projects_relative_path);
+     
+     (* build *)
+     msg "always" ("switch to component path: "^project_path);
+     let start_time = Unix.gettimeofday () in
+     msg "always" ("build "^component_name^" started");
+     Rules.build_rules rules;
+     msg "always" ("build "^component_name^" has been finished");
+     Rules.fill_bf_build ?rules start_time;
+
+     (* install *)
+     msg "always" ("install "^component_name^" started");
+     let start_time = Unix.gettimeofday () in
+
      
      let oldstate = Chroot_scanner.filter
 		      (fun path -> not (String.have_prefix projects_relative_path path))
@@ -282,9 +284,20 @@ let build_component chroot_name component_name rules =
 
      Params.update_param "top-dir" top_dir;
      Params.update_param "dev-dir" dev_dir_orig;
-     
+
+
      let changes = Chroot_scanner.changes oldstate newstate in
 
+(*     print_endline "\nOLDSTATE\n";
+     List.iter (fun file -> if String.have_prefix "/opt/dev" file then
+			      print_endline file)
+	       (Chroot_scanner.files oldstate);
+
+     print_endline "\nNEWSTATE\n";
+     List.iter (fun file -> if String.have_prefix "/opt/dev" file then
+			      print_endline file)
+	       (Chroot_scanner.files newstate); *)
+     
      print_endline "\nCHANGES\n";
      List.iter print_endline (Chroot_scanner.files changes);
      
@@ -550,7 +563,12 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
      (match pkgspec.post_install with
       | None -> ()
       | Some post ->
-	 print_endline "%post";
+	 print_endline "%post -p /bin/bash";
+	 let files = Hashtbl.keys bf_files in
+	 let qfiles = List.map Output.surrount_dquotes files in
+	 let qfiles_str = Output.string_of_string_list qfiles in
+	 print_endline ("BF_VERSION=2");
+	 print_endline ("FILES=("^qfiles_str^")");
 	 print_endline post);
      (match pkgspec.pre_uninstall with
       | None -> ()
@@ -601,6 +619,7 @@ let buildpkg ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgspec =
   let msg = Output.msg "Chroot.buildpkg" in
   let pkgname = pkgspec.pkgname in
   let version = pkgspec.version in
+  let pack_param = Params.get "pack" in
 
   (* надо загрузить конфигурацию чрута *)
   let chroot = load_chroot_cfg pkgspec.chroot platform in
@@ -622,7 +641,7 @@ let buildpkg ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgspec =
   
   msg "always" "Clone components into chroot...";
   List.iter (fun component -> ignore (clone_component chroot_name component))
-	    spec.components;
+	    (List.filter (fun (comp:component) -> comp.name <> pack_param) spec.components);
 
   msg "always" "Install build dependencies... ";
   depinstall ~os ~platform chroot_name pkgspec;
@@ -679,20 +698,23 @@ type job_desc =
 
 type instance = Shell_sys.job_instance
 
-type build_state = Build_success | Build_failure
+type build_state = Build_success | Build_failure | Build_run | Build_wait | Build_not_needed
       
-let build_subtree ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgspec =
+let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgspec =
   let msg = Output.msg "build_subtree" in
   let err = Output.err "build_subtree" in
-  let warn = Output.warn "build_subtree" in
+  (*let warn = Output.warn "build_subtree" in*)
 
+  msg "always" ("THREADS: "^(string_of_int threads));
+  
   let top_pkg = pkgspec.pkgname in
   let version = pkgspec.version in
 
   (* граф сборочных зависимостей ветви + интерфейсы к нему *)
-  let dg = Depgraph2.subtree_buildgraph top_pkg version in
+  let dg = Depgraph2.subtree_buildgraph ~local_only:true top_pkg version in
   let unreg_pkg pkg = Depgraph2.unreg_pkg dg pkg in
 
+  let pkgs = Depgraph2.pkgs dg in
   let specs = Depgraph2.copy_spectable dg in
   let jobs = ((Hashtbl.create 0) : (pkg_name,job_desc) Hashtbl.t) in
   let instances = ((Hashtbl.create 0) : (pkg_name,instance) Hashtbl.t) in
@@ -701,13 +723,25 @@ let build_subtree ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgspec =
   let pkg_spec pkg = Hashtbl.find specs pkg in
   let pkg_jdesc pkg = Hashtbl.find jobs pkg in
 
+  (* функции для работы со статусом пакета *)
   let get_status pkg = Hashtbl.find status pkg in
   let build_ok pkg = (get_status pkg) = Build_success in
   let build_err pkg = (get_status pkg) = Build_failure in
+  let build_not_needed pkg = (get_status pkg) = Build_not_needed in
+  let build_wait pkg = (get_status pkg) = Build_wait in
   let set_status pkg st = Hashtbl.add status pkg st in
   let set_ok pkg = set_status pkg Build_success in
   let set_err pkg = set_status pkg Build_failure in
-  
+  let set_wait pkg = set_status pkg Build_wait in
+  let set_run pkg = set_status pkg Build_run in
+  let set_not_needed pkg = set_status pkg Build_not_needed in
+
+  (* функции для работы с экземпляром сборочного процесса *)
+  let pkg_inst pkg = Hashtbl.find instances pkg in
+  let reg_inst pkg inst = Hashtbl.add instances pkg inst in
+  let unreg_inst pkg = Hashtbl.remove instances pkg in
+
+  (* создание команды для запуска сборочного процесса *)
   let new_job pkg =
     let spec = pkg_spec pkg in
     let ver = spec.version in
@@ -725,222 +759,140 @@ let build_subtree ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgspec =
 				   [command] in
     let job = {out = outbuf; err = errbuf; job = job} in
     Hashtbl.add jobs pkg job in
-
-  let start_job pkg =
+  
+  (* начать сборку *)
+  let start_build pkg =
+    msg "always" ("Start building of '"^pkg^"'");
     let jdesc = pkg_jdesc pkg in
     let job = jdesc.job in
-    let inst = Shell_sys.call_job ~forward_signals:true job in
-    Hashtbl.add instances pkg inst in
+    let inst = Shell_sys.run_job job in
+    set_run pkg; reg_inst pkg inst in
 
-  let stop_job pkg =
-    let inst = Hashtbl.find instances pkg in
+  (* Хрень собачья: Shell_sys не меняет статус, пока не сделаешь
+   * finish_job, который, сука, блокирует выполнению текущего треда.
+   * Нужна консультация людей, которые писали Ocamlnet.
+   * Ну, по крайней мере я хотя бы могу одновременно собирать листья. *)
+  let wait_build pkg =
+    msg "always" ("Waiting build process of '"^pkg^"'");
+    Shell_sys.finish_job (pkg_inst pkg) in
+
+  (* завершить сборку *)
+  let rec stop_build pkg =
+    let inst = pkg_inst pkg in
     let status = Shell_sys.job_status inst in
-    match status with
-    | Shell_sys.Job_ok ->
-       msg "always" ("Build success: "^pkg);
-       Hashtbl.remove instances pkg;
-       unreg_pkg pkg;
-       set_ok pkg
-    | Shell_sys.Job_error ->
-       msg "always" ("Build failure: "^pkg);
-       Hashtbl.remove instances pkg;
-       unreg_pkg pkg;
-       set_err pkg
-    | _ -> err ("") in
-  
-  
-  ()
-		
-    
-    
-  
-(*
-type process_fds = (Unix.file_descr * Unix.file_descr * Unix.file_descr)
-let fdin ((fd, _, _) : process_fds) = fd
-let fdout ((_, fd, _) : process_fds) = fd
-let fderr ((_, _, fd) : process_fds) = fd
-		     
-type process_id = int
-type build_status = Built of pkg_rev | (* собрано с ревизией *)
-		    Building of process_id | (* в процессе сборки *)
-		    Failed of Unix.process_status | (* сборка провалилась *)
-		    Waiting (* ожидает сборки *)
+    (match status with
+     | Shell_sys.Job_ok ->
+	msg "always" ("Build success: "^pkg);
+	unreg_inst pkg; unreg_pkg pkg; set_ok pkg
+     | Shell_sys.Job_error ->
+	msg "always" ("Build failure: "^pkg);
+	unreg_inst pkg; unreg_pkg pkg; set_err pkg
+     | _ -> err (""));
+    (* если завершена сборка пакета, то завершена и сборка его -dev версии *)
+    let devpkg = pkg^"-dev" in
+    if List.mem devpkg pkgs then
+      (match status with
+       | Shell_sys.Job_ok ->
+	  msg "always" ("Build success: "^devpkg);
+	  unreg_pkg devpkg; set_ok devpkg
+       | Shell_sys.Job_error ->
+	  msg "always" ("Build failure: "^devpkg);
+	  unreg_pkg devpkg; set_err devpkg
+       | _ -> err ("")) in
 
-exception Process_finished of process_id
-exception Found
-				
-let build_subtree ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgspec =
-  let msg = Output.msg "build_subtree" in
-  let err = Output.err "build_subtree" in
-  let warn = Output.warn "build_subtree" in
+  (* проверить, завершена ли сборка всех пакетов *)
+  let all_builds_finished () =
+    List.fold_left (fun finp pkg ->
+		    finp && (match (get_status pkg) with
+			     | Build_success | Build_failure -> true
+			     | _ -> false))
+		   true pkgs in
 
-  let top_pkg = pkgspec.pkgname in
-  let version = pkgspec.version in
+  (* список пакетов, которые можно стартовать *)
+  let ready_to_start_pkgs () =
+    List.filter build_wait (Depgraph2.leaves dg) in
 
-  (* таблица буферов считывания из файловых дескрипторов *)
-  let fd_table = ((Hashtbl.create 0) : (Unix.file_descr, Buffer.t) Hashtbl.t) in
-  let reg_fd fd =
-    Hashtbl.add fd_table fd (Buffer.create 0) in
-  let unreg_fd fd =
-    let buf = Hashtbl.find fd_table fd in
-    Hashtbl.remove fd_table fd; buf in
-  let fd_buf fd = Hashtbl.find fd_table fd in
-  let append_buf fd chunk len =
-    let buf = fd_buf fd in
-    if len <> 0 then Buffer.add_string buf chunk in
+  (* список собранных пакетов *)
+  let built_pkgs () =
+    List.filter (fun pkg -> (build_ok pkg) || (build_err pkg) || (build_not_needed pkg))
+		pkgs in
 
-  (* таблица процессов и связанных с ними файловых дескрипторов *)
-  let process_table = ((Hashtbl.create 0) : (process_id, process_fds) Hashtbl.t) in
-  let get_fds pid = Hashtbl.find process_table pid in
-  let reg_process (pid,fds) =
-    Hashtbl.add process_table pid fds;
-    reg_fd (fdout fds);
-    reg_fd (fderr fds) in
-  let unreg_process pid =
-    let (fdin,fdout,fderr) = get_fds pid in
-    Hashtbl.remove process_table pid;
-    let outputs = unreg_fd fdout in
-    let errors = unreg_fd fderr in
-    let status = Cmd.async_status pid in
-    Unix.close fdin; Unix.close fdout; Unix.close fderr;
-    (status, outputs, errors) in
-
-  let fd_pid = Hashtbl.fold
-		 (fun pid fds
-  
-  (* граф сборочных зависимостей ветви + интерфейсы к нему *)
-  let dg = Depgraph2.subtree_buildgraph top_pkg version in
-  let pkg_spec pkg = Depgraph2.pkg_spec dg pkg in
-  let unreg_pkg pkg = Depgraph2.unreg_pkg dg pkg in
-
-  (* таблица статусов обработки пакетов дерева сборочных зависимостей *)
-  let build_table = ((Hashtbl.create 0) : (spec, build_status) Hashtbl.t) in
-  let set_status pkg status =
-    let spec = pkg_spec pkg in
-    Hashtbl.add build_table spec status in
-  let get_status pkg =
-    let spec = pkg_spec pkg in
-    Hashtbl.find build_table spec in
-  
-  (* дополнительные функции *)
-  (* возвращает истину, если сборка всех пакетов завершена *)
-  let build_finished () =
-    Hashtbl.fold (fun pkgspec status finp ->
-		  let pkg_finp = match status with
-		    | Built _ | Failed _ -> true
-		    | Building _ | Waiting -> false in
-		  finp && pkg_finp)
-		 build_table true in
-  (* возвращает истину, если сборка ещё идёт *)
-  let build_in_process () = not (build_finished ()) in
-  (* возвращает список пакетов, которые можно начать собирать *)
-  let ready_to_start_pkgs () = Depgraph2.leaves dg in
-  (* возвращает список пакетов, находящихся в процессе сборки *)
-  let pkgs_that_are_building () =
-    Hashtbl.fold (fun spec status acc ->
-		  match status with
-		  | Building _ -> spec.pkgname :: acc
+  (* список пакетов, сборка которых завершена, для которых надо вызвать stop_build *)
+  let finished_instances () =
+    Hashtbl.fold (fun pkg inst acc ->
+		  match Shell_sys.job_status inst with
+		  | Shell_sys.Job_running -> acc
+		  | Shell_sys.Job_ok | Shell_sys.Job_error -> pkg :: acc
 		  | _ -> acc)
-		 build_table [] in
+		 instances [] in
 
+  (* вывод на stdout содержимого буферов соответсвующих сборочных команд *)
+  let print_inst_outputs pkg =
+    let jd = pkg_jdesc pkg in
+    msg "always" (Output.prefix_textblock "OUT: " (Buffer.contents jd.out));
+    msg "always" (Output.prefix_textblock "ERR: " (Buffer.contents jd.err));
+    List.iter Buffer.clear [jd.out; jd.err] in
+
+  (* -------------------- НАЧАЛО ИМПЕРАТИВА ТУТ -------------------- *)
+
+  (* заполняем таблицу jobs командами для сборки *)
+  List.iter new_job pkgs;
+  (* выставляем всем пакетам статус wait *)
+  List.iter set_wait pkgs;
+  (* определяем список пакетов, в которых есть изменения и удаляем из графа остальные *)
+  List.iter (fun pkg ->
+	     let spec = pkg_spec pkg in
+	     let comps = Package.components_need_to_rebuild spec in
+	     match comps with
+	     | [] -> (* удаляем пакеты, которые не нужно пересобирать *)
+		unreg_pkg pkg;
+		set_not_needed pkg
+	     | _ -> ())
+	    pkgs;
   
-  (* ищет, какой пакет собирал pid *)
-  let pid_pkg pid =
-    let pkg =
-      Hashtbl.fold
-	(fun spec status result ->
-	 if result <> "" then result
-	 else match status with
-	      | Building pid_to_check ->
-		 if pid = pid_to_check then spec.pkgname else ""
-	      | _ -> "")
-	build_table "" in
-    if pkg <> "" then pkg else raise Not_found in
-  
-  (* запускает новую сборку, требует от sudo сохранения HOME (херня, да) *)
-  let start_build pkg =
-    if (get_status pkg) <> Waiting then
-      err ("package '"^pkg^"' does not need building");
-    try let version = (pkg_spec pkg).version in
-	let platform_str = string_of_platform platform in
-	let (pid,fds) = Cmd.async_command ("sudo bf2 buildpkg "^pkg^" "^version^" "^platform_str) in
-	reg_process (pid,fds);
-	set_status pkg (Building pid)
-    with Unix.Unix_error (err, func, arg) ->
-      warn (Output.string_of_string_list
-	      [("Unix error: "^(Unix.error_message err));
-	       ("Function: "^func); ("Argument: "^arg)]) in
+  msg "always" "Start build process";
 
-  (* завершает сборку *)
-  let finish_build pkg =
-    let rev = succ (pkg_spec pkg).revision in
-    match get_status pkg with
-    | Building pid ->
-       let (pstatus, outputs, errors) = unreg_process pid in
-       unreg_pkg pkg; (* удаление из графа *)
-       set_status pkg (Built rev);
-       (pstatus, outputs, errors)
-    | _ -> err ("package '"^pkg^"' is not building now!") in
-       
-  (* устанавливаем всем пакетам статус Waiting *)
-  List.iter (fun pkg -> set_status pkg Waiting) (Depgraph2.pkgs dg);
+  let i = ref 1 in
+  (* сборка *)
+  while not (all_builds_finished ()) do
+    let fin_pkgs = finished_instances () in
+    List.iter stop_build fin_pkgs;
+    List.iter print_inst_outputs fin_pkgs;
+    let red_pkgs = ready_to_start_pkgs () in
+    (* не забываем, что -dev пакеты собираются в рамках процесса сборки обычных *)
+    let red_pkgs = List.remove_duplicates (List.map Pkg.chop_devel_suffix red_pkgs) in
+    let red_pkgs =
+      if (List.length red_pkgs) > threads then
+	List.get threads red_pkgs
+      else red_pkgs in
+    List.iter start_build red_pkgs;
+    List.iter wait_build red_pkgs; (* я жду, пока все листья соберутся, это отстой *)
+    msg "always" ((string_of_int !i)^": Wave competed!");
+    (*Unix.sleep 10;*)
+    i := succ !i;
+  done;
 
-  (* вычитывает содержимое пайпов из соответствующих файловых
-  дескрипторов в ассоциированные с ними буферы. кидает
-  Process_finished если процесс завершился *)
-  let select_timeout = 0.1 in
-  let chunk_size = 4 * int_of_float(2.**8.) in
-  let chunk = Bytes.create 0 in
-
-  let read_fd_to_end fd =
-    let n = ref 0 in
-    n := Unix.read fd chunk 0 chunk_size;
-    while !n <> 0 do
-      append_buf fd chunk;
-      n := Unix.read fd chunk 0 chunk_size
-    done in
-
-  let ipc () =
-    (*pkgs_that_are_building ()*)
-
-    List.iter
-      (fun pkg ->
-       let status = get_status pkg in
-       match status with
-       | Building pid ->
-	  begin
-	    let (infd, outfd, errfd) = get_fds pid in
-	    let ready_fds = Unix.select [outfd; errfd] [] [] select_timeout in
-	    let output_finished_p = ref false in
-	    let error_finishd_p = ref false in
-	    (* считываем кусок для outfd *)
-	    let n = Unix.read outfd chunk 0 chunk_size in
-	    if n = 0 then output_finished_p := true
-	    else append_buf outfd chunk n;
-	    (* считываем кусок для errfd *)
-	    let n = Unix.read errfd chunk 0 chunk_size in
-	    if n = 0 then error_finishd_p := true
-	    else append_buf errfd chunk n;
-	    (* если один дескриптор дочитан, дочитываем и второй *)
-	    match !output_finished_p, !error_finishd_p with
-	    | false,false  | true, true -> ()
-	    | true,false -> read_fd_to_end errfd; raise (Process_finished pid)
-	    | false, true -> read_fd_to_end outfd; raise (Process_finished pid)
-	  end
-       | _ -> ())
-      (pkgs_that_are_building ()) in
-
-    
-  
-  
-
-  let rec build_loop () =
-    if build_in_process () then
-      try
-	List.iter start_build (ready_to_start_pkgs ());
-      with
-      | Process_finished pid ->
-	 let pkg = pid_pkg pid in
-       *)
-
-      
+  (* пост-сборочные процессы *)
+  let bpkgs = built_pkgs () in
+  (* расстановка тегов *)
+  ();
+  (* вывод сообщения о сборке *)
+  msg "always" "--------------------------------------------------";
+  msg "always" "Built packages:";
+  List.iter (fun pkg ->
+	     if build_ok pkg then
+	       (let spec = pkg_spec pkg in
+		let version = spec.version in
+		let revision = string_of_int (succ spec.revision) in
+		msg "always" ("  "^pkg^"-"^version^"-"^revision)))
+	    bpkgs;
+  msg "always" "--------------------------------------------------";
+  msg "always" "Failed packages:";
+  List.iter (fun pkg ->
+	     if build_err pkg then
+	       (let spec = pkg_spec pkg in
+		let version = spec.version in
+		let revision = string_of_int (succ spec.revision) in
+		msg "always" ("  "^pkg^"-"^version^"-"^revision)))
+	    bpkgs;
+  ()

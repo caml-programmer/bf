@@ -3,9 +3,30 @@ open Component
 open Logger
 open Spectype
 
+(* возвращает список компонентов, которые нуждаются в пересборке *)
+(* сделать checkout на нужный тэг надо заранее *)
+let components_need_to_rebuild pkgspec =
+  let pkg = pkgspec.pkgname in
+  let version = pkgspec.version in
+  let tag_template = pkg^"/"^version in
+  List.fold_left
+    (fun acc component ->
+     let comp_path = Component.path component in
+     System.with_dir comp_path
+       (fun () ->
+	let last_commit = Git.git_last_commit () in
+	try let last_tag = Git.git_tag_lookup_last tag_template in
+	    let last_tag_commit = Git.git_tag_commit last_tag in
+	    if last_commit = last_tag_commit then
+	      acc
+	    else
+	      component :: acc
+	with Not_found -> component :: acc (* если тэг не найден, то пересобирать *)
+       ))
+    [] pkgspec.components
+
 let reinstalled_components = (* for update and upgrade actions *)
   Hashtbl.create 32;;
-
 
 exception Cannot_build_package of string
 

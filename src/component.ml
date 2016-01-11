@@ -672,4 +672,6 @@ let components_of_sval_array v =
   List.map component_of_sval (Array.to_list v)
 
 let path component =
-  Path.make [component.name]
+  let comps_path = Params.get "components-dir" in
+  Path.make [comps_path; component.name]
+
