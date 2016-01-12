@@ -497,6 +497,12 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		  (fun (pkgname, ov_opt, _) ->
 		    match ov_opt with
 		      | Some (op,ver) ->
+			  let ver =
+			    (* Убираем инфу об архитектуре из состава версии *)
+			    try
+			      let pos = String.rindex ver '.' in
+			      String.sub ver 0 pos
+			    with Not_found -> ver in
 			  (try
 			    let _ = String.index ver '-' in
 			    add (sprintf "%s (%s %s)" pkgname (string_of_pkg_op op) ver)
