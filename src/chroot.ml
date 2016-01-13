@@ -872,6 +872,8 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
     i := succ !i;
   done;
 
+  
+  
   (* пост-сборочные процессы *)
   let bpkgs = built_pkgs () in
   (* расстановка тегов *)

@@ -92,6 +92,6 @@ let draw_buildgraph pkgname version =
 
 (* subtree-buildgraph*)
 let draw_subtree_buildgraph pkgname version =
-  let depgraph = Depgraph2.subtree_buildgraph pkgname version in
+  let depgraph = Depgraph2.subtree_buildgraph ~local_only:true pkgname version in
   Depgraph2.draw ~local_only:true depgraph
 

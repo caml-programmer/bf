@@ -239,13 +239,17 @@ let filter f dg =
        
 let subtree_buildgraph ?(local_only=false) pkg ver =
   let dg = of_pkg pkg ver in
+  (* С чего я вообще решил, что их надо удалять? cassandra зависит от
+  libs, а те от init, но init собирается позже cassandra, потому что
+  нет зависимости
+
   (* удаляем из графа все зависимости, кроме last *)
   List.iter (fun dep ->
 	     match depinfo dg dep with
 	     | Some (Pkg_last, _) -> ()
 	     | _ -> unreg_dep dg dep)
 	    (deps dg);
-
+   *)
   (* строим графы сборочных зависимостей для всех пакетов dg *)
   let pkgvers = List.map (fun pkg -> (pkg, (pkg_spec dg pkg).version))
 			 (pkgs dg) in
@@ -255,6 +259,19 @@ let subtree_buildgraph ?(local_only=false) pkg ver =
 
   (* объединяем исходный граф с остальными сборочными *)
   let dg = union (dg :: dgs) in
-  if not local_only then dg
-  else filter Pkg.is_local dg
-						  
+  (* фильтруем по локальным пакетам, если надо *)
+  let dg = if not local_only then dg
+	   else filter Pkg.is_local dg in
+  (* выводим на экран список пакетов с версиями *)
+  print_endline "--- Package versions ---";
+  List.iter (fun pkg ->
+	     let spec = pkg_spec dg pkg in
+	     let pkg = spec.pkgname in
+	     let ver = spec.version in
+	     let rev = string_of_int spec.revision in
+	     print_endline (pkg^" "^ver^"-"^rev))
+	    (pkgs dg);
+
+  (* возвращаем полученный граф *)
+  dg
+	   
