@@ -96,7 +96,7 @@ let string_of_platform = function
   | Solaris9  -> "sol9"
   | Solaris10 -> "sol10"
   | Debian    -> "deb"
-  | Astra1_4  -> "astra1_4"
+  | Astra1_4  -> "astra14"
   | Gentoo    -> "gentoo"
   | Unknown_linux -> "linux"
 
@@ -117,7 +117,7 @@ let platform_of_string = function
   | "sol9"  -> Solaris9
   | "sol10" -> Solaris10
   | "deb"   -> Debian
-  | "astra1_4" -> Astra1_4
+  | "astra14" -> Astra1_4
   | "gentoo" -> Gentoo
   | "linux" -> Unknown_linux
   |  s -> log_error (sprintf "Unsupported platform (%s)" s)
