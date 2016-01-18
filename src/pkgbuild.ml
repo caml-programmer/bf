@@ -576,11 +576,17 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 	      List.iter make_deb_line custom_pkg_files;
 	      
 	      let write_script name content =
+		let rpm_install_prefix =
+		  (* Для совместимости с существующеми скриптами
+		     делаем установки переменной окружения
+		     RPM_INSTALL_PREFIX *)
+		  sprintf "RPM_INSTALL_PREFIX=%s\n" (Params.get_param "top-dir") in
 		let file =
 		  Filename.concat
 		    (Filename.concat abs_specdir "debian/DEBIAN") name in
 		System.write_string
-		  ~file ~string:(resolve_params find_value (sprintf "#!/bin/sh\n%s\n" content));
+		  ~file ~string:(resolve_params find_value 
+		    (sprintf "#!/bin/sh\n%s%s\n" rpm_install_prefix content));
 		Unix.chmod file 0o755
 	      in
 
