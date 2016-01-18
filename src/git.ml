@@ -69,6 +69,7 @@ let git_pull ?(force=false) ?refspec url =
 	let opts = if force then ["--force"] else [] in
 	log_command ~env "git" (["pull"] @ (Lazy.force no_edit) @ opts @ [url])
 
+(* Вообще говря, у всех реп есть url "по-умолчанию". Для его использования url="" *)
 let git_push ?(tags=false) ?refspec url =
   match refspec with
     | Some spec -> 
@@ -81,6 +82,7 @@ let git_push ?(tags=false) ?refspec url =
 let git_remote_update spec =
   log_command ~env "git" ["remote";"update";spec]
        
+(* ставит тэг в текущем репозитории *)
 let git_make_tag tag =
   let state = ref Tag_created in
   let error_handler ps =

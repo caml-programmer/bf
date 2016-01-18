@@ -5,7 +5,7 @@ open Component
 open Spectype
 open Ocs_types
 open Ext
-       
+
 type mount_point = {
     src : string;
     dst : string;
@@ -42,7 +42,7 @@ let mount_all_points chroot =
 let umount_all_points chroot =
   List.iter (fun point -> ignore (Cmd.root_command ~loglevel:"low" (umount_point_cmd chroot point)))
 	    chroot.mount
-		   
+
 let string_of_chroot chroot_spec =
   string_of_string_list
     [("Chroot name: "^chroot_spec.name);
@@ -413,6 +413,8 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
   let projects_relative_path = projects_path () in
   let projects_path = Path.make [chroot_path; projects_relative_path] in
 
+  let pack_param = Params.get "pack" in
+  
   let bf_files = Hashtbl.create 32 in
   let reg file ftype =
     let edit_param = match Hashtbl.mem bf_files file with
@@ -422,7 +424,8 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
   let filecount () = Hashtbl.length bf_files in
 
   let components = List.filter (fun c -> c.pkg = None && (not c.nopack)) pkgspec.components in
-
+  let components = List.filter (fun (comp:component) -> comp.name <> (Filename.basename pack_param))
+			       components in
   
   let pkgpack_dir = compose_pkgpack_dir pkgname in
 
@@ -440,7 +443,7 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
 			   ~platform None in
   
   (* генерируем список файлов *)
-  
+
   msg "always" ("Generating file "^file_rpmbuild_files);
   List.iter
     (fun (component : Component.component) ->
@@ -471,17 +474,35 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
     (fun ch -> Output.print_endline_to_channel ch rpmbuild_files);
 
   (* генерируем findreq -- скрипт, определяющий в rpmbuild список зависимостей *)
-  
+
   msg "always" ("Generating file "^file_rpmbuild_findreq);
   System.with_out file_rpmbuild_findreq
     (fun ch ->
      let print_endline = Output.print_endline_to_channel ch in
      let prin = Output.print_to_channel ch in
      print_endline "#!/bin/sh";
+
+     (* нужна для того, чтобы в last-зависимостях ревизию править расставлялись *)
+     let hack_last_dep (dep : platform_depend) =
+       let (pkg, opver_opt, desc_opt) = dep in
+       match opver_opt with
+       | None -> dep
+       | Some (op, ver) ->
+	  match op with
+	  | Pkg_last -> (* Определяем ревизию *)
+	     let maxrev = Ptag.find_max_rev pkg ver in
+	     let newrev = string_of_int (succ maxrev) in
+	     let platform = string_of_platform platform in
+	     (pkg, Some (Pkg_eq, (ver^"-"^newrev^"."^platform)), desc_opt)
+	  | _ -> dep
+     in
+
      let depends = if devf then
 		     (* dev-пакет должен зависеть от bin-пакета *)
-		     (pkgspec.pkgname, Some(Pkg_eq, ver_release), None) :: pkgspec.devdeps
-		   else pkgspec.depends in
+		     (pkgspec.pkgname, Some(Pkg_eq, ver_release), None)
+		     :: (List.map hack_last_dep pkgspec.devdeps)
+		   else (List.map hack_last_dep pkgspec.depends) in
+
      print_endline (Output.string_of_string_list
 		      (List.map make_rpm_findreq_line depends));
      let find_requires = "/usr/lib/rpm/find-requires" in
@@ -493,22 +514,23 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
 	   prin ("| grep -v '"^reject_tmpl^"'")
        end
      else msg "always" (find_requires^" is not found!"));
-	  
+
   (* генерируем spec-файл для rpmbuild *)
-  
+
   msg "always" ("Generating file "^file_rpmbuild_spec);
   let provides_with_arch libraries = (* здесь можно указать тип библиотек*)
     if System.arch () = "x86_64" then
       List.map (fun p -> if Pcre.pmatch ~rex:(Pcre.regexp "^lib") p then p ^ "()(64bit)" else p)
 	       libraries
     else libraries in
+  let top_dir = Params.get_param "top-dir" in
   let find_value = function
-    | "topdir" -> if nodev then "/opt" else
+    | "topdir" -> if nodev then top_dir else
 		    if devf then "/opt/dev"
-		    else Params.get_param "top-dir"
-    | "prefix" -> if nodev then "/opt" else
+		    else top_dir
+    | "prefix" -> if nodev then top_dir else
 		    if devf then "/opt/dev"
-		    else Params.get_param "top-dir"
+		    else top_dir
     | "name" -> pkgname
     | "version" -> version
     | "release" | "revision"  -> (string_of_int revision) ^ "." ^ (string_of_platform platform)
@@ -518,7 +540,7 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
     | "obsoletes" ->
        String.concat ", " pkgspec.obsoletes
     | k -> Hashtbl.find pkgspec.params k in
-  
+
   System.with_out file_rpmbuild_spec
     (fun ch ->
      let print_endline = Output.print_endline_to_channel ch in
@@ -544,6 +566,8 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
      
      print_endline "%files";
      if filecount () > 0 then print_endline ("%%include "^file_rpmbuild_files);
+
+     let resolve_and_print_endline s = print_endline (Pkgbuild.resolve_params find_value s) in
      
      (match pkgspec.pre_install with
       | None -> ()
@@ -551,32 +575,32 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
 	 print_endline "%pre";
 	 print_endline "if [ \"$1\" = \"1\" ] ; then # first install";
 	 print_endline "echo -n";
-	 print_endline pre;
+	 resolve_and_print_endline pre;
 	 print_endline "fi";
 	 (match pkgspec.pre_update with
 	  | None -> ()
 	  | Some preup ->
 	     print_endline "if [ \"$1\" = \"2\" ] ; then # update";
 	     print_endline "echo -n";
-	     print_endline preup;
+	     resolve_and_print_endline preup;
 	     print_endline "fi"));
      (match pkgspec.post_install with
       | None -> ()
       | Some post ->
-	 print_endline "%post -p /bin/bash";
-	 let files = Hashtbl.keys bf_files in
-	 let qfiles = List.map Output.surrount_dquotes files in
-	 let qfiles_str = Output.string_of_string_list qfiles in
+	 print_endline "%post" (*-p /bin/bash*);
+	 (*let files = Hashtbl.keys bf_files in*)
+	 (*let qfiles = List.map Output.surrount_dquotes files in*)
+	 (*let qfiles_str = Output.string_of_string_list qfiles in*)
 	 print_endline ("BF_VERSION=2");
-	 print_endline ("FILES=("^qfiles_str^")");
-	 print_endline post);
+	 (*print_endline ("FILES=("^qfiles_str^")");*)
+	 resolve_and_print_endline post);
      (match pkgspec.pre_uninstall with
       | None -> ()
       | Some preun ->
 	 print_endline "%preun";
 	 print_endline "if [ \"$1\" = \"0\" ] ; then # all versions deleted";
 	 print_endline "echo -n";
-	 print_endline preun;
+	 resolve_and_print_endline preun;
 	 print_endline "fi")
     );
 
@@ -594,7 +618,7 @@ let rec pack_rpm ?(devf=false) ?(os=Platform.os ()) ?(platform=Platform.current 
 		     file_rpmbuild_spec,file_rpmbuild_files,file_rpmbuild_findreq,
 		     None);
   (* Последний параметр -- hooks. Устарел. *)
-  
+
   (* устанавливаем правильные права на файл *)
   let user = Unix.getlogin () in
   let pkgfile = Rpm.fullname pkgname version (string_of_int revision)
@@ -638,10 +662,12 @@ let buildpkg ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgspec =
 
   let topdir_opt = try (" --top-dir="^(Hashtbl.find spec.params "top-dir"))
 		   with _ -> "" in
+
+  let components = List.filter (fun (comp:component) -> comp.name <> (Filename.basename pack_param))
+			       spec.components in
   
   msg "always" "Clone components into chroot...";
-  List.iter (fun component -> ignore (clone_component chroot_name component))
-	    (List.filter (fun (comp:component) -> comp.name <> pack_param) spec.components);
+  List.iter (fun component -> ignore (clone_component chroot_name component)) components;
 
   msg "always" "Install build dependencies... ";
   depinstall ~os ~platform chroot_name pkgspec;
@@ -670,7 +696,7 @@ let buildpkg ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgspec =
 		 ignore (Cmd.root_command ~loglevel:"low"
 					  ("/bin/bf2 build-component "^chroot_name^" "^name^" "^rules
 					   ^topdir_opt)))
-		spec.components;
+	        components;
     with _ as exn ->
       msg "always" "Build has been failed!";
       msg "always" "Unmount supplies..."; umount_all_points chroot;
@@ -699,7 +725,13 @@ type job_desc =
 type instance = Shell_sys.job_instance
 
 type build_state = Build_success | Build_failure | Build_run | Build_wait | Build_not_needed
-      
+let string_of_build_state = function
+  | Build_success -> "success"
+  | Build_failure -> "failure"
+  | Build_run -> "running"
+  | Build_wait -> "waiting"
+  | Build_not_needed -> "not needed"
+									      
 let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgspec =
   let msg = Output.msg "build_subtree" in
   let err = Output.err "build_subtree" in
@@ -804,7 +836,7 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
   let all_builds_finished () =
     List.fold_left (fun finp pkg ->
 		    finp && (match (get_status pkg) with
-			     | Build_success | Build_failure -> true
+			     | Build_success | Build_failure | Build_not_needed-> true
 			     | _ -> false))
 		   true pkgs in
 
@@ -814,7 +846,7 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
 
   (* список собранных пакетов *)
   let built_pkgs () =
-    List.filter (fun pkg -> (build_ok pkg) || (build_err pkg) || (build_not_needed pkg))
+    List.filter (fun pkg -> (build_ok pkg) (*|| (build_err pkg) || (build_not_needed pkg)*))
 		pkgs in
 
   (* список пакетов, сборка которых завершена, для которых надо вызвать stop_build *)
@@ -833,6 +865,13 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
     msg "always" (Output.prefix_textblock "ERR: " (Buffer.contents jd.err));
     List.iter Buffer.clear [jd.out; jd.err] in
 
+  (* это дебаг для вывода инфы о состоянии пакетов *)
+  let print_state () =
+    print_endline "    --- Build status ---";
+    List.iter (fun pkg -> print_endline ("    "^pkg^": "^(string_of_build_state (get_status pkg))))
+	      pkgs;
+    print_endline "    --------------------" in
+  
   (* -------------------- НАЧАЛО ИМПЕРАТИВА ТУТ -------------------- *)
 
   (* заполняем таблицу jobs командами для сборки *)
@@ -855,6 +894,7 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
   let i = ref 1 in
   (* сборка *)
   while not (all_builds_finished ()) do
+    print_state ();
     let fin_pkgs = finished_instances () in
     List.iter stop_build fin_pkgs;
     List.iter print_inst_outputs fin_pkgs;
@@ -872,12 +912,42 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
     i := succ !i;
   done;
 
-  
-  
   (* пост-сборочные процессы *)
   let bpkgs = built_pkgs () in
-  (* расстановка тегов *)
-  ();
+  let bpkgs_wo_dev = List.filter (fun pkgname -> not (Pkg.is_devel pkgname)) bpkgs in
+  
+  let pack_param = Params.get "pack" in
+  (* расстановка тэгов и инкремент release в pack-е *)
+  List.iter (fun pkg ->
+	     let spec = pkg_spec pkg in
+	     let version = spec.version in
+	     let specdir = Specdir.specdir_by_version pkg version in
+	     let revision = string_of_int (succ spec.revision) in
+	     let tag = Ptag.by_spec spec in
+	     System.with_dir specdir
+	       (fun () ->
+		System.append_write ~file:"release" (version^" "^revision^"\n");
+		Git.git_add "release";
+		ignore (Git.git_make_tag tag)); (* пока не обрабатываем статус задания тэга *)
+	     (* в каждый компонент закидываем тэг *)
+	     let components = List.filter (fun (comp:component) ->
+					   comp.name <> (Filename.basename pack_param))
+					  spec.components in
+	     let compdir = Params.get "components-dir" in
+	     List.iter (fun (comp:component) ->
+			System.with_dir (Path.make [compdir;comp.name])
+			  (fun () ->
+			   ignore (Git.git_make_tag tag);
+			  (*Git.git_push ~tags:true ""*)))
+		       components)
+	    bpkgs_wo_dev;
+  System.with_dir pack_param
+    (fun () ->
+     Git.git_commit ("[BF2] Build finished: "^top_pkg^"/"^version);
+    (*Git.git_push ~tags:false "";
+     Git.git_push ~tags:true "";*)
+    );
+
   (* вывод сообщения о сборке *)
   msg "always" "--------------------------------------------------";
   msg "always" "Built packages:";
@@ -898,3 +968,5 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
 		msg "always" ("  "^pkg^"-"^version^"-"^revision)))
 	    bpkgs;
   ()
+
+    

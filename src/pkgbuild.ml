@@ -54,6 +54,7 @@ let call_before_build ~snapshot ~pkgname ~version ~revision ~platform hooks =
       
 let build_over_rpmbuild ?chroot ~snapshot (pkgname,platform,version,release,spec,files,findreq,hooks) =
   let top_dir = Params.get_param "top-dir" in
+  print_endline ("FCK: topdir = "^top_dir);
   System.check_commands ["rpmbuild"];
   log_command "chmod" ["+x";findreq];
   if chroot = None then
@@ -98,7 +99,11 @@ let check_composite_depends spec =
       raise (Permanent_error "you must correct depends or composite files")
     end
 
-(* И что же это делает-то, блин?! *)
+(* Эта функция преобразует в inst-скриптах, идущих в пакетах,
+выражения вида %(var). var подаётся на вход find, которая либо
+возвращает строку, на которую выражение должно быть заменено, либо
+вызывает исключение Not_found. *)
+
 let resolve_params find s =
   Pcre.substitute
     ~rex:(Pcre.regexp "%\\(.*?\\)")

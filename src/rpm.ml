@@ -69,7 +69,8 @@ let resolve_ldeps ?(os=Platform.os()) ?(platform=Platform.current()) (deplist:pl
   let pkgs = list_pkgs_in_dir pool_dir in
   let pkgs = List.map parse_fullname pkgs in
   let pkgs = List.filter (fun (pkgname,version,revision,rhsys,arch) ->
-			  rhsys = (string_of_platform platform)) pkgs in
+			  rhsys = (string_of_platform platform))
+			 pkgs in
   let pkgs_table = Hashtbl.create 32 in
   List.iter
     (fun (pkgname,version,revision,rhsys,arch) ->
@@ -141,7 +142,7 @@ let resolve_ldeps ?(os=Platform.os()) ?(platform=Platform.current()) (deplist:pl
 
   List.iter resolve (List.filter is_local_dep deplist);
   stored_deps ()
-	   
+
 (* Создаёт дубликат строки и делает её первый символ заглавным *)
 let key_format s =
   let l = String.length s in
@@ -156,9 +157,11 @@ let build
   ?(format="%%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm")
   ?chroot
   ~pkgname ~platform ~version ~release ~spec ~files ~findreq () =
+  print_endline ("FCK: topdir = "^top_dir);
   let args = ref [] in
   let add s = args := !args @ [s] in
   let define n v =
+    print_endline ("define: "^n^" = "^v);
     add "--define"; add (sprintf "%s %s" n v)
   in
   let arch = System.arch () in
