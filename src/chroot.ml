@@ -938,14 +938,14 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
 			System.with_dir (Path.make [compdir;comp.name])
 			  (fun () ->
 			   ignore (Git.git_make_tag tag);
-			  (*Git.git_push ~tags:true ""*)))
+			  Git.git_push ~tags:true ""))
 		       components)
 	    bpkgs_wo_dev;
   System.with_dir pack_param
     (fun () ->
      Git.git_commit ("[BF2] Build finished: "^top_pkg^"/"^version);
-    (*Git.git_push ~tags:false "";
-     Git.git_push ~tags:true "";*)
+     Git.git_push ~tags:false "";
+     Git.git_push ~tags:true "";
     );
 
   (* вывод сообщения о сборке *)
