@@ -987,8 +987,8 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
   System.with_dir pack_param
 		  (fun () ->
 		   Git.git_commit ~empty:true ("[BF2] Build finished: "^top_pkg^"/"^version);
-		   (*Git.git_push ~tags:false "";*)
 		   Git.git_pull "";
+		   Git.git_push ~tags:false "";
 		   Git.git_push ~tags:true "";
 		  );
 
