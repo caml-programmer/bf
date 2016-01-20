@@ -724,13 +724,14 @@ type job_desc =
 
 type instance = Shell_sys.job_instance
 
-type build_state = Build_success | Build_failure | Build_run | Build_wait | Build_not_needed
+type build_state = Build_success | Build_failure | Build_run | Build_wait | Build_not_needed | Build_unknown
 let string_of_build_state = function
   | Build_success -> "success"
   | Build_failure -> "failure"
   | Build_run -> "running"
   | Build_wait -> "waiting"
   | Build_not_needed -> "not needed"
+  | Build_unknown -> "unknown"
 									      
 let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current ()) pkgspec =
   let msg = Output.msg "build_subtree" in
@@ -761,12 +762,14 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
   let build_err pkg = (get_status pkg) = Build_failure in
   let build_not_needed pkg = (get_status pkg) = Build_not_needed in
   let build_wait pkg = (get_status pkg) = Build_wait in
+  let build_unknown pkg = (get_status pkg) = Build_unknown in
   let set_status pkg st = Hashtbl.add status pkg st in
   let set_ok pkg = set_status pkg Build_success in
   let set_err pkg = set_status pkg Build_failure in
   let set_wait pkg = set_status pkg Build_wait in
   let set_run pkg = set_status pkg Build_run in
   let set_not_needed pkg = set_status pkg Build_not_needed in
+  let set_unknown pkg = set_status pkg Build_unknown in
 
   (* функции для работы с экземпляром сборочного процесса *)
   let pkg_inst pkg = Hashtbl.find instances pkg in
@@ -787,8 +790,8 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
     let errbuf = Buffer.create 0 in
     (* судя по всему она сразу открывает дескрипторы, что не очень хорошо *)
     let (job,_) = Shell.setup_job ~stdout:(Shell.to_buffer outbuf)
-				   ~stderr:(Shell.to_buffer errbuf)
-				   [command] in
+				  ~stderr:(Shell.to_buffer errbuf)
+				  [command] in
     let job = {out = outbuf; err = errbuf; job = job} in
     Hashtbl.add jobs pkg job in
   
@@ -844,6 +847,10 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
   let ready_to_start_pkgs () =
     List.filter build_wait (Depgraph2.leaves dg) in
 
+  (* список пакетов с неизвестным статусом *)
+  let unknown_status_pkgs () =
+    List.filter build_unknown pkgs in
+  
   (* список собранных пакетов *)
   let built_pkgs () =
     List.filter (fun pkg -> (build_ok pkg) (*|| (build_err pkg) || (build_not_needed pkg)*))
@@ -883,11 +890,47 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
 	     let spec = pkg_spec pkg in
 	     let comps = Package.components_need_to_rebuild spec in
 	     match comps with
-	     | [] -> (* удаляем пакеты, которые не нужно пересобирать *)
-		unreg_pkg pkg;
-		set_not_needed pkg
+	     | [] -> (* устанавливаем статус unknown пакетам, в которых ничего не изменилось, ибо есть вероятность, что их надо перепаковать из-за строгих зависимостей от других пакетов *)
+		(*unreg_pkg pkg;*)
+		set_unknown pkg
 	     | _ -> ())
 	    pkgs;
+  (* пробегаем по пакетам с неопределённым статусом и определяем его *)
+  let rec determine_unknown_status_pkgs () =
+    match unknown_status_pkgs () with
+    | [] -> ()
+    | unk_pkgs ->
+       List.iter (fun pkg ->
+		  let deps = Depgraph2.pkg_deps dg pkg in
+		  let (dep_from_unknown_found:bool ref) = ref false in
+		  let (last_dep_found:bool ref) = ref false in
+		  List.iter (fun dep ->
+			     let (pkg, dep_pkg) = dep in
+			     match Depgraph2.depinfo dg dep with
+			     | Some dep ->
+				(match dep with
+				 | (Pkg_last,_) ->
+				    if build_unknown dep_pkg then
+				      dep_from_unknown_found := true
+				    else if build_wait dep_pkg then
+				      last_dep_found := true
+				 | _ -> ())
+			     | None -> ())
+			    deps;
+		  if !last_dep_found then
+		    set_wait pkg (* если найдёна last-зависимость, то нужна перепаковка *)
+		  else if !dep_from_unknown_found then
+		    () (* если нет last-dep, но есть unknown-dep, в следующую итерацию разберёмся*)
+		  else
+		    (* в противном случае убрать из сборочного графа эту нечисть *)
+		    begin unreg_pkg pkg; set_not_needed pkg; end
+		 )
+		 unk_pkgs;
+       determine_unknown_status_pkgs ()
+  in determine_unknown_status_pkgs ();
+
+  (* Делаем инкремент ревизии для всех пакетов, подлежащих пересборке *)
+  (* А впрочем, пусть пока так побудет *)
   
   msg "always" "Start build process";
 
@@ -925,10 +968,10 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
 	     let revision = string_of_int (succ spec.revision) in
 	     let tag = Ptag.by_spec spec in
 	     System.with_dir specdir
-	       (fun () ->
-		System.append_write ~file:"release" (version^" "^revision^"\n");
-		Git.git_add "release";
-		ignore (Git.git_make_tag tag)); (* пока не обрабатываем статус задания тэга *)
+			     (fun () ->
+			      System.append_write ~file:"release" (version^" "^revision^"\n");
+			      Git.git_add "release";
+			      ignore (Git.git_make_tag tag)); (* пока не обрабатываем статус задания тэга *)
 	     (* в каждый компонент закидываем тэг *)
 	     let components = List.filter (fun (comp:component) ->
 					   comp.name <> (Filename.basename pack_param))
@@ -936,17 +979,18 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
 	     let compdir = Params.get "components-dir" in
 	     List.iter (fun (comp:component) ->
 			System.with_dir (Path.make [compdir;comp.name])
-			  (fun () ->
-			   ignore (Git.git_make_tag tag);
-			  Git.git_push ~tags:true ""))
+					(fun () ->
+					 ignore (Git.git_make_tag tag);
+					 Git.git_push ~tags:true ""))
 		       components)
 	    bpkgs_wo_dev;
   System.with_dir pack_param
-    (fun () ->
-     Git.git_commit ("[BF2] Build finished: "^top_pkg^"/"^version);
-     Git.git_push ~tags:false "";
-     Git.git_push ~tags:true "";
-    );
+		  (fun () ->
+		   Git.git_commit ~empty:true ("[BF2] Build finished: "^top_pkg^"/"^version);
+		   (*Git.git_push ~tags:false "";*)
+		   Git.git_pull "";
+		   Git.git_push ~tags:true "";
+		  );
 
   (* вывод сообщения о сборке *)
   msg "always" "--------------------------------------------------";
@@ -955,7 +999,7 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
 	     if build_ok pkg then
 	       (let spec = pkg_spec pkg in
 		let version = spec.version in
-		let revision = string_of_int (succ spec.revision) in
+		let revision = string_of_int ((*succ*) spec.revision) in
 		msg "always" ("  "^pkg^"-"^version^"-"^revision)))
 	    bpkgs;
   msg "always" "--------------------------------------------------";
@@ -964,9 +1008,10 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
 	     if build_err pkg then
 	       (let spec = pkg_spec pkg in
 		let version = spec.version in
-		let revision = string_of_int (succ spec.revision) in
+		let revision = string_of_int ((*succ*) spec.revision) in
 		msg "always" ("  "^pkg^"-"^version^"-"^revision)))
 	    bpkgs;
+  ignore bpkgs; (* потом будем возвращать список собранных пакетов *)
   ()
 
     
