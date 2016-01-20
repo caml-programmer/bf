@@ -227,6 +227,7 @@ let build_component chroot_name component_name rules =
   Params.set "dest-dir" "";
   
   if not Cmd.i_am_root then err "Need to be run under root to make chroot call";
+  msg "very-high" ("chroot-path: "^chroot_path);
   Unix.chdir chroot_path;
   Unix.chroot chroot_path;
 
