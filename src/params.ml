@@ -189,6 +189,8 @@ let reread_params () =
   set_param ~default:"" "tag-prefix";
   (* директория с компонентами *)
   set_param ~default:"." "components-dir";
+  (* директория, из которой надо работать (актуально для совместимости с bf) *)
+  set_param ~default:"." "root-dir";
   ()
   
 
