@@ -7,7 +7,10 @@ open Chroot
 let () = reload_cfg ();;
 (* Если используется данный бинарник, установить bf-version в 2 *)
 Params.set "bf-version" "2";;
-
+(* Портаемся в root-dir, чтобы сделать вид, что мы оттуда запущены *)
+let root_dir = Params.get "root-dir";;
+Sys.chdir root_dir;;
+  
 (* Определение основных секций *)
 let bugs_secs = [
     `S "BUGS";
