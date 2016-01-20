@@ -892,6 +892,7 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
 	     let comps = List.map (fun (comp:component) -> comp.name) spec.components in
 	     let comps = List.filter (fun comp -> comp <> (Filename.basename pack_param)) comps in
 	     List.iter (fun comp ->
+			msg "low" ("pull repository of component "^comp);
 			System.with_dir comp
 			  (fun () ->
 			   Git.git_pull_new ()))
@@ -997,6 +998,7 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
 	     List.iter (fun (comp:component) ->
 			System.with_dir (Path.make [compdir;comp.name])
 					(fun () ->
+					 msg "low" ("Creating new tag for component "^comp.name);
 					 ignore (Git.git_make_tag tag);
 					 Git.git_push ~tags:true ""))
 		       components)
