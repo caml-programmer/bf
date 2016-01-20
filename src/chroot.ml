@@ -129,7 +129,7 @@ let compose_home_path () =
   try Sys.getenv "HOME" with Not_found -> err "Cannot determine user's home directory"
 
 let chroots_dir () =
-  Params.get_param "chroots-dir"
+  Params.get "chroots-dir"
   
 (* если chroot_name начинается на /, то он и возвращается, считаясь
    абсолютным путём к chroot-окружению. В противном случае
@@ -223,11 +223,14 @@ let build_component chroot_name component_name rules =
   let projects_relative_path = projects_path () in
   let project_path = Path.make [projects_relative_path; component_name] in
 
+  msg "always" ("chroot-path: "^chroot_path);
+  msg "always" ("proj_rel_path: "^projects_relative_path);
+  msg "always" ("project_path:  "^project_path);
+  
   (* в chroot-окружении установка происходит непосредственно в систему *)
   Params.set "dest-dir" "";
   
   if not Cmd.i_am_root then err "Need to be run under root to make chroot call";
-  msg "very-high" ("chroot-path: "^chroot_path);
   Unix.chdir chroot_path;
   Unix.chroot chroot_path;
 
