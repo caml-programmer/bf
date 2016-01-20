@@ -47,6 +47,9 @@ type spec = {
     chroot: string; (* имя chroot-окружения, которое будет использоваться при сборке *)
   }
 
+let inc_rev (spec:spec) = 
+  {spec with revision = (succ spec.revision);}
+  
 let pkgname_of_platform_depend ((pkgname,_,_): platform_depend) = pkgname
 
 

@@ -60,25 +60,43 @@ let git_fetch ?refspec ?(tags=false) () =
 let git_merge remote =
   log_command ~env "git" ["merge";remote]
 
+let git_pull_new ?(force=false) () =
+  let opts = if force then ["--force"] else [] in
+  log_command ~env "git" (["pull"] @ opts)
+	      
 let git_pull ?(force=false) ?refspec url =
-  match refspec with
+  if url = "" then
+    git_pull_new ~force ()
+  else
+    match refspec with
     | Some spec ->
-	let opts = if force then ["--force"] else [] in
-	log_command ~env "git" (["pull"] @ (Lazy.force no_edit) @ opts @ [url;spec])
+       let opts = if force then ["--force"] else [] in
+       log_command ~env "git" (["pull"] @ (Lazy.force no_edit) @ opts @ [url;spec])
     | None ->
-	let opts = if force then ["--force"] else [] in
-	log_command ~env "git" (["pull"] @ (Lazy.force no_edit) @ opts @ [url])
+       let opts = if force then ["--force"] else [] in
+       log_command ~env "git" (["pull"] @ (Lazy.force no_edit) @ opts @ [url])
+
+let git_push_new ?(tags=false) () =
+  let opts = if tags then ["--tags"] else [] in
+  log_command ~env "git" (["push"] @ opts)
 
 (* Вообще говря, у всех реп есть url "по-умолчанию". Для его использования url="" *)
+(* Соврал. Нельзя ставить url="", потому что "" тогда передаётся параметром. *)
+(* Чтобы быстро исправить, написал git_push_new, который вызывается, если url="" *)
 let git_push ?(tags=false) ?refspec url =
-  match refspec with
+  if url = "" then
+    git_push_new ~tags ()
+  else
+    match refspec with
     | Some spec -> 
-	let opts = if tags then ["--tags"] else [] in
-	log_command ~env "git" (["push"] @ opts @ [url;spec])
+       let opts = if tags then ["--tags"] else [] in
+       log_command ~env "git" (["push"] @ opts @ [url;spec])
     | None ->
-	let opts = if tags then ["--tags"] else [] in
-	log_command ~env "git" (["push"] @ opts @ [url])
+       let opts = if tags then ["--tags"] else [] in
+       log_command ~env "git" (["push"] @ opts @ [url])
 
+
+		    
 let git_remote_update spec =
   log_command ~env "git" ["remote";"update";spec]
        
