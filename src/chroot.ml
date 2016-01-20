@@ -739,6 +739,10 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
   (*let warn = Output.warn "build_subtree" in*)
 
   msg "always" ("THREADS: "^(string_of_int threads));
+
+  let pack_param = Params.get "pack" in
+  msg "always" ("Pull PACK repository: "^pack_param);
+  System.with_dir pack_param (fun () -> Git.git_pull_new ());
   
   let top_pkg = pkgspec.pkgname in
   let version = pkgspec.version in
@@ -881,6 +885,20 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
   
   (* -------------------- НАЧАЛО ИМПЕРАТИВА ТУТ -------------------- *)
 
+  (* обновляем репозитории компонентов пакетов, чтобы разобарться, какие из них надо пересобирать*)
+  msg "always" "Pull all the components...";
+  List.iter (fun pkg ->
+	     let spec = pkg_spec pkg in
+	     let comps = List.map (fun (comp:component) -> comp.name) spec.components in
+	     let comps = List.filter (fun comp -> comp <> (Filename.basename pack_param)) comps in
+	     List.iter (fun comp ->
+			System.with_dir comp
+			  (fun () ->
+			   Git.git_pull_new ()))
+		       comps;
+	     ())
+	    pkgs;
+
   (* заполняем таблицу jobs командами для сборки *)
   List.iter new_job pkgs;
   (* выставляем всем пакетам статус wait *)
@@ -959,7 +977,6 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
   let bpkgs = built_pkgs () in
   let bpkgs_wo_dev = List.filter (fun pkgname -> not (Pkg.is_devel pkgname)) bpkgs in
   
-  let pack_param = Params.get "pack" in
   (* расстановка тэгов и инкремент release в pack-е *)
   List.iter (fun pkg ->
 	     let spec = pkg_spec pkg in
