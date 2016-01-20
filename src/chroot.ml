@@ -889,15 +889,18 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
   msg "always" "Pull all the components...";
   List.iter (fun pkg ->
 	     let spec = pkg_spec pkg in
-	     let comps = List.map (fun (comp:component) -> comp.name) spec.components in
-	     let comps = List.filter (fun comp -> comp <> (Filename.basename pack_param)) comps in
-	     List.iter (fun comp ->
-			msg "low" ("pull repository of component "^comp);
-			System.with_dir comp
+	     let comps = List.map (fun (comp:component) -> comp) spec.components in
+	     let comps = List.filter (fun (comp:component) ->
+				      comp.name <> (Filename.basename pack_param))
+				     comps in
+	     List.iter (fun (comp:component) ->
+			if not (System.is_directory comp.name) then
+			  Component.clone comp;
+			msg "low" ("pull repository of component "^comp.name);
+			System.with_dir comp.name
 			  (fun () ->
 			   Git.git_pull_new ()))
-		       comps;
-	     ())
+		       comps)
 	    pkgs;
 
   (* заполняем таблицу jobs командами для сборки *)
