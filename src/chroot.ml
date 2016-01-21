@@ -223,9 +223,12 @@ let build_component chroot_name component_name rules =
   let projects_relative_path = projects_path () in
   let project_path = Path.make [projects_relative_path; component_name] in
 
+  msg "always" "BUILD COMPONENT";
+  
   msg "always" ("chroot-path: "^chroot_path);
   msg "always" ("proj_rel_path: "^projects_relative_path);
   msg "always" ("project_path:  "^project_path);
+  
   
   (* в chroot-окружении установка происходит непосредственно в систему *)
   Params.set "dest-dir" "";
