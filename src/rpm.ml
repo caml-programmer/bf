@@ -176,7 +176,8 @@ let build
 	      false
     | Some chroot -> define "buildroot" "/buildroot";
 		     add "--root"; add chroot;
-		     true in
+		     (* в методичке по пакетированию rpm написано, что от рута это делать не следует *)
+		     false in
   define "_rpmdir" location;
   define "fileslist" files; (* must be absolute *)
   define top_label top_dir;
