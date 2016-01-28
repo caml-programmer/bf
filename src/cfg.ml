@@ -3,9 +3,11 @@ module Params = struct
     include Params
     open String_ext
 
-    let global_config_file = "/etc/bf.conf"
-    let config_file = Path.expand_globs "~/.bf/config"
+    let global_config_file = "/etc/bf.conf";;
+    let config_file = Path.expand_globs "~/.bf/config";;
 
+      print_endline ("CFG: config_file: "^config_file);;
+					
     let read_from_file filename =
       (* print_endline ("Load parameters from file: "^filename);*)
       let rex = Re_perl.compile_pat "^([^#][^\\s]+)\\s+(.*)\\s*$" in

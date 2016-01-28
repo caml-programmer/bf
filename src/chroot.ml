@@ -129,7 +129,9 @@ let compose_home_path () =
   try Sys.getenv "HOME" with Not_found -> err "Cannot determine user's home directory"
 
 let chroots_dir () =
-  Params.get "chroots-dir"
+  let chroots_dir = Params.get "chroots-dir" in
+  Output.msg "chroots_dir" "high" chroots_dir;
+  chroots_dir
   
 (* если chroot_name начинается на /, то он и возвращается, считаясь
    абсолютным путём к chroot-окружению. В противном случае
@@ -228,7 +230,6 @@ let build_component chroot_name component_name rules =
   msg "always" ("chroot-path: "^chroot_path);
   msg "always" ("proj_rel_path: "^projects_relative_path);
   msg "always" ("project_path:  "^project_path);
-  
   
   (* в chroot-окружении установка происходит непосредственно в систему *)
   Params.set "dest-dir" "";
@@ -893,23 +894,33 @@ let build_subtree ?(threads=1) ?(os=Platform.os ()) ?(platform=Platform.current 
   (* -------------------- НАЧАЛО ИМПЕРАТИВА ТУТ -------------------- *)
 
   (* обновляем репозитории компонентов пакетов, чтобы разобарться, какие из них надо пересобирать*)
-  msg "always" "Pull all the components...";
-  List.iter (fun pkg ->
-	     let spec = pkg_spec pkg in
-	     let comps = List.map (fun (comp:component) -> comp) spec.components in
-	     let comps = List.filter (fun (comp:component) ->
-				      comp.name <> (Filename.basename pack_param))
-				     comps in
-	     List.iter (fun (comp:component) ->
-			if not (System.is_directory comp.name) then
-			  Component.clone comp;
-			msg "low" ("pull repository of component "^comp.name);
-			System.with_dir comp.name
-			  (fun () ->
-			   Git.git_pull_new ()))
-		       comps)
-	    pkgs;
+  let must_pull_repos = match Params.get "omit-pull-repos" with
+    | "true" -> false
+    | _ -> true in
 
+  if must_pull_repos then
+    begin
+      msg "always" "Pull all the components...";
+      List.iter
+	(fun pkg ->
+	 let spec = pkg_spec pkg in
+	 let comps =
+	   List.filter
+	     (fun (comp:component) -> comp.name <> (Filename.basename pack_param))
+	     spec.components in
+	 List.iter (fun (comp:component) ->
+		    if not (System.is_directory comp.name) then
+		      Component.clone comp;
+		    msg "low" ("pull repository of component "^comp.name);
+		    System.with_dir comp.name
+		      (fun () ->
+		       Git.git_pull_new ()))
+		   comps)
+	pkgs
+    end
+  else
+    msg "always" "Pull repos is omitted because of configuration options";
+      
   (* заполняем таблицу jobs командами для сборки *)
   List.iter new_job pkgs;
   (* выставляем всем пакетам статус wait *)

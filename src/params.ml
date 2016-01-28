@@ -191,6 +191,8 @@ let reread_params () =
   set_param ~default:"." "components-dir";
   (* директория, из которой надо работать (актуально для совместимости с bf) *)
   set_param ~default:"." "root-dir";
+  (* для того, чтобы не делать pull репозиториев перед сборкой: полезно для отладки *)
+  set_param ~default:"false" "omit-pull-repos";
   ()
   
 
