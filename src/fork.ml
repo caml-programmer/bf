@@ -234,7 +234,7 @@ let make ?(interactive=true) ?(depth=0) top_specdir dst =
       dst src (string_of_forktype mode));
 
   let pack_dir = dir (dir top_specdir) in
-  let deptree = Packtree.create ~default_branch:(Some src) top_specdir in
+  let deptree = Packtree.create ~default_branch:(Some src) ~all_platforms:true top_specdir in
   let deplist = List.map (fun (k,v) -> fst k,v) (deplist_of_deptree deptree) in
   let depends = list_of_deptree deptree in
   log_message "depend list...";

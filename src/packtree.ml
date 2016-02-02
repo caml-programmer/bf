@@ -7,7 +7,7 @@ type pack_tree =
 
 exception No_specdir of string
 
-let create ?(log=true) ~default_branch specdir : pack_tree =
+let create ?(all_platforms=false) ?(log=true) ~default_branch specdir : pack_tree =
   let table = Hashtbl.create 32 in
   let pkgdir =
     Filename.dirname (Filename.dirname specdir) in
@@ -50,7 +50,7 @@ let create ?(log=true) ~default_branch specdir : pack_tree =
 		if log then
 		  log_message (sprintf "Warning: deptree_of_pack problem: %s\n" (Printexc.to_string exn));
 		acc)
-	      [] (Spectype.depload ~ignore_last:false depfile)
+	      [] (Spectype.depload ~all_platforms ~ignore_last:false depfile)
 	  in
 	  resolve depth specdir;
 	  Dep_val (value, Dep_list

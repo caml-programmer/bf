@@ -164,7 +164,7 @@ let system_pkg_spec ?os ?platform pkgname version =
 
 exception No_pkg_prefix of string
 
-let depload ?snapshot ?(interactive=false) ?(ignore_last=false) file : platform_depend list =
+let depload ?snapshot ?(all_platforms=false) ?(interactive=false) ?(ignore_last=false) file : platform_depend list =
   let packdir = Filename.dirname (Filename.dirname (Filename.dirname file)) in
   let pkgname = Filename.basename (Filename.dirname (Filename.dirname file)) in
 (*
@@ -294,10 +294,10 @@ let depload ?snapshot ?(interactive=false) ?(ignore_last=false) file : platform_
       Scheme.print v;
       log_error "Cannot parse platform value";
   in
-  let platform_filter v =
+  let platform_filter v =    
     with_platform (fun os platform ->
       let platforms = make_platforms (Scheme.fst v) in
-      if platforms = [] || List.mem platform platforms then
+      if all_platforms || platforms = [] || List.mem platform platforms then
 	Scheme.iter add_package (Scheme.snd v))
   in
   let add_os =
