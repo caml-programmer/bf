@@ -422,22 +422,37 @@ let make ?(interactive=true) ?(depth=0) top_specdir dst =
 	(Specdir.branch top_specdir)
 	depends);
 
-  List.iter (fun x ->
-    log_message (sprintf "Need branching %s" (fst x))) !branch_jobs;
-
-  if interactive then
+  let ignore_branching =
+    try
+      ignore(Sys.getenv "IGNORE_BRANCHING");
+      true
+    with Not_found -> false
+  in
+  
+  if not ignore_branching then
     begin
-      log_message "Delay before components branching...";
-      Interactive.stop_delay 10;
+      List.iter (fun x ->
+	log_message (sprintf "Need branching %s" (fst x))) !branch_jobs;
+      
+      if interactive then
+	begin
+	  log_message "Delay before components branching...";
+	  Interactive.stop_delay 10;
+	end;
+      List.iter
+	(fun (loc,f) -> 
+	  log_message (sprintf "Branching %s" loc);
+	  System.with_dir loc f)
+	!branch_jobs;
     end;
-  List.iter
-    (fun (loc,f) -> 
-      log_message (sprintf "Branching %s" loc);
-      System.with_dir loc f)
-    !branch_jobs;
+  
   if interactive then
     begin
       log_message "Delay before commit pack changes...";
       Interactive.stop_delay 10;
     end;
   commit_pack_changes (src,dst) pack_dir
+
+
+
+
