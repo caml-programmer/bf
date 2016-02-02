@@ -49,7 +49,7 @@ type spec = {
 
 let inc_rev (spec:spec) = 
   {spec with revision = (succ spec.revision);}
-  
+    
 let pkgname_of_platform_depend ((pkgname,_,_): platform_depend) = pkgname
 
 

@@ -230,6 +230,11 @@ let read_symbol = function
   | Ssymbol s -> s
   | v -> raise (Bad_sexp (string_of_sval v))
 
+let read_string_or_symbol = function
+  | Sstring s -> s
+  | Ssymbol s -> s
+  | v -> raise (Bad_sexp (string_of_sval v))
+
 let read_int = function
   | Sint n -> n
   | v -> raise (Bad_sexp (string_of_sval v))

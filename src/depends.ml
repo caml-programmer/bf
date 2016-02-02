@@ -5,81 +5,112 @@ open Printf
 open Logger
 
 type os = string
-type depend = os * Spectype.platform_depend list
+type depend = os * platform list * Spectype.platform_depend list
 type depends = depend list
 
 exception Load_error of string
 
-let parse file : depends  =
-  let make_dep v =
-    let v2 = Scheme.map (fun v -> v) v in
-    try
-      let name_v = List.hd v2 in
-      let op_ver_v = try Some (List.nth v2 1) with _ -> None in
-      let desc_v = try Some (List.nth v2 2) with _ -> None in
-      
-      let pkg_name = ref None in
-      let pkg_op = ref None in
-      let pkg_ver = ref None in
-      let pkg_desc = ref None in
-      
-      let add_op op v =
-	let ver =
-	  Scheme.make_string (Scheme.fst v) in
-	pkg_op  := Some op;
-	pkg_ver := Some ver;
-      in
-      
-      (match name_v with
-	| Ssymbol s -> pkg_name := Some s
-	| Sstring s -> pkg_name := Some s
-	| _ -> ());
-      (match op_ver_v with
-	| None -> ()
-	| Some op_ver ->
-	    Scheme.parse
-	      [
-		"=",add_op Pkg_eq;
-		">",add_op Pkg_gt;
-		"<",add_op Pkg_lt;
-		">=", add_op Pkg_ge;
-		"<=", add_op Pkg_le;
-		"last", add_op Pkg_last;
-	      ] op_ver);
-      (match desc_v with
-	| None -> ()
-	| Some desc ->
-	    Scheme.parse
-	      [ "desc", (fun v -> 
-		pkg_desc := Some (Scheme.make_string (Scheme.fst v))) ] desc);
-      
-      (match (!pkg_name : pkg_name option) with
-	| Some name ->
-	    (match !pkg_op, !pkg_ver with
-	      | Some op, Some ver ->
-		  (name,(Some (op,ver)),!pkg_desc)
-	      | _ ->
-		  (name,None,!pkg_desc))
-	| None -> raise Not_found)
-    with exn ->
-      log_message (Printexc.to_string exn);
-      log_message "Package value:";
-      Scheme.print v;
-      log_error "Cannot add package"
-  in   
-  let add_os v =
-    let n = 
-      Scheme.make_string (Scheme.fst v) in
-    n, (Scheme.map make_dep (Scheme.snd (Scheme.snd v)))
-  in
+(*
+ * Example:
+ * 
+ * (depends
+ *  (linux ()
+ *   ("solar-wp-core" (last "2.0.0") (desc "Solar Web Proxy core"))
+ *   ("solar-wp-url-checker" (last "2.0.0") (desc "Solar Web Proxy URL-checker"))
+ *   ("solar-wp-services" (last "2.0.0") (desc "Solar Web Proxy services"))
+ *   ("solar-wp-server" (last "2.0.0") (desc "Solar Web Proxy server"))
+ *   ("solar-wp-docs" (last "2.0.0") (desc "Solar Web Proxy documentations"))
+ *   ("solar-wp-gateway" (last "2.0.0") (desc "Solar Web Proxy gateway"))
+ *   ("solar-wp-cassandra" (last "2.0.0") (desc "Solar Cassandra"))
+ *   ("solar-wp-logproc" (last "2.0.0") (desc "Solar Web Proxy Log Porcessor"))
+ *   ("solar-wp-squid" (last "2.0.0") (desc "Solar Squid"))
+ *   ("solar-wp-samba" (last "2.0.0") (desc "Solar Samba"))
+ *   ("net-tools" (>= "1.60") (desc "A collection of programs that form the base set of the NET-3 networking distribution"))
+ * )
+ * (linux (cent6 rhel6)
+ *   ("bind-utils" (>= "9.3.6") (desc "Collection of utilities for querying DNS name servers to find out information about Internet hosts for Dozor Jet."))
+ *   ("tzdata-java" (>= "2014f") (desc "OpenJDK Runtime Environment"))
+ * )
+ * (linux (astra14)
+ *   ("dnsutils" (>= "9.3.6") (desc "Collection of utilities for querying DNS name servers to find out information about Internet hosts for Dozor Jet."))
+ *   ("tzdata-java" (>= "2014a") (desc "OpenJDK Runtime Environment"))))
+ * 
+ *)
+
+exception No_depends_file of string
+exception Bad_depend_record of string
+exception Bad_description of string
+exception Bad_vstrict of string
+ 
+let parse_vstrict v =
+  match Scm.read_list v with
+    | op::value::_ ->
+	let op =
+	  match Scm.read_symbol op with
+	    | "=" ->    Pkg_eq
+	    | ">" ->    Pkg_gt
+	    | "<" ->    Pkg_lt
+	    | ">=" ->   Pkg_ge
+	    | "<=" ->   Pkg_le
+	    | "last" -> Pkg_last 
+	    | _      -> raise (Bad_vstrict (Scm.string_of_sval v))
+	in
+	(op, Scm.read_string value)
+    | _ -> raise (Bad_vstrict (Scm.string_of_sval v))
+
+let parse_description v =
+  match Scm.read_tag v with
+    | "desc", v ->
+	Scm.read_string v
+    | _ -> raise (Bad_description (Scm.string_of_sval v))
+
+let parse_platform_depend v =
+  match Scm.read_list v with
+    | pkgname::vstrict::description::_ ->
+	Scm.read_string_or_symbol pkgname,
+	Some (parse_vstrict vstrict),
+	Some (parse_description description)
+
+    | pkgname::description::_ ->
+	Scm.read_string_or_symbol pkgname,
+	None,
+	Some (parse_description description)
+
+    | pkgname::_ ->
+	Scm.read_string_or_symbol pkgname, None, None
+    
+    | _ ->
+	raise (Bad_depend_record (Scm.string_of_sval v))
+
+let parse_depend v =
+  match Scm.read_list v with
+    | os::platforms::deps ->
+	Scm.read_symbol os,
+	(List.map platform_of_string 
+	  (List.map Scm.read_symbol
+	    (Scm.read_list platforms))),
+	(List.map parse_platform_depend deps)
+    | _ ->
+	raise (Bad_depend_record (Scm.string_of_sval v))
+
+let parse file : depends =
   if Sys.file_exists file then
     begin
-      let acc = ref [] in
-      Scheme.parse
-	["depends",(fun v -> acc := (Scheme.map add_os v))]
-	(Ocs_read.read_from_port
-	  (Ocs_port.open_input_port file));
-      !acc
+      let port = 
+	Ocs_port.open_input_port file in
+      let value =
+	Ocs_read.read_from_port port in
+      Ocs_port.close port;
+      try
+	match Scm.read_tag_list value with
+	  | "depends", v ->
+	      List.map parse_depend (Scm.read_list v)
+	  | _ ->
+	      raise (No_depends_file file)
+      with
+	| Bad_depend_record s -> raise (Bad_depend_record (s ^ "(file: " ^ file ^ ")"))
+	| Bad_vstrict s       -> raise (Bad_vstrict       (s ^ "(file: " ^ file ^ ")"))
+	| Bad_description s   -> raise (Bad_description   (s ^ "(file: " ^ file ^ ")"))
     end
   else []
 
@@ -88,8 +119,8 @@ let write file (depends : depends) =
   let out = output_string ch in
   out "(depends\n";
   List.iter 
-    (fun (os,deps) ->
-      out (sprintf "  (%s ()\n" os);
+    (fun (os,platforms,deps) ->
+      out (sprintf "  (%s (%s)\n" os (String.concat " " (List.map string_of_platform platforms)));
       List.iter 
 	(fun (pkg_name, ov_opt, pkg_desc_opt) ->
 	  let pkg_desc =

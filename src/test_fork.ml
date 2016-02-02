@@ -88,7 +88,7 @@ let create_pack_packages () =
       ]
     in
     let depends = [
-      "linux", [
+      "linux", [Platform.Rhel6], [
 	"vendor-project-package-level-two-a", Some (Pkg_last, "1.0"),   Some "vendor package level two a";
 (*	"vendor-project-package-level-two-b", Some (Pkg_last, "2.2.2"), Some "vendor package level two b";
 	"vendor-project-package-level-two-c", Some (Pkg_eq, "3.0"),     Some "vendor package level two c";
@@ -118,7 +118,7 @@ let create_pack_packages () =
 	mkc "component_b";
       ]
     in
-    let depends = [ "linux", [] ] in
+    let depends = [ "linux", [Platform.Rhel6], [] ] in
     let release = [ "1.0",0 ] in
     {
       name = "vendor-project-package-level-two-a";

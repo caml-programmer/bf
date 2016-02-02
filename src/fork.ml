@@ -69,8 +69,8 @@ let update_external_depends mode dst_capacity capacity_reduction local_depends s
 	  else
 	    Some (op,ver)
     in
-    List.map (fun (os,deplist) ->
-      os,(List.map (fun (pkgname,ov_opt,pkg_desc_opt) -> 
+    List.map (fun (os,platforms,deplist) ->
+      os,platforms,(List.map (fun (pkgname,ov_opt,pkg_desc_opt) -> 
 	(pkgname,(change pkgname ov_opt),pkg_desc_opt)) deplist))
       depends
   in
@@ -312,8 +312,8 @@ let make ?(interactive=true) ?(depth=0) top_specdir dst =
 	    Some (op,increment (capacity_reduction ver))
     in
     List.map
-      (fun (os,deplist) ->
-	os,(List.map (fun (pkgname,ov_opt,pkg_desc_opt) ->
+      (fun (os,platforms,deplist) ->
+	os,platforms,(List.map (fun (pkgname,ov_opt,pkg_desc_opt) ->
 	  if Params.home_made_package pkgname then
 	    (pkgname,(change pkgname ov_opt),pkg_desc_opt)
 	  else
