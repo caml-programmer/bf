@@ -44,10 +44,15 @@ let parse_platform_depend v =
 	Some (parse_vstrict vstrict),
 	Some (parse_description description)
 
-    | pkgname::description::_ ->
-	Scm.read_string_or_symbol pkgname,
-	None,
-	Some (parse_description description)
+    | pkgname::description_or_vstrict::_ ->
+	(try
+	  Scm.read_string_or_symbol pkgname,
+	  None,
+	  Some (parse_description description_or_vstrict)
+	with Bad_description  _ ->
+	  Scm.read_string_or_symbol pkgname,
+	  Some (parse_vstrict description_or_vstrict),
+	  None)
 
     | pkgname::_ ->
 	Scm.read_string_or_symbol pkgname, None, None
