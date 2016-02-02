@@ -10,33 +10,6 @@ type depends = depend list
 
 exception Load_error of string
 
-(*
- * Example:
- * 
- * (depends
- *  (linux ()
- *   ("solar-wp-core" (last "2.0.0") (desc "Solar Web Proxy core"))
- *   ("solar-wp-url-checker" (last "2.0.0") (desc "Solar Web Proxy URL-checker"))
- *   ("solar-wp-services" (last "2.0.0") (desc "Solar Web Proxy services"))
- *   ("solar-wp-server" (last "2.0.0") (desc "Solar Web Proxy server"))
- *   ("solar-wp-docs" (last "2.0.0") (desc "Solar Web Proxy documentations"))
- *   ("solar-wp-gateway" (last "2.0.0") (desc "Solar Web Proxy gateway"))
- *   ("solar-wp-cassandra" (last "2.0.0") (desc "Solar Cassandra"))
- *   ("solar-wp-logproc" (last "2.0.0") (desc "Solar Web Proxy Log Porcessor"))
- *   ("solar-wp-squid" (last "2.0.0") (desc "Solar Squid"))
- *   ("solar-wp-samba" (last "2.0.0") (desc "Solar Samba"))
- *   ("net-tools" (>= "1.60") (desc "A collection of programs that form the base set of the NET-3 networking distribution"))
- * )
- * (linux (cent6 rhel6)
- *   ("bind-utils" (>= "9.3.6") (desc "Collection of utilities for querying DNS name servers to find out information about Internet hosts for Dozor Jet."))
- *   ("tzdata-java" (>= "2014f") (desc "OpenJDK Runtime Environment"))
- * )
- * (linux (astra14)
- *   ("dnsutils" (>= "9.3.6") (desc "Collection of utilities for querying DNS name servers to find out information about Internet hosts for Dozor Jet."))
- *   ("tzdata-java" (>= "2014a") (desc "OpenJDK Runtime Environment"))))
- * 
- *)
-
 exception No_depends_file of string
 exception Bad_depend_record of string
 exception Bad_description of string
