@@ -147,7 +147,6 @@ let check_components =
       in
       let checkout_state key =
 	log_message (sprintf "prepare component state: %s (%s)" c.name key);
-	
 	if Sys.file_exists c.name then
 	  ignore
 	    (System.with_dir c.name
@@ -156,7 +155,9 @@ let check_components =
 		  | Some key' ->
 		      if key' <> key then
 			Git.git_checkout ~force:true ~key ()
-		  | _ -> Git.git_checkout ~force:true ~key ())))
+		  | _ -> Git.git_checkout ~force:true ~key ());
+		(* Подтягиваем изменения перед ветвлением *)
+		Git.git_fetch ()))
 	else
 	  Component.prepare c
       in
