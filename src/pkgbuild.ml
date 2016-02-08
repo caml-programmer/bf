@@ -23,7 +23,7 @@ let extract_packbranch ~userhost pkg_path =
 	in
 	String.sub hd (succ pos) (len - pos - 1)
 
-let call_after_build ?chroot ~snapshot ~location ~fullname hooks version release =
+let call_after_build ?chroot ~snapshot ~location ~fullname hooks version release platform =
   Plugins.load ();
   (match hooks with
     | Some file -> Scheme.eval_file file
@@ -35,9 +35,10 @@ let call_after_build ?chroot ~snapshot ~location ~fullname hooks version release
   in
   if Scheme.defined "after-build" then
     Scheme.eval_code (fun _ -> ())
-      (sprintf "(after-build \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %s)"
+      (sprintf "(after-build \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %s %s)"
 	(System.hostname ()) location fullname version release branch
-	(if snapshot then "#t" else "#f"))
+	(if snapshot then "#t" else "#f")
+	(string_of_platform platform))
 
 let call_before_build ~snapshot ~pkgname ~version ~revision ~platform hooks =
   Plugins.load ();
@@ -51,7 +52,7 @@ let call_before_build ~snapshot ~pkgname ~version ~revision ~platform hooks =
 	pkgname version revision (string_of_platform platform) (if snapshot then "#t" else "#f"));
     !result (* эта штука при нашем нынешнем lib.scm возвращает [] *)
   else []
-      
+
 let build_over_rpmbuild ?chroot ~snapshot (pkgname,platform,version,release,spec,files,findreq,hooks) =
   let top_dir = Params.get_param "top-dir" in
   print_endline ("FCK: topdir = "^top_dir);
@@ -64,7 +65,7 @@ let build_over_rpmbuild ?chroot ~snapshot (pkgname,platform,version,release,spec
       ~top_dir ?chroot
       ~pkgname ~platform ~version ~release
       ~spec ~files ~findreq ()
-  in call_after_build ?chroot ~snapshot ~location ~fullname hooks version release
+  in call_after_build ?chroot ~snapshot ~location ~fullname hooks version release platform
 
 let check_composite_depends spec =
   let composite_depends =
@@ -479,7 +480,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 	      log_command "gzip" [pkg_file];
 	      call_after_build ?chroot:None ~snapshot
 		~location:(Sys.getcwd ())
-		~fullname:pkg_file_gz spec.hooks version release
+		~fullname:pkg_file_gz spec.hooks version release Solaris10
 
 	  (* DEB BUILD CODE ---------------------------------------- *)
 	  | Deb_pkg ->
@@ -693,7 +694,14 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		sprintf "%s-%s-%s.%s.deb" 
 		  spec.pkgname version release (Debian.fix_arch (System.arch ())) in
 	      log_command
-		"mv" [(Filename.concat abs_specdir "debian.deb");pkgfile])
+		"mv" [(Filename.concat abs_specdir "debian.deb");pkgfile];
+
+	      let location = Sys.getcwd () in
+	      let arch = System.arch () in
+	      let fullname = Debian.fullname spec.pkgname version release arch in
+	      let location = Filename.concat location fullname in
+	      call_after_build ~snapshot ~location ~fullname spec.hooks version release platform
+	)
     | version ->
 	raise (Spectype.Unsupported_specdir_version version))
 
