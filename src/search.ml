@@ -181,7 +181,7 @@ let commit_id commit_id =
 	(List.filter System.is_directory (System.list_of_directory "."))
     in
     let mem pkg depends =
-      List.exists (fun (os,deplist) -> List.exists (fun (pkg',_,_) -> pkg = pkg') deplist) depends in
+      List.exists (fun (os,platforms,deplist) -> List.exists (fun (pkg',_,_) -> pkg = pkg') deplist) depends in
     List.fold_left
       (fun acc (pkg,_) ->
 	if List.exists (fun (_,depends) -> mem pkg depends) plist then

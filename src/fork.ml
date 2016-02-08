@@ -69,8 +69,8 @@ let update_external_depends mode dst_capacity capacity_reduction local_depends s
 	  else
 	    Some (op,ver)
     in
-    List.map (fun (os,deplist) ->
-      os,(List.map (fun (pkgname,ov_opt,pkg_desc_opt) -> 
+    List.map (fun (os,platforms,deplist) ->
+      os,platforms,(List.map (fun (pkgname,ov_opt,pkg_desc_opt) -> 
 	(pkgname,(change pkgname ov_opt),pkg_desc_opt)) deplist))
       depends
   in
@@ -147,7 +147,6 @@ let check_components =
       in
       let checkout_state key =
 	log_message (sprintf "prepare component state: %s (%s)" c.name key);
-	
 	if Sys.file_exists c.name then
 	  ignore
 	    (System.with_dir c.name
@@ -156,7 +155,9 @@ let check_components =
 		  | Some key' ->
 		      if key' <> key then
 			Git.git_checkout ~force:true ~key ()
-		  | _ -> Git.git_checkout ~force:true ~key ())))
+		  | _ -> Git.git_checkout ~force:true ~key ());
+		(* Подтягиваем изменения перед ветвлением *)
+		Git.git_fetch ()))
 	else
 	  Component.prepare c
       in
@@ -234,7 +235,7 @@ let make ?(interactive=true) ?(depth=0) top_specdir dst =
       dst src (string_of_forktype mode));
 
   let pack_dir = dir (dir top_specdir) in
-  let deptree = Packtree.create ~default_branch:(Some src) top_specdir in
+  let deptree = Packtree.create ~default_branch:(Some src) ~all_platforms:true top_specdir in
   let deplist = List.map (fun (k,v) -> fst k,v) (deplist_of_deptree deptree) in
   let depends = list_of_deptree deptree in
   log_message "depend list...";
@@ -312,8 +313,8 @@ let make ?(interactive=true) ?(depth=0) top_specdir dst =
 	    Some (op,increment (capacity_reduction ver))
     in
     List.map
-      (fun (os,deplist) ->
-	os,(List.map (fun (pkgname,ov_opt,pkg_desc_opt) ->
+      (fun (os,platforms,deplist) ->
+	os,platforms,(List.map (fun (pkgname,ov_opt,pkg_desc_opt) ->
 	  if Params.home_made_package pkgname then
 	    (pkgname,(change pkgname ov_opt),pkg_desc_opt)
 	  else
@@ -422,22 +423,37 @@ let make ?(interactive=true) ?(depth=0) top_specdir dst =
 	(Specdir.branch top_specdir)
 	depends);
 
-  List.iter (fun x ->
-    log_message (sprintf "Need branching %s" (fst x))) !branch_jobs;
-
-  if interactive then
+  let ignore_branching =
+    try
+      ignore(Sys.getenv "IGNORE_BRANCHING");
+      true
+    with Not_found -> false
+  in
+  
+  if not ignore_branching then
     begin
-      log_message "Delay before components branching...";
-      Interactive.stop_delay 10;
+      List.iter (fun x ->
+	log_message (sprintf "Need branching %s" (fst x))) !branch_jobs;
+      
+      if interactive then
+	begin
+	  log_message "Delay before components branching...";
+	  Interactive.stop_delay 10;
+	end;
+      List.iter
+	(fun (loc,f) -> 
+	  log_message (sprintf "Branching %s" loc);
+	  System.with_dir loc f)
+	!branch_jobs;
     end;
-  List.iter
-    (fun (loc,f) -> 
-      log_message (sprintf "Branching %s" loc);
-      System.with_dir loc f)
-    !branch_jobs;
+  
   if interactive then
     begin
       log_message "Delay before commit pack changes...";
       Interactive.stop_delay 10;
     end;
   commit_pack_changes (src,dst) pack_dir
+
+
+
+
