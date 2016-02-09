@@ -35,7 +35,7 @@ let call_after_build ?chroot ~snapshot ~location ~fullname hooks version release
   in
   if Scheme.defined "after-build" then
     Scheme.eval_code (fun _ -> ())
-      (sprintf "(after-build \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %s %s)"
+      (sprintf "(after-build \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %s \"%s\")"
 	(System.hostname ()) location fullname version release branch
 	(if snapshot then "#t" else "#f")
 	(string_of_platform platform))
