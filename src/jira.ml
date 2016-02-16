@@ -5,7 +5,7 @@
  *)
 
 open Printf
-module J = Yojson.Basic
+module J = Yojson.Safe
 
 exception Bad_jira_port of string
 exception Bad_response_status of string
