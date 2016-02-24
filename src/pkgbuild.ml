@@ -727,8 +727,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		"mv" [(Filename.concat abs_specdir "debian.deb");pkgfile];
 
 	      let location = Sys.getcwd () in
-	      let arch = System.arch () in
-	      let fullname = Debian.fullname spec.pkgname version release arch in
+	      let fullname = pkgfile in
 	      call_after_build ~snapshot ~location ~fullname spec.hooks version release platform
 	)
     | version ->
