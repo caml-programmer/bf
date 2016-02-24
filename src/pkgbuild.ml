@@ -537,7 +537,17 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		Buffer.contents b
 	      in
 
-	      let specify_provides l = l in
+	      let specify_provides l =
+		match System.arch () with
+		| "x86_64"
+		| "amd64" ->
+		   List.map (fun provides ->
+			     let len = try String.index provides ' '
+				       with _ -> String.length provides in
+			     String.sub provides 0 (len - 1))
+			    l
+		| _ -> ([]: string list)
+	      in
 	      
 	      let find_value = function
 		| "topdir" -> Params.get_param "top-dir"
@@ -672,7 +682,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 			gen_param "package";
 			gen_param "architecture";
 			gen_param "depends";
-			gen_param "provides";
+			if spec.provides <> [] then gen_param "provides";
 			gen_param "description";
 			out
 			  (" " ^ (find_value "description") ^ "\n"))
