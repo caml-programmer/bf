@@ -542,9 +542,12 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		| "x86_64"
 		| "amd64" ->
 		   List.map (fun provides ->
+			     printf "Process provides line: %s" provides;
 			     let len = try String.index provides ' '
-				       with _ -> String.length provides in
-			     String.sub provides 0 (len - 1))
+				       with Not_found -> String.length provides in
+			     let result = String.sub provides 0 (len - 1) in
+			     printf "Result processing: %s" result;
+			     result)
 			    l
 		| _ -> ([]: string list)
 	      in
