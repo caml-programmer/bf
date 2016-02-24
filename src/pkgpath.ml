@@ -105,8 +105,9 @@ let parse pkg_path =
 
 let make_pkg_record ~userhost pkg_path =
   let (pkg_dir,pkg_name,pkg,platform,extension,arch,version,revision) = parse pkg_path in
+  let engine = engine_of_platform platform in
   let pack_branch =
-    Pkgbuild.extract_packbranch ~userhost pkg_path in
+    Pkgbuild.extract_packbranch ?userhost ~engine pkg_path in
   { 
     pkg_path = pkg_path;
     pkg_dir = pkg_dir;

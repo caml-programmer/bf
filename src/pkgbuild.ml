@@ -4,18 +4,29 @@ open Logger
 open Platform
 open Spectype
 
-let extract_packbranch ~userhost pkg_path =
+let extract_packbranch ?userhost ?(engine=Rpm_build) pkg_path =
   match
-    (match userhost with
-      | Some auth ->
-	  (System.read_lines ~filter:(Pcre.pmatch ~rex:(Pcre.regexp "packbranch-"))
-	    (sprintf "ssh %s rpm -qp --provides %s" auth pkg_path))
-      | None ->
-	  (System.read_lines ~filter:(Pcre.pmatch ~rex:(Pcre.regexp "packbranch-"))
-	    (sprintf "rpm -qp --provides %s" pkg_path)))
+    (match engine with
+     | Rpm_build ->
+	(match userhost with
+	 | Some auth ->
+	    (System.read_lines ~filter:(Pcre.pmatch ~rex:(Pcre.regexp "packbranch-"))
+			       (sprintf "ssh %s rpm -qp --provides %s" auth pkg_path))
+	 | None ->
+	    (System.read_lines ~filter:(Pcre.pmatch ~rex:(Pcre.regexp "packbranch-"))
+			       (sprintf "rpm -qp --provides %s" pkg_path)))
+     | Deb_pkg ->
+	(match userhost with
+	 | Some auth ->
+	    (System.read_lines ~filter:(Pcre.pmatch ~rex:(Pcre.regexp "packbranch-"))
+			       (sprintf "ssh %s dpkg-deb -f %s provides" auth pkg_path))
+	 | None ->
+	    (System.read_lines ~filter:(Pcre.pmatch ~rex:(Pcre.regexp "packbranch-"))
+			       (sprintf "dpkg-deb -f %s provides" pkg_path)))
+     | _ -> [])
   with [] -> raise (Pack_branch_is_not_found pkg_path)
     | hd::_ ->
-	let pos = String.index hd '-' in
+       let pos = String.index hd '-' in
 	let len =
 	  try
 	    String.index hd ' '
@@ -29,8 +40,9 @@ let call_after_build ?chroot ~snapshot ~location ~fullname hooks version release
     | Some file -> Scheme.eval_file file
     | None -> ());
   let full_path =  sprintf "%s/%s" location fullname in
+  let engine = engine_of_platform platform in
   let branch = match chroot with
-    | None -> extract_packbranch None full_path
+    | None -> extract_packbranch ?userhost:None ~engine full_path
     | Some _ -> "packbranch-obsolete"
   in
   if Scheme.defined "after-build" then
@@ -524,6 +536,9 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		  deps;
 		Buffer.contents b
 	      in
+
+	      let specify_provides l = l in
+	      
 	      let find_value = function
 		| "topdir" -> Params.get_param "top-dir"
 		| "source" -> spec.pkgname
@@ -535,6 +550,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		| "section" -> Hashtbl.find spec.params "group"
 		| "description" -> Hashtbl.find spec.params "summary"
 		| "depends" -> make_debian_depends spec.depends
+		| "provides" -> String.concat ", " (specify_provides spec.provides)
 		| k -> Hashtbl.find spec.params k
 	      in
 	      
@@ -656,6 +672,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 			gen_param "package";
 			gen_param "architecture";
 			gen_param "depends";
+			gen_param "provides";
 			gen_param "description";
 			out
 			  (" " ^ (find_value "description") ^ "\n"))
