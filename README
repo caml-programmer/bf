@@ -51,7 +51,7 @@ Objective Caml >= 3.12 и программа make.
 
 Скачиваем исходники bf:
 
-git clone http://caml.ru/repos/bf.git bf.git
+git clone https://github.com/dm-ka/bf bf.git
 
 Утилита git использует curl для скачивания файлов, 
 поэтому необходимые пременные окружения также должны 
