@@ -6,12 +6,13 @@ open Spectype
   
 let rec make ?(toplevel=true) pkg_name version rev_a rev_b =
   (*Params.disable_display_logs ();*)
-  let msg loglevel text = msg "Changelog_ng.make" loglevel text in
-  let tag_a = Tag.make pkg_name version rev_a in
-  let tag_b = Tag.make pkg_name version rev_b in
-  let specdir = Specdir.specdir_by_version pkg_name version in
-  let depgraph_a = Depgraph.of_pkg pkg_name version (Some rev_a) in
-  let depgraph_b = Depgraph.of_pkg pkg_name version (Some rev_b) in
+  (*
+    let tag_a = Tag.make pkg_name version rev_a in
+    let tag_b = Tag.make pkg_name version rev_b in
+    let specdir = Specdir.specdir_by_version pkg_name version in
+    let depgraph_a = Depgraph.of_pkg pkg_name version (Some rev_a) in
+    let depgraph_b = Depgraph.of_pkg pkg_name version (Some rev_b) in
+  *)
   ()
 
 (* данная функция выводит changelog пакета и всех его зависимостей *)       

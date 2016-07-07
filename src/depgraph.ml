@@ -71,8 +71,6 @@ let reg_dep depgraph head_pkg tail_pkg =
 (* Загрузка графа зависимостей определённой ревизии *)
 let of_pkg_with_rev ?(use_builddeps=false) pkgname version revision : depgraph =
   let func = "Depgraph.of_pkg_with_rev" in
-  let err = Output.err func in
-  let warn = Output.warn func in
   let msg = Output.msg func in
 
   (* Для загрузки актуальной информации о зависимостях пакета, надо
@@ -93,9 +91,7 @@ let of_pkg_with_rev ?(use_builddeps=false) pkgname version revision : depgraph =
   let depgraph = create () in
   (* Прописываем алиасы основных функций, которые будут работать только с этим графом *)
   let has_pkg = has_pkg depgraph in
-  let get_spec = get_spec depgraph in
   let reg_pkg = reg_pkg depgraph in
-  let upd_pkg = upd_pkg_if_rev_less depgraph in
   let reg_dep = reg_dep depgraph in
 
   (* функция заполнения графа *)
@@ -108,24 +104,27 @@ let of_pkg_with_rev ?(use_builddeps=false) pkgname version revision : depgraph =
       reg_pkg spec;
       (if prevpkg <> "" then reg_dep prevpkg pkg);
       let deps =
-	List.map (fun dep ->
-		  let (deppkg, Some (_, depver), _) = dep in
+	List.map 
+	  (function
+	    | (deppkg, Some (_, depver), _) ->
+		begin
 		  match Pkg.is_local deppkg with
-		  | false -> (deppkg, depver, 0)
-		  | true ->
-		     let deprev = Specdir.revision_by_pkgver deppkg depver in
-		     (deppkg, depver, deprev))
-		 depends in
+		    | false -> (deppkg, depver, 0)
+		    | true ->
+			let deprev = 
+			  Specdir.revision_by_pkgver deppkg depver in
+			(deppkg, depver, deprev)
+		end
+	    | _ -> assert false)
+	  depends in
       List.iter (fill_graph ~prevpkg:pkg) deps in
-		  
+  
   (* Основное тело функции *)
   fill_graph (pkgname, version, revision);
   depgraph
 
 let of_pkg_only ?(use_builddeps=false) pkgname version =
   let func = "Depgraph.of_pkg_only" in
-  let err = Output.err func in
-  let warn = Output.warn func in
   let msg = Output.msg func in
 
   msg "always" ("test package: "^pkgname);
@@ -140,9 +139,7 @@ let of_pkg_only ?(use_builddeps=false) pkgname version =
   let depgraph = create () in
 
   let has_pkg = has_pkg depgraph in
-  let get_spec = get_spec depgraph in
   let reg_pkg = reg_pkg depgraph in
-  let upd_pkg = upd_pkg_if_rev_less depgraph in
   let reg_dep = reg_dep depgraph in
 
   let rec fill_graph ?(prevpkg="") (pkg, ver) =
@@ -154,10 +151,11 @@ let of_pkg_only ?(use_builddeps=false) pkgname version =
       reg_pkg spec;
       (if prevpkg <> "" then reg_dep prevpkg pkg);
       let deps =
-	List.map (fun dep ->
-		  let (deppkg, Some (_, depver), _) = dep in
-		  (deppkg, depver))
-		 depends in
+	List.map 
+	  (function
+	    | (deppkg, Some (_, depver), _) -> (deppkg, depver)
+	    | _ -> assert false)
+	  depends in
       List.iter (fill_graph ~prevpkg:pkg) deps in
 
   fill_graph (pkgname, version);

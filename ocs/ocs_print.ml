@@ -6,7 +6,7 @@ open Ocs_numstr
 
 let write_string p s =
   Ocs_port.putc p '\"';
-  for i = 0 to String.length s - 1 do
+  for i = 0 to Bytes.length s - 1 do
     match s.[i] with
       '\n' -> Ocs_port.puts p "\\n"
     | '\r' -> Ocs_port.puts p "\\r"

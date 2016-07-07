@@ -145,10 +145,10 @@ let resolve_ldeps ?(os=Platform.os()) ?(platform=Platform.current()) (deplist:pl
 
 (* Создаёт дубликат строки и делает её первый символ заглавным *)
 let key_format s =
-  let l = String.length s in
+  let l = Bytes.length s in
   if l > 0 then
-    let r = String.sub s 0 l in
-    r.[0] <- Char.uppercase r.[0]; r
+    let r = Bytes.sub s 0 l in
+    Bytes.set r 0 (Char.uppercase (Bytes.get r 0)); r
   else s
 
 let build
@@ -191,7 +191,7 @@ let build
 
   let cmd = 
     sprintf "rpmbuild %s" 
-      (String.concat " " (List.map (fun x -> "'" ^ x ^ "'") !args)) in
+      (Bytes.concat " " (List.map (fun x -> "'" ^ x ^ "'") !args)) in
 
   log_message (sprintf "run: %s" cmd);
   
@@ -239,9 +239,9 @@ let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
   Commands.make_directory [buildroot];
   
   let match_prefix p v =
-    let pl = String.length p in
-    let vl = String.length v in
-    vl >= pl && String.sub v 0 pl = p
+    let pl = Bytes.length p in
+    let vl = Bytes.length v in
+    vl >= pl && Bytes.sub v 0 pl = p
   in
   let parse_line s =
     let make_path s =
@@ -250,13 +250,13 @@ let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
 	  (Strings.substring_replace ("%topdir",top_dir)
 	    (Strings.substring_replace ("%config\\(noreplace\\) %topdir",top_dir) s)) in
       let m = 
-	let l = String.length n in
+	let l = Bytes.length n in
 	if l > 0 && n.[0] = '/' then
-	  String.sub n 1 (pred l)
+	  Bytes.sub n 1 (pred l)
 	else n
       in m
     in
-    let len = String.length s in
+    let len = Bytes.length s in
     if match_prefix "%dir " s then
       `Empty_dir (make_path s)
     else if match_prefix "%config(noreplace) %topdir" s then

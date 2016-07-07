@@ -130,7 +130,6 @@ let os_of_string = function
 let string_of_os = function
   | Linux -> "linux"
   | SunOS -> "sunos"
-  | _ -> Output.err "Platform.string_of_os" "Unknown OS"
 
 let os_as_string = System.uname
 

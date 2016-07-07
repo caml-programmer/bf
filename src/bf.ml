@@ -232,7 +232,6 @@ let main () =
 	    if len > 2 then
 	      let specdir = Sys.argv.(2) in
 	      let version = Filename.concat specdir "version" in
-	      let composite = Filename.concat specdir "composite" in
 	      let (lazy_mode,lazy_pos) =
 		if      len > 3 && Sys.argv.(3) = "lazy" then true,3
 		else if len > 4 && Sys.argv.(4) = "lazy" then true,4
@@ -410,8 +409,8 @@ let main () =
 	      else
 		Changelog.make Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	    else usage ()
-	| "diff-ng" -> ()
-	| "changelog-ng" -> Changelog_ng.changelog_specdir Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
+	| "changelog-ng" -> 
+	    Changelog_ng.changelog_specdir Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
 	| "link" ->
 	    if len = 3 then
 	      Link.make ~hard:true Sys.argv.(2)
@@ -537,7 +536,7 @@ let main () =
 	   let rev_b = Sys.argv.(5) in
 	   with_teleport Goto_bf_params
 	     (fun () ->
-	      ignore (Changelog_ng.make package version (int_of_string rev_a) (int_of_string rev_b)))
+	       ignore (Changelog_ng.make package version (int_of_string rev_a) (int_of_string rev_b)))
 	| "test-depload" ->
 	   let depfile = Sys.argv.(2) in
 	   Test.depload depfile

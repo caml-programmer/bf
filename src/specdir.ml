@@ -59,15 +59,13 @@ let last_line_of_file filename =
 exception Invalid_release of string
        
 let ver_rev_of_release release =
-  let err msg = err "ver_rev_of_release" msg in
   match Str.split (Str.regexp " ") release with
-  | [ver;rev] -> ver,(int_of_string rev)
-  | x -> raise (Invalid_release (String.concat " " x))
-
+    | [ver;rev] -> ver,(int_of_string rev)
+    | x -> raise (Invalid_release (String.concat " " x))
+	
 exception No_release_file
 	     
 let release_by_specdir specdir =
-  let err msg = err "release_by_specdir" msg in
   let release_file = Path.make [specdir;"release"] in
   if Sys.file_exists release_file then
     last_line_of_file release_file

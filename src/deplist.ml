@@ -66,8 +66,7 @@ let make pkg_target =
 		let slash = Str.regexp "/" in
 		let split s =
 		  match Str.split slash s with
-		    | [name;_] -> name
-		    | [name] -> name
+		    | name::_ -> name
 		    | [] -> s in
 		List.map split
 		  (Str.split nl data)) in

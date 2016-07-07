@@ -8,16 +8,16 @@
 open Unix
 
 exception Protocol_error
-exception Transient_error of int * string
-exception Permanent_error of int * string
+exception Transient_error of int * bytes
+exception Permanent_error of int * bytes
 
 let tcp_port = 25
 
 (* Helpers *)
 
-let trim s l r = String.sub s l (String.length s - r - l)
+let trim s l r = Bytes.sub s l (Bytes.length s - r - l)
 
-let join = String.concat "\n"
+let join = Bytes.concat "\n"
 
 let none = function _ -> false
 let void  = function _ -> ()
@@ -32,7 +32,7 @@ let read_status ic =
       read ((trim l 4 1)::acc)
     else
       (int_of_char l.[0] - int_of_char '0') ,
-      int_of_string (String.sub l 0 3) ,
+      int_of_string (Bytes.sub l 0 3) ,
       List.rev ((trim l 4 1)::acc)
   in read []
 
@@ -85,11 +85,11 @@ object (self)
     ( try
       while true do
         let l = input_line chan in
-        if String.length l > 0 && l.[0] = '.' then output_char oc '.';
+        if Bytes.length l > 0 && l.[0] = '.' then output_char oc '.';
         output_string oc l;
         output_string oc
-	  (if String.length l > 0 && 
-	    l.[String.length l - 2] = '\r' then "\n" else "\r\n")
+	  (if Bytes.length l > 0 && 
+	    l.[Bytes.length l - 2] = '\r' then "\n" else "\r\n")
       done;
       assert false
     with End_of_file -> () );

@@ -24,9 +24,9 @@ let encode_with_options b64 equal s pos len
    *   [last_linelen] is the length of the last line
    *)
   assert (Array.length b64 = 64);
-  if len < 0 || pos < 0 || pos > String.length s || linelen < 0 then
+  if len < 0 || pos < 0 || pos > Bytes.length s || linelen < 0 then
     invalid_arg "Netencoding.Base64.encode";
-  if pos + len > String.length s then
+  if pos + len > Bytes.length s then
     invalid_arg "Netencoding.Base64.encode";
 
   let linelen = (linelen asr 2) lsl 2 in
@@ -48,28 +48,28 @@ let encode_with_options b64 equal s pos len
   in
   (* l_t': length of the result with CRLF or LF characters *)
   
-  let t = String.make l_t' equal in
+  let t = Bytes.make l_t' equal in
   let j = ref 0 in
   let q = ref (linelen - first_linelen) in
   for k = 0 to len / 3 - 1 do
     let p = pos + 3*k in
     (* p >= pos >= 0: this is evident
-     * p+2 < pos+len <= String.length s:
+     * p+2 < pos+len <= Bytes.length s:
      *   Because k <= len/3-1
      *         3*k <= 3*(len/3-1) = len - 3
      *   pos+3*k+2 <= pos + len - 3 + 2 = pos + len - 1 < pos + len
      * So it is proved that the following unsafe string accesses always
      * work.
      *)
-    let bits = (Char.code (String.unsafe_get s (p))   lsl 16) lor
-      (Char.code (String.unsafe_get s (p+1)) lsl  8) lor
-      (Char.code (String.unsafe_get s (p+2))) in
+    let bits = (Char.code (Bytes.unsafe_get s (p))   lsl 16) lor
+      (Char.code (Bytes.unsafe_get s (p+1)) lsl  8) lor
+      (Char.code (Bytes.unsafe_get s (p+2))) in
     (* Obviously, 'bits' is a 24 bit entity (i.e. bits < 2**24) *)
     assert(!j + 3 < l_t');
-    String.unsafe_set t !j     (Array.unsafe_get b64 ( bits lsr 18));
-    String.unsafe_set t (!j+1) (Array.unsafe_get b64 ((bits lsr 12) land 63));
-    String.unsafe_set t (!j+2) (Array.unsafe_get b64 ((bits lsr  6) land 63));
-    String.unsafe_set t (!j+3) (Array.unsafe_get b64 ( bits         land 63));
+    Bytes.unsafe_set t !j     (Array.unsafe_get b64 ( bits lsr 18));
+    Bytes.unsafe_set t (!j+1) (Array.unsafe_get b64 ((bits lsr 12) land 63));
+    Bytes.unsafe_set t (!j+2) (Array.unsafe_get b64 ((bits lsr  6) land 63));
+    Bytes.unsafe_set t (!j+3) (Array.unsafe_get b64 ( bits         land 63));
     j := !j + 4;
     if linelen > 3 then begin
       q := !q + 4;
@@ -78,12 +78,12 @@ let encode_with_options b64 equal s pos len
 	 * a line ending.
 	 *)
 	if crlf then begin
-	  t.[ !j ] <- '\013';
-	  t.[ !j+1 ] <- '\010';
+	  Bytes.set t !j '\013';
+	  Bytes.set t (succ !j) '\010';
 	  j := !j + 2;
 	end
-	else begin 
-	  t.[ !j ] <- '\010';
+	else begin
+	  Bytes.set t !j '\010';
 	  incr j
 	end;
 	q := 0;
@@ -97,16 +97,16 @@ let encode_with_options b64 equal s pos len
 	0 -> ()
       | 1 ->
           let bits = Char.code (s.[pos + len - 1]) in
-	  t.[ !j     ] <- b64.( bits lsr 2);
-	  t.[ !j + 1 ] <- b64.( (bits land 0x03) lsl 4);
+	  Bytes.set t !j b64.(bits lsr 2);
+	  Bytes.set t (succ !j) b64.((bits land 0x03) lsl 4);
 	  j := !j + 4;
 	  q := !q + 4;
       | 2 ->
 	  let bits = (Char.code (s.[pos + len - 2]) lsl 8) lor
             (Char.code (s.[pos + len - 1])) in
-	  t.[ !j     ] <- b64.( bits lsr 10);
-	  t.[ !j + 1 ] <- b64.((bits lsr  4) land 0x3f);
-	  t.[ !j + 2 ] <- b64.((bits lsl  2) land 0x3f);
+	  Bytes.set t !j b64.( bits lsr 10);
+	  Bytes.set t (succ !j) b64.((bits lsr  4) land 0x3f);
+	  Bytes.set t (!j + 2)  b64.((bits lsl  2) land 0x3f);
 	  j := !j + 4;
 	  q := !q + 4;
       | _ -> assert false
@@ -114,22 +114,25 @@ let encode_with_options b64 equal s pos len
 
   (* If required, add another line end: *)
 
-  if linelen > 3 && !q > 0 && len > 0 then begin
-    if crlf then begin
-      t.[ !j ] <- '\013';
-      t.[ !j+1 ] <- '\010';
-      j := !j + 2;
-    end
-    else begin 
-      t.[ !j ] <- '\010';
-      incr j;
-    end;	
-  end;
+  if linelen > 3 && !q > 0 && len > 0 then
+    begin
+      if crlf then 
+	begin
+	  Bytes.set t !j '\013';
+	  Bytes.set t (succ !j) '\010';
+	  j := !j + 2;
+	end
+      else 
+	begin
+	  Bytes.set t !j '\010';
+	  incr j;
+	end;	
+    end;
 
   (t, !q) ;;
 
 let encode ?(pos=0) ?len ?(linelength=0) ?(crlf=false) s =
-  let l = match len with None -> String.length s - pos | Some x -> x in
+  let l = match len with None -> Bytes.length s - pos | Some x -> x in
   let s,_ = 
     encode_with_options rfc_pattern '=' s pos l linelength linelength crlf in
   s

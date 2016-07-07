@@ -15,10 +15,10 @@ let read_descriptors l =
       (fun fd ->
 	Unix.set_nonblock fd;
 	fd,Buffer.create 32) l in
-  let data = String.create 1024 in
+  let data = Bytes.create 1024 in
   let append fd len =
     let chunk =
-      String.sub data 0 len in
+      Bytes.sub data 0 len in
     let buf =
       List.assoc fd buffer_map in
     if Buffer.length buf + len < Sys.max_string_length then
@@ -91,5 +91,5 @@ let string_of_result = function
 
 let string_of_error (program,args,result) =
   sprintf "failed call: %s %s -> %s"
-    program (String.concat " " args) (string_of_result result)
+    program (Bytes.concat " " args) (string_of_result result)
 

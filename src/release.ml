@@ -119,6 +119,5 @@ let of_string release_str =
     int_of_string (String.sub release_str (succ pos) (len - pos - 1))
   with Not_found -> err ("Invalid release: " ^ release_str)
 
-let to_string = function
-  | (ver, rev) -> ver^"-"^(string_of_int rev)
-  | _ -> raise Invalid_release
+let to_string (ver,rev) =
+  ver ^ "-" ^ (string_of_int rev)

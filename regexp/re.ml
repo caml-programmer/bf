@@ -255,7 +255,7 @@ let dummy_substrings = `Match ("", [], [||], 0)
 
 let get_color re s pos =
   if pos < 0 then -1 else
-  let slen = String.length s in
+  let slen = Bytes.length s in
   if pos >= slen then -1 else
   (* Special case for the last newline *)
   if pos = slen - 1 && re.lnl <> -1 && s.[pos] = '\n' then re.lnl else
@@ -284,7 +284,7 @@ let rec scan_str info s initial_state groups =
   let pos = info.pos in
   let last = info.last in
   if
-    last = String.length s &&
+    last = Bytes.length s &&
     info.re.lnl <> -1 &&
     last > pos &&
     s.[last - 1] = '\n'
@@ -301,7 +301,7 @@ let rec scan_str info s initial_state groups =
     loop_no_mark info s pos last initial_state
 
 let match_str groups re s pos len =
-  let slen = String.length s in
+  let slen = Bytes.length s in
   let last = if len = -1 then slen else pos + len in
   let info =
     { re = re; i_cols = re.cols; pos = pos; last = last;
@@ -435,8 +435,11 @@ let rec is_charset r =
 (*XXX Use a better algorithm allowing non-contiguous regions? *)
 let rec split s cm =
   match s with
-    []    -> ()
-  | (i, j)::r -> cm.[i] <- '\001'; cm.[j + 1] <- '\001'; split r cm
+      [] -> ()
+    | (i, j)::r -> 
+	Bytes.set cm i '\001';
+	Bytes.set cm (j+1) '\001';
+	split r cm
 
 let cupper =
   Cset.union (cseq 'A' 'Z') (Cset.union (cseq '\192' '\214') (cseq '\216' '\222'))
@@ -471,20 +474,20 @@ let rec colorize c regexp =
   colorize regexp;
   !lnl
 
-let make_cmap () = String.make 257 '\000'
+let make_cmap () = Bytes.make 257 '\000'
 
 let flatten_cmap cm =
-  let c = String.create 256 in
-  let col_repr = String.create 256 in
+  let c = Bytes.create 256 in
+  let col_repr = Bytes.create 256 in
   let v = ref 0 in
-  c.[0] <- '\000';
-  col_repr.[0] <- '\000';
+  Bytes.set c 0 '\000';
+  Bytes.set col_repr 0 '\000';
   for i = 1 to 255 do
     if cm.[i] <> '\000' then incr v;
-    c.[i] <- Char.chr !v;
-    col_repr.[!v] <- Char.chr i
+    Bytes.set c i (Char.chr !v);
+    Bytes.set col_repr !v (Char.chr i)
   done;
-  (c, String.sub col_repr 0 (!v + 1), !v + 1)
+  (c, Bytes.sub col_repr 0 (!v + 1), !v + 1)
 
 (**** Compilation ****)
 
@@ -737,7 +740,7 @@ type t = regexp
 
 let str s =
   let l = ref [] in
-  for i = String.length s - 1 downto 0 do
+  for i = Bytes.length s - 1 downto 0 do
     l := Set (csingle s.[i]) :: !l
   done;
   Sequence !l
@@ -782,7 +785,7 @@ let nest r = Nest r
 
 let set str =
   let s = ref [] in
-  for i = 0 to String.length str - 1 do
+  for i = 0 to Bytes.length str - 1 do
     s := Cset.union (csingle str.[i]) !s
   done;
   Set !s
@@ -834,21 +837,21 @@ type substrings = (string * Automata.mark_infos * int array * int)
 let compile r = compile_1 (seq [shortest (rep any); group r])
 
 let exec ?(pos = 0) ?(len = -1) re s =
-  if pos < 0 || len < -1 || pos + len > String.length s then
+  if pos < 0 || len < -1 || pos + len > Bytes.length s then
     invalid_arg "Re.exec";
   match match_str true re s pos len with
     `Match substr -> substr
   | _             -> raise Not_found
 
 let execp ?(pos = 0) ?(len = -1) re s =
-  if pos < 0 || len < -1 || pos + len > String.length s then
+  if pos < 0 || len < -1 || pos + len > Bytes.length s then
     invalid_arg "Re.execp";
   match match_str false re s pos len with
     `Match substr -> true
   | _             -> false
 
 let exec_partial ?(pos = 0) ?(len = -1) re s =
-  if pos < 0 || len < -1 || pos + len > String.length s then
+  if pos < 0 || len < -1 || pos + len > Bytes.length s then
     invalid_arg "Re.exec_partial";
   match match_str false re s pos len with
     `Match _ -> `Full
@@ -868,7 +871,7 @@ let get (s, marks, pos, _) i =
   if m1 = -1 then raise Not_found;
   let p1 = pos.(m1) - 1 in
   let p2 = pos.(marks.(2 * i + 1)) - 1 in
-  String.sub s p1 (p2 - p1)
+  Bytes.sub s p1 (p2 - p1)
 
 let get_ofs (s, marks, pos, _) i =
   if 2 * i + 1 >= Array.length marks then raise Not_found;
@@ -906,7 +909,7 @@ let get_all (s, marks, pos, count) =
     if m1 <> -1 then begin
       let p1 = pos.(m1) in
       let p2 = pos.(marks.(2 * i + 1)) in
-      res.(i) <- String.sub s (p1 - 1) (p2 - p1)
+      res.(i) <- Bytes.sub s (p1 - 1) (p2 - p1)
     end
   done;
   res

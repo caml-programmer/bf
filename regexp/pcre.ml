@@ -24,7 +24,7 @@ let pmatch ~rex s =
 let substitute ~rex ~subst str =
   let b = Buffer.create 1024 in
   let rec loop pos =
-    if pos >= String.length str then
+    if pos >= Bytes.length str then
       Buffer.contents b
     else if Re.execp ~pos rex str then (
       let ss = Re.exec ~pos rex str in
@@ -34,44 +34,44 @@ let substitute ~rex ~subst str =
       Buffer.add_string b (subst pat);
       loop fin
     ) else (
-      Buffer.add_substring b str pos (String.length str - pos);
-      loop (String.length str)
+      Buffer.add_substring b str pos (Bytes.length str - pos);
+      loop (Bytes.length str)
     )
   in
   loop 0
 
 let split ~rex str =
   let rec loop accu pos =
-    if pos >= String.length str then
+    if pos >= Bytes.length str then
       List.rev accu
     else if Re.execp ~pos rex str then (
       let ss = Re.exec ~pos rex str in
       let start, fin = Re.get_ofs ss 0 in
-      let s = String.sub str pos (start - pos) in
+      let s = Bytes.sub str pos (start - pos) in
       loop (s :: accu) fin
     ) else (
-      let s = String.sub str pos (String.length str - pos) in
-      loop (s :: accu) (String.length str)
+      let s = Bytes.sub str pos (Bytes.length str - pos) in
+      loop (s :: accu) (Bytes.length str)
     ) in
   loop [] 0
 
 (* From PCRE *)
 let string_unsafe_sub s ofs len =
-  let r = String.create len in
-  String.unsafe_blit s ofs r 0 len;
+  let r = Bytes.create len in
+  Bytes.unsafe_blit s ofs r 0 len;
   r
 
 let quote s =
-  let len = String.length s in
-  let buf = String.create (len lsl 1) in
+  let len = Bytes.length s in
+  let buf = Bytes.create (len lsl 1) in
   let pos = ref 0 in
   for i = 0 to len - 1 do
-    match String.unsafe_get s i with
+    match Bytes.unsafe_get s i with
     | '\\' | '^' | '$' | '.' | '[' | '|'
     | '('  | ')' | '?' | '*' | '+' | '{' as c ->
-      String.unsafe_set buf !pos '\\';
+      Bytes.unsafe_set buf !pos '\\';
       incr pos;
-      String.unsafe_set buf !pos c; incr pos
-    | c -> String.unsafe_set buf !pos c; incr pos
+      Bytes.unsafe_set buf !pos c; incr pos
+    | c -> Bytes.unsafe_set buf !pos c; incr pos
   done;
   string_unsafe_sub buf 0 !pos
