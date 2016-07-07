@@ -1,4 +1,5 @@
-<*.ml> : package(unix,yojson,shell)
+<jira.ml>: syntax(camlp4o), package(camlp4.macro), define(YOJSON)
+<*.ml> : package(unix,shell)
 <bf2.ml> : package(cmdliner)
-<bf.native> : package(unix,num,str,yojson,shell)
-<bf2.native> : package(cmdliner,str,unix,yojson,num,shell)
+<bf.native> : package(unix,num,str,shell)
+<bf2.native> : package(cmdliner,str,unix,num,shell)
