@@ -8,4 +8,4 @@
     (log-command "make"))
 
   (define (install args)
-      (log-command "make" "install")))
+      (log-command "sudo" "make" "install")))

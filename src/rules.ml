@@ -46,33 +46,51 @@ let with_snapshot snapshot f =
   Ocs_env.set_glob Scheme.env (Ssymbol "snapshot") Sfalse  
 
 let build_rules ?(snapshot=false) name =
-  Plugins.load ();
-  Env.prepare ();
-  print_string "load rules...";
-  Scheme.eval_file (rules_file name);
-  print_endline "ok"; 
-  with_snapshot snapshot 
-    (fun () ->
-      Scheme.eval_code (fun _ -> ()) "(build ())";
-      Env.prepare ())
-
-let install_rules ?(snapshot=false) ?(check_build=true) name =
-  Plugins.load ();
-  Env.prepare ();
-  print_string "load rules...";
-  Scheme.eval_file (rules_file name);
-  print_endline "ok";
-  if (not check_build) || Sys.file_exists
-    (match name with None -> ".bf-build" | Some s -> ".bf-build." ^ s)
-  then
+  let file = rules_file name in
+  if Sys.file_exists file then
     begin
+      Plugins.load ();
+      Env.prepare ();
+      print_string "load rules...";
+      Scheme.eval_file file;
+      print_endline "ok"; 
       with_snapshot snapshot 
-	(fun () ->	  
-	  Scheme.eval_code (fun _ -> ()) "(install ())";
+	(fun () ->
+	  Scheme.eval_code (fun _ -> ()) "(build ())";
 	  Env.prepare ())
     end
   else
-    log_error "current component is not built"
+    begin
+      if Sys.file_exists "configure" then
+	begin
+	  ignore(Sys.command "./configure");
+	end;
+      ignore(Sys.command "make")
+    end
+      
+let install_rules ?(snapshot=false) ?(check_build=true) name =
+  let file = rules_file name in
+  if Sys.file_exists file then
+    begin
+      Plugins.load ();
+      Env.prepare ();
+      print_string "load rules...";
+      Scheme.eval_file (rules_file name);
+      print_endline "ok";
+      if (not check_build) || Sys.file_exists
+	(match name with None -> ".bf-build" | Some s -> ".bf-build." ^ s)
+      then
+	begin
+	  with_snapshot snapshot 
+	    (fun () ->	  
+	      Scheme.eval_code (fun _ -> ()) "(install ())";
+	      Env.prepare ())
+	end
+      else
+	log_error "current component is not built"
+    end
+  else
+    ignore(Sys.command "make install")
 
 (*** Component rules *)
 
