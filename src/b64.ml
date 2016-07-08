@@ -21,18 +21,18 @@ let uri_safe_alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012
 let padding = '='
 
 let of_char ?(alphabet=default_alphabet) x =
-  if x = padding then 0 else String.index alphabet x
+  if x = padding then 0 else Bytes.index alphabet x
 
 let to_char ?(alphabet=default_alphabet) x =
   alphabet.[x]
 
 let decode ?alphabet input =
-  let length = String.length input in
+  let length = Bytes.length input in
   let input =
     if length mod 4 = 0 then input
-    else input ^ (String.make (4 - length mod 4) padding)
+    else input ^ (Bytes.make (4 - length mod 4) padding)
   in
-  let length = String.length input in
+  let length = Bytes.length input in
   let words = length / 4 in
   let padding =
     match length with
@@ -41,29 +41,29 @@ let decode ?alphabet input =
     | _ when input.[length - 1] = padding -> 1
     | _ -> 0
   in
-  let output = String.make (words * 3 - padding) '\000' in
+  let output = Bytes.make (words * 3 - padding) '\000' in
   for i = 0 to words - 1 do
-    let a = of_char ?alphabet (String.get input (4 * i + 0))
-    and b = of_char ?alphabet (String.get input (4 * i + 1))
-    and c = of_char ?alphabet (String.get input (4 * i + 2))
-    and d = of_char ?alphabet (String.get input (4 * i + 3)) in
+    let a = of_char ?alphabet (Bytes.get input (4 * i + 0))
+    and b = of_char ?alphabet (Bytes.get input (4 * i + 1))
+    and c = of_char ?alphabet (Bytes.get input (4 * i + 2))
+    and d = of_char ?alphabet (Bytes.get input (4 * i + 3)) in
     let n = (a lsl 18) lor (b lsl 12) lor (c lsl 6) lor d in
     let x = (n lsr 16) land 255
     and y = (n lsr 8) land 255
     and z = n land 255 in
-    String.set output (3 * i + 0) (char_of_int x);
+    Bytes.set output (3 * i + 0) (char_of_int x);
     if i <> words - 1 || padding < 2 then
-      String.set output (3 * i + 1) (char_of_int y);
+      Bytes.set output (3 * i + 1) (char_of_int y);
     if i <> words - 1 || padding < 1 then
-      String.set output (3 * i + 2) (char_of_int z);
+      Bytes.set output (3 * i + 2) (char_of_int z);
   done;
   output
 
 let encode ?(pad=true) ?alphabet input =
-  let length = String.length input in
+  let length = Bytes.length input in
   let words = (length + 2) / 3 in (* rounded up *)
   let padding_len = if length mod 3 = 0 then 0 else 3 - (length mod 3) in
-  let output = String.make (words * 4) '\000' in
+  let output = Bytes.make (words * 4) '\000' in
   let get i = if i >= length then 0 else int_of_char input.[i] in
   for i = 0 to words - 1 do
     let x = get (3 * i + 0)
@@ -74,13 +74,13 @@ let encode ?(pad=true) ?alphabet input =
     and b = (n lsr 12) land 63
     and c = (n lsr 6) land 63
     and d = n land 63 in
-    String.set output (4 * i + 0) (to_char ?alphabet a);
-    String.set output (4 * i + 1) (to_char ?alphabet b);
-    String.set output (4 * i + 2) (to_char ?alphabet c);
-    String.set output (4 * i + 3) (to_char ?alphabet d);
+    Bytes.set output (4 * i + 0) (to_char ?alphabet a);
+    Bytes.set output (4 * i + 1) (to_char ?alphabet b);
+    Bytes.set output (4 * i + 2) (to_char ?alphabet c);
+    Bytes.set output (4 * i + 3) (to_char ?alphabet d);
   done;
   for i = 1 to padding_len do
-    String.set output (String.length output - i) padding;
+    Bytes.set output (Bytes.length output - i) padding;
   done;
   if pad then output
-  else String.sub output 0 (String.length output - padding_len)
+  else Bytes.sub output 0 (Bytes.length output - padding_len)
