@@ -122,5 +122,5 @@ let fix_issue key (pkg,ver,rev) =
 (*let _ = fix_issue "SKVT-7213" ("PKG","1.0",3)*)  
 ELSE    
 let fix_issue key (pkg,ver,rev) = ()
-ENDIF
+END
 
