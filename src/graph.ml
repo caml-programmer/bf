@@ -461,7 +461,7 @@ let extract_langs component =
       let name = Filename.basename x in
       let pos = String.rindex name '.' in
       let ext =
-	String.lowercase
+	String.lowercase_ascii
 	  (String.sub name (succ pos) (String.length name - pos - 1)) in
       update ext (count_cc x)
     with Not_found ->

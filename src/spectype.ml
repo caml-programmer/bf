@@ -249,7 +249,7 @@ let depload ?snapshot ?(all_platforms=false) ?(interactive=false) ?(ignore_last=
       
       (match name_v with
 	| Ssymbol s -> pkg_name := Some s
-	| Sstring s -> pkg_name := Some s
+	| Sstring s -> pkg_name := Some (Bytes.to_string s)
 	| _ -> ());
       (match op_ver_v with
 	| None -> ()

@@ -1,7 +1,11 @@
-(let* ((ocaml-dir "/opt/dev/ocaml")
-       (bindir (path-concat ocaml-dir "bin"))
-       (libdir (path-concat ocaml-dir "lib")))
-  (add-path bindir)
+(define (opam-ocaml-dir)
+  (car (read-command "realpath ~/.opam/4*")))
+
+(let* ((ocaml-dir (opam-ocaml-dir))
+       (bindir (path-concat ocaml-dir "bin")))
+
+  (if (file-exists bindir)
+      (add-path bindir))
 
   (define (build args)
       (log-command "./configure")

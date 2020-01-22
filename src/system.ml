@@ -176,7 +176,7 @@ let uname ?flag () =
     (match flag with
       | Some c -> sprintf "uname -%c" c
       | None   -> "uname") in
-  let name = String.lowercase (input_line ch) in
+  let name = String.lowercase_ascii (input_line ch) in
   ignore(Unix.close_process_in ch);
   name
 
@@ -388,8 +388,6 @@ let move_file src dir =
   let name = Filename.basename src in
   let dst = Filename.concat dir name in
   Sys.rename src dst
-
-exception Cannot_create_directory of string
 
 let make_directory_r ?(mode=0o755) s =
   let rec make rest s =

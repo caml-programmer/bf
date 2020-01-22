@@ -16,8 +16,8 @@ let replace_param key value content =
 	| Some v -> v
 	| None -> "" in
     let result =
-      if Re.execp (Re_perl.compile_pat ~opts:[`Caseless] ("^" ^ key ^ "\\s*=.*?$")) line then
-	((String.uppercase key) ^ "=" ^ value)
+      if Re.execp (Re.Perl.compile_pat ~opts:[`Caseless] ("^" ^ key ^ "\\s*=.*?$")) line then
+	((String.uppercase_ascii key) ^ "=" ^ value)
       else
 	line in
     (* printf "update-params key(%s) value(%s): %s\n%!" key value result; *)
@@ -138,11 +138,11 @@ let scm_make v =
   Rules.make (Scheme.make_params_of_sval v); Snull
 
 let scm_path_concat v =
-  Sstring (path_concat (Scheme.string_list_of_sval_array v))
+  Sstring (Bytes.of_string (path_concat (Scheme.string_list_of_sval_array v)))
 
 let scm_string_concat v =  
-  Sstring (string_concat 
-    (Scheme.string_list_of_sval_array v))
+  Sstring (Bytes.of_string (string_concat
+    (Scheme.string_list_of_sval_array v)))
 
 let scm_log_command v =
   let l = Scheme.string_list_of_sval_array v in
@@ -168,7 +168,7 @@ let scm_install_file file dir =
 
 let scm_read_directory dir =
   scm_make_list
-    (fun s -> Sstring s)
+    (fun s -> Sstring (Bytes.of_string s))
     (System.read_directory
       (Scheme.string_of_sval dir))
 
@@ -193,21 +193,22 @@ let scm_file_exists file =
 
 let scm_get_env name =
   match Rules.get_env (Scheme.string_of_sval name) with
-    | Some v -> Sstring v
-    | None   -> Sstring ""
+    | Some v -> Sstring (Bytes.of_string v)
+    | None   -> Sstring Bytes.empty
 
 let scm_read_command cmd =
-  scm_make_list (fun s -> Sstring s)
+  scm_make_list (fun s -> Sstring (Bytes.of_string s))
     (read_command (Scheme.string_of_sval cmd))
     
 let scm_command cmd =
   let (status,outputs,errors) = Cmd.command_log ~env:(Env.component ()) (Scheme.string_of_sval cmd) in
-  Spair {car = Sint status;
-	 cdr =
-	   Spair {car = Sstring outputs;
-		  cdr=
-		    Spair {car = Sstring errors;
-			   cdr = Snull}}}
+  Spair {
+    car = Sint status;
+    cdr = Spair {
+      car = Sstring (Bytes.of_string outputs);
+      cdr= Spair {
+	car = Sstring (Bytes.of_string errors);
+	cdr = Snull}}}
 
 let scm_cpu_number () =
   Sint (Cmd.cpu_number ())
@@ -217,19 +218,19 @@ let scm_update_make_params v =
   Snull
 
 let scm_current_directory () =
-  Sstring (Sys.getcwd ())
+  Sstring (Bytes.of_string (Sys.getcwd ()))
 
 let scm_uname () =
-  Sstring (List.hd (read_command "uname"))
+  Sstring (Bytes.of_string (List.hd (read_command "uname")))
 
 let scm_arch () =
-  Sstring (List.hd (read_command "arch"))
+  Sstring (Bytes.of_string (List.hd (read_command "arch")))
 
 let scm_dirname s =
-  Sstring (Filename.dirname (Scheme.string_of_sval s))
+  Sstring (Bytes.of_string (Filename.dirname (Scheme.string_of_sval s)))
 
 let scm_basename s =
-  Sstring (Filename.basename (Scheme.string_of_sval s))
+  Sstring (Bytes.of_string (Filename.basename (Scheme.string_of_sval s)))
 
 let scm_remove_file v =
   List.iter (fun file ->
@@ -292,8 +293,8 @@ let scm_package_build_message v =
   match Scheme.string_list_of_sval_array v with
     | [host;location;pkgname;storage] ->
 	Sstring 
-	  (Notify.package_build_message
-	    ~host ~location ~pkgname ~storage)
+	  (Bytes.of_string (Notify.package_build_message
+	    ~host ~location ~pkgname ~storage))
     | _  ->
 	log_error "Invalid package-build-message usage"
 
@@ -336,9 +337,9 @@ let scm_substring templ s =
 
 let scm_substrings templ s =
   let rex = 
-    Re_perl.compile_pat (Scheme.string_of_sval templ) in
-  scm_make_list (fun x -> Sstring x)
-    (Array.to_list (Re.get_all (Re.exec rex (Scheme.string_of_sval s))))
+    Re.Perl.compile_pat (Scheme.string_of_sval templ) in
+  scm_make_list (fun x -> Sstring (Bytes.of_string x))
+    (Array.to_list (Pcre.extract ~rex (Scheme.string_of_sval s)))
 
 let scm_env_append v =
   match Scheme.string_list_of_sval_array v with
@@ -390,7 +391,7 @@ let scm_git_push_tag_cycle url tag depth =
 ;;
 
 let scm_print_endline = function
-  | Sstring str -> print_endline str; Snull
+  | Sstring str -> print_endline (Bytes.to_string str); Snull
   | Ssymbol str -> print_endline str; Snull
   | _ -> failwith "Not a symbol or string"
 ;;

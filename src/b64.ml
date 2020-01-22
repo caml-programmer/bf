@@ -1,6 +1,7 @@
 (*
  * Copyright (c) 2006-2009 Citrix Systems Inc.
  * Copyright (c) 2010 Thomas Gazagnaire <thomas@gazagnaire.com>
+ * Copyright (c) 2020 DM SOFTWARE
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,29 +17,31 @@
  *
  *)
 
-let default_alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-let uri_safe_alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+let default_alphabet =
+  Bytes.of_string "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+let uri_safe_alphabet =
+  Bytes.of_string "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 let padding = '='
 
 let of_char ?(alphabet=default_alphabet) x =
   if x = padding then 0 else Bytes.index alphabet x
 
 let to_char ?(alphabet=default_alphabet) x =
-  alphabet.[x]
+  Bytes.get alphabet x
 
 let decode ?alphabet input =
   let length = Bytes.length input in
   let input =
     if length mod 4 = 0 then input
-    else input ^ (Bytes.make (4 - length mod 4) padding)
+    else Bytes.cat input (Bytes.make (4 - length mod 4) padding)
   in
   let length = Bytes.length input in
   let words = length / 4 in
   let padding =
     match length with
     | 0 -> 0
-    | _ when input.[length - 2] = padding -> 2
-    | _ when input.[length - 1] = padding -> 1
+    | _ when Bytes.get input (length - 2) = padding -> 2
+    | _ when Bytes.get input (length - 1) = padding -> 1
     | _ -> 0
   in
   let output = Bytes.make (words * 3 - padding) '\000' in
@@ -64,7 +67,7 @@ let encode ?(pad=true) ?alphabet input =
   let words = (length + 2) / 3 in (* rounded up *)
   let padding_len = if length mod 3 = 0 then 0 else 3 - (length mod 3) in
   let output = Bytes.make (words * 4) '\000' in
-  let get i = if i >= length then 0 else int_of_char input.[i] in
+  let get i = if i >= length then 0 else int_of_char (Bytes.get input i) in
   for i = 0 to words - 1 do
     let x = get (3 * i + 0)
     and y = get (3 * i + 1)

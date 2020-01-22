@@ -25,7 +25,7 @@ type sval =
   (* Symbol type.  Symbols should not be created directly, but using
      Ocs_sym.get_symbol, which ensures that they are unique and can be
      compared using ==.  *)
-  | Ssymbol of bytes
+  | Ssymbol of string
 
   (* Numeric types.  *)
   | Sint of int

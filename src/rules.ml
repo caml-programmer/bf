@@ -116,7 +116,7 @@ let simple_install args =
 let export args =
   List.iter
     (fun (key,value) ->
-      let key = String.uppercase key in
+      let key = String.uppercase_ascii key in
       match value with
 	  Some v ->
 	    Env.update key v
@@ -140,7 +140,7 @@ let make args =
     | [] -> List.rev acc
     | (key,value)::tl ->
 	match value with
-	  | Some v -> prepare ((String.uppercase key^"="^v)::acc) tl
+	  | Some v -> prepare ((String.uppercase_ascii key^"="^v)::acc) tl
 	  | None   -> prepare (key::acc) tl
   in log_command "make" (add_make_opts (prepare [] args))
 

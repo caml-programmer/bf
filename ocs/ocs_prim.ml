@@ -74,14 +74,14 @@ let is_symbol =
 
 let symbol_to_string =
   function
-    Ssymbol s -> Sstring s
-  | _ -> raise (Error "symbol->string: not a symbol")
+      Ssymbol s -> Sstring (Bytes.of_string s)
+    | _ -> raise (Error "symbol->string: not a symbol")
 ;;
 
 let string_to_symbol =
   function
-    Sstring s -> get_symbol (Bytes.copy s)
-  | _ -> raise (Error "string->symbol: not a string")
+      Sstring s -> get_symbol (Bytes.to_string (Bytes.copy s))
+    | _ -> raise (Error "string->symbol: not a string")
 ;;
 
 let is_eq a b =
@@ -206,8 +206,8 @@ let load_file e th name =
 
 let load_prim e th cc =
   function
-    [| Sstring name |] -> load_file e th name; cc Snull
-  | _ -> raise (Error "load: invalid name argument")
+      [| Sstring name |] -> load_file e th (Bytes.to_string name); cc Snull
+    | _ -> raise (Error "load: invalid name argument")
 ;;
 
 let eval_prim th cc =

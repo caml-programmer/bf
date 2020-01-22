@@ -6,8 +6,9 @@
 
    This library is free software; you can redistribute it and/or
    modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation; either
-   version 2 of the License, or (at your option) any later version.
+   License as published by the Free Software Foundation, with
+   linking exception; either version 2.1 of the License, or (at
+   your option) any later version.
 
    This library is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -16,11 +17,37 @@
 
    You should have received a copy of the GNU Lesser General Public
    License along with this library; if not, write to the Free Software
-   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 *)
+
+module Re = Core
 
 exception Parse_error
 exception Not_supported
+
+let posix_class_of_string = function
+  | "alpha"  -> Re.alpha
+  | "alnum"  -> Re.alnum
+  | "ascii"  -> Re.ascii
+  | "blank"  -> Re.blank
+  | "cntrl"  -> Re.cntrl
+  | "digit"  -> Re.digit
+  | "lower"  -> Re.lower
+  | "print"  -> Re.print
+  | "space"  -> Re.space
+  | "upper"  -> Re.upper
+  | "word"   -> Re.wordc
+  | "punct"  -> Re.punct
+  | "graph"  -> Re.graph
+  | "xdigit" -> Re.xdigit
+  | class_   -> invalid_arg ("Invalid pcre class: " ^ class_)
+
+let posix_class_strings =
+  [ "alpha" ; "alnum" ; "ascii"
+  ; "blank" ; "cntrl" ; "digit"
+  ; "lower" ; "print" ; "space"
+  ; "upper" ; "word"  ; "punct"
+  ; "graph" ; "xdigit" ]
 
 let parse multiline dollar_endonly dotall ungreedy s =
   let i = ref 0 in
@@ -28,9 +55,18 @@ let parse multiline dollar_endonly dotall ungreedy s =
   let eos () = !i = l in
   let test c = not (eos ()) && s.[!i] = c in
   let accept c = let r = test c in if r then incr i; r in
+  let accept_s s' =
+    let len = String.length s' in
+    try
+      for j = 0 to len - 1 do
+        try if s'.[j] <> s.[!i + j] then raise Exit
+        with _ -> raise Exit
+      done;
+      i := !i + len;
+      true
+    with Exit -> false in
   let get () = let r = s.[!i] in incr i; r in
   let unget () = decr i in
-
   let greedy_mod r =
     let gr = accept '?' in
     let gr = if ungreedy then not gr else gr in
@@ -149,26 +185,35 @@ let parse multiline dollar_endonly dotall ungreedy s =
   and bracket s =
     if s <> [] && accept ']' then s else begin
       match char () with
-        `Char c ->
-          if accept '-' then begin
-            if accept ']' then Re.char c :: Re.char '-' :: s else begin
-              match char () with
-                `Char c' ->
-                  bracket (Re.rg c c' :: s)
-              | `Set st' ->
-                  Re.char c :: Re.char '-' :: st' :: s
-            end
-          end else
-            bracket (Re.char c :: s)
-      | `Set st ->
-          bracket (st :: s)
+      | `Char c ->
+        if accept '-' then begin
+          if accept ']' then Re.char c :: Re.char '-' :: s else begin
+            match char () with
+              `Char c' ->
+              bracket (Re.rg c c' :: s)
+            | `Set st' ->
+              bracket (Re.char c :: Re.char '-' :: st' :: s)
+          end
+        end else
+          bracket (Re.char c :: s)
+      | `Set st -> bracket (st :: s)
     end
   and char () =
     if eos () then raise Parse_error;
     let c = get () in
     if c = '[' then begin
-      if accept '=' || accept ':' then raise Not_supported;
-      if accept '.' then begin
+      if accept '=' then raise Not_supported;
+      if accept ':' then
+        let compl = accept '^' in
+        let cls =
+          try List.find accept_s posix_class_strings
+          with Not_found -> raise Parse_error in
+        if not (accept_s ":]") then raise Parse_error;
+        let re =
+          let posix_class = posix_class_of_string cls in
+          if compl then Re.compl [posix_class] else posix_class in
+        `Set (re)
+      else if accept '.' then begin
         if eos () then raise Parse_error;
         let c = get () in
         if not (accept '.') then raise Not_supported;
@@ -177,6 +222,7 @@ let parse multiline dollar_endonly dotall ungreedy s =
       end else
         `Char c
     end else if c = '\\' then begin
+      if eos () then raise Parse_error;
       let c = get () in
 (* XXX
    \127, ...
@@ -201,6 +247,7 @@ let parse multiline dollar_endonly dotall ungreedy s =
     end else
       `Char c
   and comment () =
+    if eos () then raise Parse_error;
     if accept ')' then Re.epsilon else begin incr i; comment () end
   in
   let res = regexp () in

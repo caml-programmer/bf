@@ -12,7 +12,7 @@ open Ocs_error
    descriptor.  *)
 
 type port = {
-  mutable p_buf : string;
+  mutable p_buf : bytes;
   mutable p_pos : int;
   mutable p_wend : int;
   mutable p_rend : int;
@@ -107,7 +107,7 @@ let getc p =
       else
 	begin
 	  assert (p.p_pos < p.p_rend);
-	  let c = p.p_buf.[p.p_pos] in
+	  let c = Bytes.get p.p_buf p.p_pos in
 	    p.p_pos <- p.p_pos + 1;
 	    Some c
 	end
@@ -160,14 +160,15 @@ let putc p c =
 ;;
 
 let puts p s =
-  let n = Bytes.length s in
+  let bs = Bytes.of_string s in
+  let n = Bytes.length bs in
     if n > 0 && p.p_rend - p.p_pos >= n then
       begin
-	Bytes.blit s 0 p.p_buf p.p_pos n;
+	Bytes.blit bs 0 p.p_buf p.p_pos n;
 	p.p_pos <- p.p_pos + n
       end
     else
-      Bytes.iter (fun c -> putc p c) s
+      Bytes.iter (fun c -> putc p c) bs
 ;;
 
 let fd_port fd flags =
@@ -213,9 +214,10 @@ let open_output_port name =
 ;;
 
 let string_input_port s =
-  let p = mkport s None true false false in
-    p.p_rend <- Bytes.length s;
-    p
+  let bs = Bytes.of_string s in
+  let p = mkport bs None true false false in
+  p.p_rend <- Bytes.length bs;
+  p
 ;;
 
 let string_output_port () =

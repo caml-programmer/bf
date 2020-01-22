@@ -72,7 +72,7 @@ let load_chroot_cfg chroot_name platform =
   let platform = Platform.string_of_platform platform in
   let read_string_value sexp errmsg =
     match sexp with
-      | Sstring x -> x
+      | Sstring x -> Bytes.to_string x
       | _ as x -> Scheme.print x; err errmsg in
   System.with_dir (Params.get_param "chroot-spec")
     (fun () ->
@@ -80,7 +80,7 @@ let load_chroot_cfg chroot_name platform =
       then let fullcfg = Scm.read_record (Scm.read_file chroot_name) in
       let cfg = Scm.read_record (List.assoc platform fullcfg) in
       let path = match List.assoc "path" cfg with
-	| Sstring p -> p
+	| Sstring p -> Bytes.to_string p
 	| _ as p -> Scheme.print p; err "Bad path" in
       let mpoints_sexp = try List.assoc "mount" cfg with
 	| Not_found -> Snull in
@@ -103,9 +103,11 @@ let load_chroot_cfg chroot_name platform =
 	    options = opts;
 	    fstype = fstype; })
 	  mpoint_sexp_list in
-      { name = chroot_name;
-      path = (Path.expand_globs path);
-      mount = mpoints; }
+      {
+	name = chroot_name;
+	path = Path.expand_globs path;
+	mount = mpoints;
+      }
       else err ("Can't find chroot spec for: "^chroot_name))
 
 exception No_chroot_command

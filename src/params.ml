@@ -13,18 +13,18 @@ let debug =
   with Not_found -> false
 
 let read_from_file filename =
-  let rex = Re_perl.compile_pat "^([^\\s]+)\\s+(.*)\\s*$" in
+  let rex = Re.Perl.compile_pat "^([^\\s]+)\\s+(.*)\\s*$" in
   if Sys.file_exists filename
   then let ch = open_in filename in
        List.iter
 	 (fun s ->
 	  try
-	    let res = Re.exec rex s in
-	    let key = Re.get res 1 in
-	    let value = Re.get res 2 in	
+	    let res = Core.exec rex s in
+	    let key = Core.Group.get res 1 in
+	    let value = Core.Group.get res 2 in
 	    Hashtbl.replace user_params key value;
 	    Ocs_env.set_glob Scheme.env
-			     (Ssymbol key) (Sstring value)
+	      (Ssymbol key) (Sstring (Bytes.of_string value))
 	  with Not_found ->
 	    Printf.printf "ignore: \"%s\"\n%!" s)
 	 (List.filter String.not_empty (System.list_of_channel ch));
@@ -53,7 +53,7 @@ let set_param ~default s =
   in
   
   Ocs_env.set_glob Scheme.env
-    (Ssymbol s) (Sstring value);
+    (Ssymbol s) (Sstring (Bytes.of_string value));
   
   Hashtbl.replace user_params s value
 
@@ -64,13 +64,13 @@ let set param value =
   (*print_endline ("Set param: "^param^" -> "^value);*)
   if not (exists param) then
     raise (Unknown_parameter param);
-  Ocs_env.set_glob Scheme.env (Ssymbol param) (Sstring value);
+  Ocs_env.set_glob Scheme.env (Ssymbol param) (Sstring (Bytes.of_string value));
   Hashtbl.replace user_params param value
 
 let create param value =
   if exists param then
     failwith ("Parameter already exists: "^param);
-  Ocs_env.set_glob Scheme.env (Ssymbol param) (Sstring value);
+  Ocs_env.set_glob Scheme.env (Ssymbol param) (Sstring (Bytes.of_string value));
   Hashtbl.add user_params param value
 
 let get_param s =
@@ -82,7 +82,7 @@ let get = get_param
 			  
 let update_param name value =
   Ocs_env.set_glob Scheme.env
-    (Ssymbol name) (Sstring value);
+    (Ssymbol name) (Sstring (Bytes.of_string value));
   Hashtbl.replace user_params name value
 
 let set_composite_mode () =
@@ -218,7 +218,10 @@ let home_made_package pkg =
     try
       let ex_prefix_str = get_param "pkg-prefix-exclude" in
       let ex_prefix_list = Str.split (Str.regexp "[ ]+") ex_prefix_str in
-      List.exists (fun ex_prefix -> String.length ex_prefix <> 0 && Strings.have_prefix ex_prefix pkg) ex_prefix_list
+      List.exists
+	(fun ex_prefix ->
+	  String.length ex_prefix <> 0 && Strings.have_prefix ex_prefix pkg)
+	ex_prefix_list
     with Unknown_parameter _ -> false in
   (Strings.have_prefix (get_param "pkg-prefix") pkg) && not exclude
 

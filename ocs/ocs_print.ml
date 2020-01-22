@@ -6,7 +6,7 @@ open Ocs_numstr
 
 let write_string p s =
   Ocs_port.putc p '\"';
-  for i = 0 to Bytes.length s - 1 do
+  for i = 0 to String.length s - 1 do
     match s.[i] with
       '\n' -> Ocs_port.puts p "\\n"
     | '\r' -> Ocs_port.puts p "\\r"
@@ -52,7 +52,7 @@ and print p disp =
   | Seof -> Ocs_port.puts p "#<eof>"
   | Strue -> Ocs_port.puts p "#t"
   | Sfalse -> Ocs_port.puts p "#f"
-  | Sstring s -> if disp then Ocs_port.puts p s else write_string p s
+  | Sstring s -> if disp then Ocs_port.puts p (Bytes.to_string s) else write_string p (Bytes.to_string s)
   | Ssymbol s -> Ocs_port.puts p s
   | Sint i -> Ocs_port.puts p (string_of_int i)
   | Sreal r -> Ocs_port.puts p (string_of_real r)

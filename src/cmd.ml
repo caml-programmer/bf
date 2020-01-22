@@ -2,17 +2,16 @@ open Printf
 
 (* честно утащил из ds-config *)
 let read_descriptors fdlist =
-  let buffer_map = List.map (fun fd -> Unix.set_nonblock fd;
-				       (fd,(Buffer.create 32)))
-			    fdlist in
+  let buffer_map =
+    List.map
+      (fun fd -> Unix.set_nonblock fd;
+	(fd,(Buffer.create 32))) fdlist in
   let data = Bytes.create 1024 in
   let append fd len =
-    let chunk =
-      Bytes.sub data 0 len in
-    let buf =
-      List.assoc fd buffer_map in
+    let chunk = Bytes.sub data 0 len in
+    let buf = List.assoc fd buffer_map in
     if Buffer.length buf + len < Sys.max_string_length then
-      Buffer.add_string buf chunk 
+      Buffer.add_bytes buf chunk
   in
   let rec read l =
     if l <> [] then

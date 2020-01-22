@@ -62,7 +62,7 @@ let log_message ?(low=false) ?key ?logger message =
       | Some k -> (sprintf "%s(%0.3f)> [%s] %s\n" (human_timestamp timestamp) (timestamp -. starttime) k message)
   in
   let write p s =
-    output_bytes p s; flush p in
+    output_string p s; flush p in
   write (Lazy.force session_port) s;
   write port s;
   if not low then
@@ -79,14 +79,14 @@ let with_logger proc =
   in proc logger;
   close_logger logger
 
-exception Found_program of bytes
+exception Found_program of string
 
 let with_path s =
-  let len = Bytes.length s in
-  if len > 2 && Bytes.sub s 0 2 = "./" then
-    Filename.concat 
-      (Sys.getcwd ()) 
-      (Bytes.sub s 2 (len - 2))
+  let len = String.length s in
+  if len > 2 && String.sub s 0 2 = "./" then
+    Filename.concat
+      (Sys.getcwd ())
+      (String.sub s 2 (len - 2))
   else
   try
     List.iter
@@ -94,7 +94,9 @@ let with_path s =
 	let program = dir ^ "/" ^ s in
 	if Sys.file_exists program then
 	  raise (Found_program program)
-	else ()) System.path_list; s
+	else ())
+      System.path_list;
+    s
   with Found_program program -> program
 
 let linearization s =
@@ -113,7 +115,7 @@ let log_error error =
 
 let log_command ?(low=false) ?env ?error_handler prog args =
   let program = with_path prog in
-  let command = program ^ " " ^ (Bytes.concat " " args) in
+  let command = program ^ " " ^ (String.concat " " args) in
   with_logger
     (fun logger ->
       try
@@ -170,7 +172,7 @@ let log_command ?(low=false) ?env ?error_handler prog args =
 
 let run_command prog args =
   let program = with_path prog in
-  let command = program ^ " " ^ (Bytes.concat " " args) in
+  let command = program ^ " " ^ (String.concat " " args) in
   match Unix.fork () with
     | 0 ->  (* child *)
 	Unix.execv program (Array.of_list (program::args))

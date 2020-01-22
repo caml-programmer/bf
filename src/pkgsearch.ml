@@ -26,7 +26,10 @@ let map_pkg f pkgname =
 	    | Deb_pkg   -> pkgname
 	    | Pkg_trans -> Pkgtrans.name_format pkgname
 	in
-	let rex = tag_extraction_rex pkgname platform in
+	let rex =
+	  tag_extraction_rex
+	    pkgname
+	    platform in
 	let ff acc s =
 	  if Pcre.pmatch ~rex s then
 	    let a = Pcre.extract ~rex s in

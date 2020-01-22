@@ -22,7 +22,7 @@ let error sval =
   output_scheme_value stdout sval; exit 4
 
 let string_of_sval = function
-  | Sstring s -> s
+  | Sstring s -> Bytes.to_string s
   | Ssymbol s -> s
   | sval      -> error sval
 
@@ -100,15 +100,15 @@ let eval_pair v =
   let (a,b) = v in
   (match a with
     | Ssymbol s -> s
-    | Sstring s -> s
+    | Sstring s -> Bytes.to_string s
     | sval -> error sval),
   (match b with
-    | Sstring s -> s
+    | Sstring s -> Bytes.to_string s
     | Ssymbol s -> s
     | _ ->
 	(match (eval_sval b) with
 	  | Ssymbol s -> s
-	  | Sstring s -> s
+	  | Sstring s -> Bytes.to_string s
 	  | sval -> error sval))
 
 let eval_pair_opt v =
@@ -116,16 +116,16 @@ let eval_pair_opt v =
   (* error b;*)
   (match a with
     | Ssymbol s -> s
-    | Sstring s -> s
+    | Sstring s -> Bytes.to_string s
     | sval -> error sval),
   (match b with
-    | Sstring s -> Some s
+    | Sstring s -> Some (Bytes.to_string s)
     | Ssymbol s -> Some s
     | Snull -> None
     | _ ->
 	(match (eval_sval b) with
 	  | Ssymbol s -> Some s
-	  | Sstring s -> Some s
+	  | Sstring s -> Some (Bytes.to_string s)
 	  | Snull     -> None
 	  | sval -> error sval))
 
@@ -196,7 +196,7 @@ let string_handler_of_sval v =
 	      th_depth = Array.length disp }
 	  in	  
 	  Ocs_eval.eval th handler
-	    (Capply1 ((Cval (Sproc (p,disp))),Cval (Sstring file)));
+	    (Capply1 ((Cval (Sproc (p,disp))),Cval (Sstring (Bytes.of_string file))));
 	  (match !res with
 	    | None -> error v
 	    | Some sval -> ())
@@ -209,13 +209,13 @@ let unpair = function
 exception Not_found_string
 	       
 let make_string = function
-  | Sstring s -> s
+  | Sstring s -> Bytes.to_string s
   | Ssymbol s -> s
   | _ -> raise Not_found_string
 
 let make_int = function
   | Sint n -> n
-  | Sstring s -> int_of_string s
+  | Sstring s -> int_of_string (Bytes.to_string s)
   | _ -> raise Not_found
 
 let make_bool = function

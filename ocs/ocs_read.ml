@@ -8,7 +8,7 @@ open Ocs_misc
 
 let read_error lex err =
   let (file, name) = get_loc lex in
-    if Bytes.length file = 0 then
+    if String.length file = 0 then
       Error err
     else
       ErrorL ((file, name), err)
@@ -24,8 +24,8 @@ let show_token =
 let rec read_item lex =
   function
     Leof -> Seof
-  | Lident s -> get_symbol (Bytes.lowercase s)
-  | Lstring s -> Sstring s
+  | Lident s -> get_symbol (String.lowercase_ascii s)
+  | Lstring s -> Sstring (Bytes.of_string s)
   | Lnumber s | Lbool s | Lchar s -> s
   | Ltoken '(' -> read_list lex
   | Lopenv -> read_vector lex

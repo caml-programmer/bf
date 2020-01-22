@@ -8,8 +8,8 @@
  *)
 
 exception Protocol_error
-exception Transient_error of int * bytes
-exception Permanent_error of int * bytes
+exception Transient_error of int * string
+exception Permanent_error of int * string
 
 val tcp_port : int
 (** default TCP port for SMTP *)

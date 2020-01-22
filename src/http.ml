@@ -22,22 +22,22 @@ let nodename s =
   with Not_found -> s
 
 let parse_header s =
-  let pos = Bytes.index s ':' in
-  Bytes.lowercase 
-    (Bytes.sub s 0 pos),
-  Bytes.sub s (pos + 2)
-    (Bytes.length s - pos - 3)
+  let pos = String.index s ':' in
+  String.lowercase_ascii
+    (String.sub s 0 pos),
+  String.sub s (pos + 2)
+    (String.length s - pos - 3)
       
 let parse_status s =
-  let p1 = Bytes.index s ' ' in
-  let p2 = Bytes.index_from s (succ p1) ' ' in
-  Bytes.sub s 0 p1,
-  Bytes.sub s (succ p1) (p2 - p1 - 1),
-  Bytes.sub s p2 (Bytes.length s - p2 - 1)
+  let p1 = String.index s ' ' in
+  let p2 = String.index_from s (succ p1) ' ' in
+  String.sub s 0 p1,
+  String.sub s (succ p1) (p2 - p1 - 1),
+  String.sub s p2 (String.length s - p2 - 1)
 
 let nocarry s =
-  let l = Bytes.length s in
-  Bytes.sub s 0 (pred l)
+  let l = String.length s in
+  String.sub s 0 (pred l)
 
 exception Cannot_parse_chunksize of string * string
 
@@ -82,10 +82,11 @@ let read_chunked i =
 let read_body ?size i =
   match size with
     | Some n ->
-	let s = Bytes.create n in
+	let bs = Bytes.create n in
 	for j=0 to pred n do
-	  Bytes.unsafe_set s j (input_char i);
-	done; s
+	  Bytes.unsafe_set bs j (input_char i);
+	done;
+	Bytes.to_string bs
     | None ->
 	read_chunked i
 
@@ -142,7 +143,7 @@ let call_request log (i,o) query =
 	  | None ->
 	      read_unlimited_body i)
     in
-    log (sprintf "<< (body (length %d))\n%!" (Bytes.length body));
+    log (sprintf "<< (body (length %d))\n%!" (String.length body));
     (code,header,body)
   with
     | Unix.Unix_error (error,_,_) ->

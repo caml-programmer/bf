@@ -35,7 +35,7 @@ let make_date () =
     tm.Unix.tm_hour tm.Unix.tm_min tm.Unix.tm_sec
 
 let make_base64 s =
-  "=?UTF-8?B?" ^ (Base64.encode s) ^ "?="
+  "=?UTF-8?B?" ^ (Bytes.to_string (Base64.encode (Bytes.of_string s))) ^ "?="
 
 let boundary =
   "------------060501060303010105060205"
@@ -109,7 +109,7 @@ let send_message
       out (sprintf "Content-Transfer-Encoding: %s\n\n" "base64");
       List.iter
 	(fun content ->
-	  out (Base64.encode ~linelength:76 content))
+	  out (Bytes.to_string (Base64.encode ~linelength:76 (Bytes.of_string content))))
 	contents;
       out (sprintf "--%s--\n" boundary);
       close_out ch;

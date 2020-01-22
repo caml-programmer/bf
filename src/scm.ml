@@ -78,7 +78,11 @@ and print p disp x =
     | Seof -> drop (); puts p "#<eof>"
     | Strue -> drop (); puts p "#t"
     | Sfalse -> drop (); puts p "#f"
-    | Sstring s -> drop (); if disp then puts p s else write_string p s
+    | Sstring s -> drop ();
+	if disp then
+	  puts p (Bytes.to_string s)
+	else
+	  write_string p (Bytes.to_string s)
     | Ssymbol s -> drop (); puts p s
     | Sint i -> drop (); puts p (string_of_int i)
     | Sreal r -> drop (); puts p (string_of_real r)
@@ -112,14 +116,14 @@ let unpair = function
   | v -> raise (Bad_sexp (string_of_sval v))
 
 let make_string = function
-  | Sstring s -> s
+  | Sstring s -> Bytes.to_string s
   | Ssymbol s -> s
   | v -> raise (Bad_sexp (string_of_sval v))
 
 let make_int = function
   | Sint n -> n
   | Sstring s as v ->
-      (try int_of_string s with _ -> raise (Bad_sexp (string_of_sval v)))
+      (try int_of_string (Bytes.to_string s) with _ -> raise (Bad_sexp (string_of_sval v)))
   | v -> raise (Bad_sexp (string_of_sval v))
 
 let make_bool = function
@@ -177,7 +181,7 @@ let read_record : Ocs_types.sval -> (string * Ocs_types.sval) list =
     | Spair v -> 
 	(match v.car with 
 	  | Ssymbol s -> s
-	  | Sstring s -> s
+	  | Sstring s -> Bytes.to_string s
 	  | v -> raise (Bad_sexp (string_of_sval v))),
 	car v.cdr
     | v       -> raise (Bad_sexp (string_of_sval v)))
@@ -186,7 +190,7 @@ let read_tag v =
   let n =
     match car v with 
       | Ssymbol s -> s
-      | Sstring s -> s
+      | Sstring s -> Bytes.to_string s
       | v -> raise (Bad_sexp (string_of_sval (car v)))
   in n, car (cdr v)
 
@@ -194,7 +198,7 @@ let read_tag_list v =
   let n =
     match car v with
       | Ssymbol s -> s
-      | Sstring s -> s
+      | Sstring s -> Bytes.to_string s
       | v -> raise (Bad_sexp (string_of_sval (car v)))
   in n, cdr v
 
@@ -223,7 +227,7 @@ let read_parameter v =
   n, read_fields v
 
 let read_string = function
-  | Sstring s -> s
+  | Sstring s -> Bytes.to_string s
   | v -> raise (Bad_sexp (string_of_sval v))
 
 let read_symbol = function
@@ -231,7 +235,7 @@ let read_symbol = function
   | v -> raise (Bad_sexp (string_of_sval v))
 
 let read_string_or_symbol = function
-  | Sstring s -> s
+  | Sstring s -> Bytes.to_string s
   | Ssymbol s -> s
   | v -> raise (Bad_sexp (string_of_sval v))
 
@@ -290,14 +294,14 @@ let gen_tag (hd,fin) =
 let gen_tag_list ?(strkey=false) (hd,tl) =
   Spair 
     { 
-      car = if strkey then Sstring hd else Ssymbol hd;
+      car = if strkey then Sstring (Bytes.of_string hd) else Ssymbol hd;
       cdr = tl }
 
 let gen_fields ?(strkey=false) l =
   gen_list
     (List.map 
       (fun (k,v) -> 
-	Spair { car = if strkey then Sstring k else Ssymbol k; cdr = (gen_list v)}) l)
+	Spair { car = if strkey then Sstring (Bytes.of_string k) else Ssymbol k; cdr = (gen_list v)}) l)
 
 let gen_section (typ,name,l) =
   Spair {

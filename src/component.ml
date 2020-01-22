@@ -557,7 +557,7 @@ let changelog ?(branch=None) ?(diff=false) ?(since=None) tag_a tag_b component =
 	begin	
 	  let chunk =
 	    Printf.sprintf "\n %s (%s) (%s)\n"
-	      (String.uppercase component.name)
+	      (String.uppercase_ascii component.name)
 	      (string_of_label_type component.label)
 	      (string_of_label component.label) in
 	  let clearlogs =
@@ -573,11 +573,12 @@ let changelog ?(branch=None) ?(diff=false) ?(since=None) tag_a tag_b component =
 let extract_tasks s =
   let comma = Str.regexp "[,; ]" in
   let rex =
-    Re_perl.compile_pat "[^A-Z]*([A-Z]+-\\d+)[^0-9]*" in
+    Re.Perl.compile_pat "[^A-Z]*([A-Z]+-\\d+)[^0-9]*" in
   List.fold_left
     (fun acc s ->
       try
-	let a = Re.get_all (Re.exec rex s) in
+	let a =
+	  Pcre.extract ~rex s in
 	if Array.length a > 1 then
 	  a.(1)::acc
 	else acc
@@ -633,13 +634,13 @@ let component_of_sval s =
 		| Spair x ->
 		    (match x.car with
 		      | Ssymbol "branch" ->
-			  label := Branch (match fst x.cdr with Sstring s -> s | x -> error x)
+			  label := Branch (match fst x.cdr with Sstring s -> Bytes.to_string s | x -> error x)
 		      | Ssymbol "tag" ->
-			  label := Tag (match fst x.cdr with Sstring s ->  s | x -> error x)
+			  label := Tag (match fst x.cdr with Sstring s -> Bytes.to_string s | x -> error x)
 		      | Ssymbol "package" ->
-			  pkg := Some (match fst x.cdr with Sstring s ->  s | x -> error x)
+			  pkg := Some (match fst x.cdr with Sstring s -> Bytes.to_string s | x -> error x)
 		      | Ssymbol "rules" ->
-			  rules := Some (match fst x.cdr with Sstring s ->  s | x -> error x)
+			  rules := Some (match fst x.cdr with Sstring s -> Bytes.to_string s | x -> error x)
 		      | Ssymbol "nopack" ->
 			  (match !pkg with
 			    | None   -> nopack := true;
@@ -649,7 +650,7 @@ let component_of_sval s =
 			  forkmode := forkmode_of_string
 			    (match fst x.cdr with
 			      | Ssymbol s -> s
-			      | Sstring s -> s
+			      | Sstring s -> Bytes.to_string s
 			      | x -> error x)
 		      | x -> error x)
 		| Snull -> ()

@@ -20,5 +20,4 @@ let make_absolute path =
 let expand_globs path =
   let home_dir = Sys.getenv "HOME" in
   let home_regexp = Str.regexp "^~" in
-  let path = Str.global_replace home_regexp home_dir path in
-  path
+  Str.global_replace home_regexp home_dir path

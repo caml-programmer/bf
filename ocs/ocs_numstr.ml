@@ -13,13 +13,13 @@ open Ratio
 (* We need to scan strings and keep track of our position.  *)
 
 type sbuf = {
-  s_str : string;
+  s_str : bytes;
   mutable s_pos : int
 }
 
 let speek s =
   if s.s_pos < Bytes.length s.s_str then
-    Some s.s_str.[s.s_pos]
+    Some (Bytes.get s.s_str s.s_pos)
   else
     None
 ;;
@@ -80,7 +80,7 @@ let strtobi s base =
       v
     else
       loop (i + 1) (am v
-	(match s.[i] with
+	(match Bytes.get s i with
 	  '0' .. '9' as c -> int_of_char c - int_of_char '0'
 	| 'a' .. 'f' as c -> int_of_char c - int_of_char 'a' + 10
 	| 'A' .. 'F' as c -> int_of_char c - int_of_char 'A' + 10
@@ -93,7 +93,7 @@ let read_bigint s base =
   if base = 10 then
     big_int_of_string s
   else
-    strtobi s base
+    strtobi (Bytes.of_string s) base
 ;;
 
 (* The largest integer is at *least* this big (bigger on 64-bit machines).  *)
@@ -134,7 +134,7 @@ let parse_num s base =
 	    else
 	      Sint i
 	| (_, true) ->
-	    Sbigint (read_bigint (Bytes.sub s.s_str sp (s.s_pos - sp)) base)
+	    Sbigint (read_bigint (Bytes.to_string (Bytes.sub s.s_str sp (s.s_pos - sp))) base)
     in
       let num = readn () in
 	match speek s with
@@ -168,7 +168,7 @@ let parse_flo10 s =
       end;
       let t = Bytes.sub s.s_str sp (s.s_pos - sp) in
 	for i = 0 to Bytes.length t - 1 do
-	  match t.[i] with
+	  match Bytes.get t i with
 	    | '#' ->
 		Bytes.set t i '0';
 	    | 'F' | 'f' | 'D' | 'd' | 'S' | 's' | 'L' | 'l' ->
@@ -176,7 +176,7 @@ let parse_flo10 s =
 	    | _ -> ()
 	done;
 	  try
-	    Sreal (float_of_string t)
+	    Sreal (float_of_string (Bytes.to_string t))
 	  with
 	    Failure _ -> raise (Error "invalid float")
 ;;
@@ -188,15 +188,15 @@ let string_to_num str ub =
   else if str = "-i" || str = "-I" then
     Scomplex { Complex.re = 0.0; Complex.im = -1.0; }
   else
-  let s = { s_str = str; s_pos = 0 } in
-  let (base, ex) =
-    match parse_prefix s with
-      0, x -> if ub = 0 then (10, x) else (ub, x)
-    | (b, x) as r ->
-      if ub <> 0 && ub <> b then
-	raise (Error "Base mismatch")
-      else r
-  in
+    let s = { s_str = (Bytes.of_string str); s_pos = 0 } in
+    let (base, ex) =
+      match parse_prefix s with
+	  0, x -> if ub = 0 then (10, x) else (ub, x)
+	| (b, x) as r ->
+	    if ub <> 0 && ub <> b then
+	      raise (Error "Base mismatch")
+	    else r
+    in
     let getn () =
       if base = 10 && ex <> Exact then
 	begin
@@ -221,7 +221,7 @@ let string_to_num str ub =
 	    if ex = Exact then
 	      raise (Error "Complex not exact")
 	    else
-	      if ssleft s = 2 && s.s_str.[s.s_pos + 1] = 'i' then
+	      if ssleft s = 2 && Bytes.get s.s_str (s.s_pos + 1) = 'i' then
 		Scomplex { Complex.re = float_of_snum a;
 			   Complex.im = (if c = '-' then -1.0 else 1.0) }
 	      else
@@ -265,10 +265,10 @@ let snum_strtonum av =
 	    Sstring s ->
 	      begin
 		try
-		  if s = "" then
+		  if s = Bytes.empty then
 		    Sfalse
 		  else
-		    string_to_num s r
+		    string_to_num (Bytes.to_string s) r
 		with
 		  _ -> Sfalse
 	      end
@@ -283,7 +283,7 @@ let string_of_real_s r =
 
 let string_of_real r =
   let s = string_of_real_s r in
-  let n = Bytes.length s in
+  let n = String.length s in
   let rec loop i =
     if i >= n then s ^ ".0"
     else if s.[i] = '.' || s.[i] = 'e' then s
@@ -331,7 +331,7 @@ let string_of_list l =
     else
       ()
   in
-    loop 0 l; s
+  loop 0 l; Bytes.to_string s
 ;;
 
 let itostr base i =
@@ -380,19 +380,19 @@ let ntostr base =
 
 let rec snum_numtostr =
   function
-    [| Sint i |] -> Sstring (string_of_int i)
-  | [| Sbigint bi |] -> Sstring (string_of_big_int bi)
-  | [| Srational r |] -> Sstring (string_of_ratio r)
-  | [| Sreal r |] -> Sstring (string_of_real r)
-  | [| Scomplex z |] -> Sstring (string_of_complex z)
-  | [| snum; Sint radix |] ->
-      if radix = 10 then
-	snum_numtostr [| snum |]
-      else if radix = 2 || radix = 8 || radix = 16 then
-	Sstring (ntostr radix snum)
-      else
-	raise (Error "number->string: invalid radix")
-  | _ -> raise (Error "number->string: bad args")
+      [| Sint i |] -> Sstring (Bytes.of_string (string_of_int i))
+    | [| Sbigint bi |] -> Sstring (Bytes.of_string (string_of_big_int bi))
+    | [| Srational r |] -> Sstring (Bytes.of_string (string_of_ratio r))
+    | [| Sreal r |] -> Sstring (Bytes.of_string (string_of_real r))
+    | [| Scomplex z |] -> Sstring (Bytes.of_string (string_of_complex z))
+    | [| snum; Sint radix |] ->
+	if radix = 10 then
+	  snum_numtostr [| snum |]
+	else if radix = 2 || radix = 8 || radix = 16 then
+	  Sstring (Bytes.of_string (ntostr radix snum))
+	else
+	  raise (Error "number->string: invalid radix")
+    | _ -> raise (Error "number->string: bad args")
 ;;
 
 let init e =

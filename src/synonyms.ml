@@ -10,7 +10,12 @@ let non_empty l =
 let parse add s =
   match Pcre.split ~rex:key_rex s with
     | [key;values] ->
-	add ((Strings.drop_spaces key), (non_empty (Pcre.split ~rex:space_rex values)))
+	add
+	  (
+	    (Strings.drop_spaces key),
+	    (non_empty
+	      (Pcre.split ~rex:space_rex values))
+	  )
     | l ->
 	List.iter print_endline l
 

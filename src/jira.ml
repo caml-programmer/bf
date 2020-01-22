@@ -12,7 +12,7 @@ module J = Yojson.Safe
 exception Bad_jira_port of string
 exception Bad_response_status of string
 exception Bad_json_path of string
-exception Bad_json_value of J.json
+exception Bad_json_value of J.t
 
 let debug =
   try
@@ -31,7 +31,7 @@ let jira_port =
 let jira_user = Params.get_param "jira-user"
 let jira_pass = Params.get_param "jira-pass"
 
-let basic = B64.encode (sprintf "%s:%s" jira_user jira_pass)
+let basic = Bytes.to_string (B64.encode (Bytes.of_string (sprintf "%s:%s" jira_user jira_pass)))
 
 let mkurl key =
   sprintf "http://%s:%d/rest/api/2/issue/%s" jira_host jira_port key

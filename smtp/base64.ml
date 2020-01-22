@@ -96,14 +96,14 @@ let encode_with_options b64 equal s pos len
     match m with
 	0 -> ()
       | 1 ->
-          let bits = Char.code (s.[pos + len - 1]) in
+          let bits = Char.code (Bytes.get s (pos + len - 1)) in
 	  Bytes.set t !j b64.(bits lsr 2);
 	  Bytes.set t (succ !j) b64.((bits land 0x03) lsl 4);
 	  j := !j + 4;
 	  q := !q + 4;
       | 2 ->
-	  let bits = (Char.code (s.[pos + len - 2]) lsl 8) lor
-            (Char.code (s.[pos + len - 1])) in
+	  let bits = (Char.code (Bytes.get s (pos + len - 2)) lsl 8) lor
+            (Char.code (Bytes.get s (pos + len - 1))) in
 	  Bytes.set t !j b64.( bits lsr 10);
 	  Bytes.set t (succ !j) b64.((bits lsr  4) land 0x3f);
 	  Bytes.set t (!j + 2)  b64.((bits lsl  2) land 0x3f);

@@ -5,7 +5,7 @@ let regexp1 () =
 let regexp2 () =
   not (Pcre.pmatch ~rex:(Pcre.regexp ("^" ^ "KEY" ^ "\\s*=.*?$")) "MESSAGE TEXT")
 let regexp3 () =
-  (Re.get (Re.exec (Re_perl.compile_pat "(\\d+)") "X = 45") 1 = "45")
+  (Re.Group.get (Re.exec (Re.Perl.compile_pat "(\\d+)") "X = 45") 1 = "45")
 let regexp4 () =
   Pcre.split ~rex:(Re.compile (Re.rep1 Re.space))
     "a b  c    d" = ["a";"b";"c";"d"]
