@@ -1,5 +1,5 @@
 <jira.ml>: syntax(camlp5o), package(camlp5.macro), define(YOJSON)
-<*.ml> : package(unix,shell)
+<*.ml> : package(unix,shell,num)
 <bf2.ml> : package(cmdliner)
 <bf.native> : package(unix,num,str,shell)
 <bf2.native> : package(cmdliner,str,unix,num,shell)

@@ -1,0 +1,2 @@
+<*.mli>: package(num)
+<*.ml>: package(num)
