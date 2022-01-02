@@ -115,8 +115,7 @@ exception No_chroot_command
 let chroot_cmd_exists =
   let chroot = Params.get "chroot-path" in
   Sys.file_exists chroot
-    
-let centos6_base_repo_filename = "Centos6-Base.repo"
+
 let centos7_base_repo_filename = "Centos7-Base.repo"
 let centos_base_repo_content () =
   let centos_mirror = Params.get_param "centos-mirror" in
@@ -174,9 +173,9 @@ let make chroot_name platform =
   Cmd.mkdir ~as_root:true chroot_dir;
   
   match platform with
-    | Cent6 ->
-	msg "always" ("Creating chroot environment for cent6 in "^chroot_dir);
-	let centos_mirror = Params.get_param "centos6-mirror" in
+    | Cent7 ->
+	msg "always" ("Creating chroot environment for cent7 in "^chroot_dir);
+	let centos_mirror = Params.get_param "centos7-mirror" in
 	let centos_release_pkg_url = Repo.centos_release_pkg_url centos_mirror in
 	let centos_release_pkg = Repo.pkg_by_url centos_release_pkg_url in
 	let centos_release_pkg_path = Path.make [(chroots_dir ());centos_release_pkg] in
@@ -188,7 +187,7 @@ let make chroot_name platform =
 
 	(* заменяем репы на нужные *)
 	ignore (root_command ("rm "^(Path.make [chroot_dir; "/etc/yum.repos.d/*.repo"])));
-	ignore (root_command ("cp /opt/dozor/bf/data/centos6-repos/*.repo "^
+	ignore (root_command ("cp /opt/dozor/bf/data/centos7-repos/*.repo "^
 	(Path.make [chroot_dir; "/etc/yum.repos.d/"])));
 	(* ставим yum *)
 	ignore (Cmd.root_command ~loglevel:"low" ("yum --installroot="^chroot_dir^" install yum -y"));

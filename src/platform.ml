@@ -11,23 +11,15 @@ type pkg_engine =
   | Deb_pkg
 
 type platform =
-  | Rhel3
-  | Rhel4
-  | Rhel5
-  | Rhel6
+  | Rhel8
   | Rhel7
-  | Cent4
-  | Cent5
-  | Cent6
   | Cent7
-  | Fedora10
   | Alt
-  | Arch
-  | Solaris8
-  | Solaris9
   | Solaris10
   | Debian
-  | Astra1_4
+  | Ubuntu
+  | Astra
+  | Arch
   | Gentoo
   | Unknown_linux
 
@@ -38,86 +30,53 @@ exception Permanent_error of string
 exception Pkg_engine_not_found
 
 let os_of_platform = function
-  | Rhel3          -> Linux
-  | Rhel4          -> Linux
-  | Rhel5          -> Linux
-  | Rhel6          -> Linux
+  | Rhel8          -> Linux
   | Rhel7          -> Linux
-  | Cent4          -> Linux
-  | Cent5          -> Linux
-  | Cent6          -> Linux
   | Cent7          -> Linux
-  | Fedora10       -> Linux
   | Alt            -> Linux
-  | Astra1_4       -> Linux
+  | Astra          -> Linux
   | Arch           -> Linux
   | Debian         -> Linux
+  | Ubuntu         -> Linux
   | Gentoo         -> Linux
   | Unknown_linux  -> Linux
-  | Solaris8       -> SunOS
-  | Solaris9       -> SunOS
   | Solaris10      -> SunOS
 
 let engine_of_platform = function
-  | Rhel3     -> Rpm_build
-  | Rhel4     -> Rpm_build
-  | Rhel5     -> Rpm_build
-  | Rhel6     -> Rpm_build
+  | Rhel8     -> Rpm_build
   | Rhel7     -> Rpm_build
-  | Cent4     -> Rpm_build
-  | Cent5     -> Rpm_build
-  | Cent6     -> Rpm_build
   | Cent7     -> Rpm_build
-  | Fedora10  -> Rpm_build
   | Alt       -> Rpm_build
   | Arch      -> Rpm_build
-  | Solaris8  -> Pkg_trans
-  | Solaris9  -> Pkg_trans
   | Solaris10 -> Pkg_trans
   | Debian    -> Deb_pkg
-  | Astra1_4  -> Deb_pkg
+  | Ubuntu    -> Deb_pkg
+  | Astra     -> Deb_pkg
   | Gentoo | Unknown_linux
       -> raise Pkg_engine_not_found
 
 let string_of_platform = function
-  | Rhel3     -> "rhel3"
-  | Rhel4     -> "rhel4"
-  | Rhel5     -> "rhel5"
-  | Rhel6     -> "rhel6"
+  | Rhel8     -> "rhel8"
   | Rhel7     -> "rhel7"
-  | Cent4     -> "cent4"
-  | Cent5     -> "cent5"
-  | Cent6     -> "cent6"
   | Cent7     -> "cent7"
-  | Fedora10  -> "f10"
   | Alt       -> "alt"
   | Arch      -> "arch"
-  | Solaris8  -> "sol8"
-  | Solaris9  -> "sol9"
   | Solaris10 -> "sol10"
   | Debian    -> "deb"
-  | Astra1_4  -> "astra14"
+  | Ubuntu    -> "ubuntu"
+  | Astra     -> "astra"
   | Gentoo    -> "gentoo"
   | Unknown_linux -> "linux"
 
 let platform_of_string = function
-  | "rhel3" -> Rhel3
-  | "rhel4" -> Rhel4
-  | "rhel5" -> Rhel5
-  | "rhel6" -> Rhel6
+  | "rhel8" -> Rhel8
   | "rhel7" -> Rhel7
-  | "cent4" -> Cent4
-  | "cent5" -> Cent5
-  | "cent6" -> Cent6
   | "cent7" -> Cent7
-  | "f10"   -> Fedora10
   | "alt"   -> Alt
   | "arch"  -> Arch
-  | "sol8"  -> Solaris8
-  | "sol9"  -> Solaris9
   | "sol10" -> Solaris10
   | "deb"   -> Debian
-  | "astra14" -> Astra1_4
+  | "astra" -> Astra
   | "gentoo" -> Gentoo
   | "linux" -> Unknown_linux
   |  s -> log_error (sprintf "Unsupported platform (%s)" s)
@@ -138,24 +97,18 @@ let os () =
 
 let linux_platform_mapping =
   [
+    "/etc/altlinux-release", [".*", Alt];
     "/etc/redhat-release",
     [
-      "^Red Hat Enterprise.*?release 5",Rhel5;
-      "^Red Hat Enterprise.*?release 6",Rhel6;
+      "^Red Hat Enterprise.*?release 8",Rhel8;
       "^Red Hat Enterprise.*?release 7",Rhel7;
-      "^CentOS.*?release 5",Rhel5;
-      "^CentOS.*?release 6",Rhel6;
-      "^CentOS.*?release 7",Rhel7;
-      "^Fedora.*?release 10",Fedora10;
-      "^ALT Linux",Alt
+      "^CentOS.*?release 7",Cent7;
     ];
     "/etc/arch-release", ["^.*",Arch];
-    "/etc/debian_version",
-    [
-        "^SE.*?1.4.*(smolensk)",Astra1_4
-    ];
+    "/usr/lib/os-release", ["Ubuntu",Ubuntu];
+    "/etc/astra_version", [".*", Astra];
+    "/etc/debian_version", [".*",Debian];
     "/etc/gentoo-release",["^.*",Gentoo];
-
   ]
 
 let rec select_platforms acc = function
@@ -182,8 +135,6 @@ let current () =
 
 let sunos_platfrom () =
   match System.uname ~flag:'r' () with
-    | "5.8"  -> Solaris8
-    | "5.9"  -> Solaris9
     | "5.10" -> Solaris10
     |  s     -> log_error (sprintf "Unsupported SunOS (%s)" s)
 
@@ -198,4 +149,3 @@ let with_platform (f : os -> platform -> 'a) =
     in f os platform
     | SunOS ->
     f os (sunos_platfrom ())
-
