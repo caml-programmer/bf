@@ -235,7 +235,7 @@ let build
 	end
     end
 
-let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot")) ~top_dir files =
+let copy_to_buildroot ?(systemd_unit=None) ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot")) ~top_dir files =
   
   Commands.remove_directory buildroot;
   Commands.make_directory [buildroot];
@@ -272,7 +272,7 @@ let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
 	`File (make_path s)
   in
   let ch = open_in files in
-  try
+  (try
     while true do
       let raw = input_line ch in
       match parse_line raw with
@@ -318,4 +318,20 @@ let copy_to_buildroot ?(buildroot=(Filename.concat (Sys.getcwd ()) "buildroot"))
 	    log_message 
 	      (sprintf "copy_to_buildroot: skipped %s" raw)
     done
-  with End_of_file -> close_in ch
+   with End_of_file -> close_in ch);
+  (match systemd_unit with
+   | None -> ()
+   | Some unit ->
+      let system_unit_path = "/lib/systemd/system/" ^ (Filename.basename unit) in
+      let dst = Filename.concat buildroot (System.strip_root system_unit_path) in
+      (try
+         let body =
+           Strings.substring_replace ("%(topdir)",top_dir) (System.read_file ~file:unit) in
+	 System.create_directory_r (Filename.dirname dst);
+         System.write_string
+	   ~file:dst
+           ~string:body
+       with exn ->
+	 log_message (sprintf "install %s to %s" unit dst);
+	 raise exn);
+      System.append_write ~file:files (sprintf "%s\n" system_unit_path))

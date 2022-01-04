@@ -8,31 +8,31 @@ let extract_packbranch ?userhost ?(engine=Rpm_build) pkg_path =
   match
     (match engine with
      | Rpm_build ->
-	(match userhost with
-	 | Some auth ->
-	    (System.read_lines ~filter:(Pcre.pmatch ~rex:(Pcre.regexp "packbranch-"))
-			       (sprintf "ssh %s rpm -qp --provides %s" auth pkg_path))
-	 | None ->
-	    (System.read_lines ~filter:(Pcre.pmatch ~rex:(Pcre.regexp "packbranch-"))
-			       (sprintf "rpm -qp --provides %s" pkg_path)))
+       (match userhost with
+        | Some auth ->
+           (System.read_lines ~filter:(Pcre.pmatch ~rex:(Pcre.regexp "packbranch-"))
+                              (sprintf "ssh %s rpm -qp --provides %s" auth pkg_path))
+        | None ->
+           (System.read_lines ~filter:(Pcre.pmatch ~rex:(Pcre.regexp "packbranch-"))
+                              (sprintf "rpm -qp --provides %s" pkg_path)))
      | Deb_pkg ->
-	(match userhost with
-	 | Some auth ->
-	    (System.read_lines ~filter:(Pcre.pmatch ~rex:(Pcre.regexp "packbranch-"))
-			       (sprintf "ssh %s dpkg-deb -f %s provides" auth pkg_path))
-	 | None ->
-	    (System.read_lines ~filter:(Pcre.pmatch ~rex:(Pcre.regexp "packbranch-"))
-			       (sprintf "dpkg-deb -f %s provides" pkg_path)))
+       (match userhost with
+        | Some auth ->
+           (System.read_lines ~filter:(Pcre.pmatch ~rex:(Pcre.regexp "packbranch-"))
+                              (sprintf "ssh %s dpkg-deb -f %s provides" auth pkg_path))
+        | None ->
+           (System.read_lines ~filter:(Pcre.pmatch ~rex:(Pcre.regexp "packbranch-"))
+                              (sprintf "dpkg-deb -f %s provides" pkg_path)))
      | _ -> [])
   with [] -> raise (Pack_branch_is_not_found pkg_path)
     | hd::_ ->
        let pos = String.index hd '-' in
-	let len =
-	  try
-	    String.index hd ' '
-	  with Not_found -> String.length hd
-	in
-	String.sub hd (succ pos) (len - pos - 1)
+       let len =
+         try
+           String.index hd ' '
+         with Not_found -> String.length hd
+       in
+       String.sub hd (succ pos) (len - pos - 1)
 
 let call_after_build ?chroot ~snapshot ~location ~fullname hooks version release platform =
   Plugins.load ();
@@ -48,9 +48,9 @@ let call_after_build ?chroot ~snapshot ~location ~fullname hooks version release
   if Scheme.defined "after-build" then
     Scheme.eval_code (fun _ -> ())
       (sprintf "(after-build \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %s \"%s\")"
-	(System.hostname ()) location fullname version release branch
-	(if snapshot then "#t" else "#f")
-	(string_of_platform platform))
+       (System.hostname ()) location fullname version release branch
+       (if snapshot then "#t" else "#f")
+       (string_of_platform platform))
 
 let call_before_build ~snapshot ~pkgname ~version ~revision ~platform hooks =
   Plugins.load ();
@@ -61,17 +61,17 @@ let call_before_build ~snapshot ~pkgname ~version ~revision ~platform hooks =
     let result = ref [] in
     Scheme.eval_code (fun v -> result := Scheme.map Scheme.make_string v)
       (sprintf "(before-build \"%s\" \"%s\" \"%s\" \"%s\" %s)"
-	pkgname version revision (string_of_platform platform) (if snapshot then "#t" else "#f"));
+       pkgname version revision (string_of_platform platform) (if snapshot then "#t" else "#f"));
     !result (* эта штука при нашем нынешнем lib.scm возвращает [] *)
   else []
 
-let build_over_rpmbuild ?chroot ~snapshot (pkgname,platform,version,release,spec,files,findreq,hooks) =
+let build_over_rpmbuild ?chroot ?(systemd_unit=None) ~snapshot (pkgname,platform,version,release,spec,files,findreq,hooks) =
   let top_dir = Params.get_param "top-dir" in
   print_endline ("FCK: topdir = "^top_dir);
   System.check_commands ["rpmbuild"];
   log_command "chmod" ["+x";findreq];
   if chroot = None then
-    Rpm.copy_to_buildroot ~top_dir files;
+    Rpm.copy_to_buildroot ~top_dir ~systemd_unit files;
   let (location,fullname) =
     Rpm.build
       ~top_dir ?chroot
@@ -83,12 +83,12 @@ let check_composite_depends spec =
   let composite_depends =
     List.map
       (fun c ->
-	match c.pkg with
-	  | Some pkg -> pkg
-	  | None -> assert false)
+       match c.pkg with
+         | Some pkg -> pkg
+         | None -> assert false)
       (List.filter
-	(fun c -> c.pkg <> None && (not c.nopack))
-	spec.components)
+       (fun c -> c.pkg <> None && (not c.nopack))
+       spec.components)
   in
   let spec_depends =
     List.map 
@@ -97,18 +97,18 @@ let check_composite_depends spec =
   let rec make acc = function
     | [] -> acc
     | hd::tl ->
-	if not (List.mem hd spec_depends) then
-	  make (hd::acc) tl
-	else
-	  make acc tl
+       if not (List.mem hd spec_depends) then
+         make (hd::acc) tl
+       else
+         make acc tl
   in
   let missings = make [] composite_depends in
   if missings <> [] then
     begin
       List.iter 
-	(fun pkg ->
-	  log_message (sprintf "package (%s) is missing in depends file" pkg))
-	missings;
+       (fun pkg ->
+         log_message (sprintf "package (%s) is missing in depends file" pkg))
+       missings;
       raise (Permanent_error "you must correct depends or composite files")
     end
 
@@ -226,7 +226,6 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		call_before_build ~snapshot
 		  ~pkgname:spec.pkgname ~version ~revision:release ~platform spec.hooks in
 	      (* hooks -- это атавизм со времен specdir-v1, забить на это дело *)
-
 	      let filecount = ref 0 in
 	      let files =
 		with_out "rpmbuild.files"
@@ -234,7 +233,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		    let make_rpm_line s =
 		      incr filecount;
 		      let l = String.length s in
-		      if l > 2 then			      
+		      if l > 2 then
 			(match s.[0] with
 			  | 'd' -> reg (sprintf "%%dir %s\n" (String.sub s 2 (l - 2)))
 			  | 'f' -> reg (sprintf "%s\n" (String.sub s 2 (l - 2)))
@@ -242,10 +241,11 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		      else ""
 		    in
 		    accumulate_lists (add_bf_list make_rpm_line) out;
-		    (* обычно ничего не делает *)
+		    (* add custom files *)
 		    List.iter (fun s -> out (make_rpm_line s))
 		      custom_pkg_files)
 	      in
+
 	      let findreq =
 		with_out "rpmbuild.findreq"
 		  (fun out -> 
@@ -361,7 +361,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 			  out "fi\n"))
 	      in
 	      
-	      build_over_rpmbuild ~snapshot
+	      build_over_rpmbuild ~snapshot ~systemd_unit:spec.systemd_unit
 		(spec.pkgname,platform,version,release,specfile,files,findreq,spec.hooks)
 
 	 (* PKG TRANS CODE ---------------------------------------- *)
@@ -598,12 +598,29 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 			    | None -> src) dst
 		    | _ -> ())
 	      in
+              let add_systemd_unit src =
+		let dst =
+                  Filename.concat
+		    (Filename.concat abs_specdir "debian")
+		    (Filename.concat "/lib/systemd/system" (Filename.basename src)) in
+                let dir = Filename.dirname dst in
+		Commands.make_directory [dir];
+		System.write_string
+		  ~file:dst
+                  ~string:(resolve_params find_value
+                             (System.read_file ~file:src))
+              in
+
 	      let debian_home =
 		Filename.concat abs_specdir "debian" in
 	      Commands.remove_directory debian_home;
 	      Commands.make_directory [debian_home];
 	      accumulate_lists (add_bf_list make_deb_line) (fun _ -> ());
 	      List.iter make_deb_line custom_pkg_files;
+              (match spec.systemd_unit with
+               | None -> ()
+               | Some unit ->
+                  add_systemd_unit unit);
 	      
 	      let write_script name content =
 		let rpm_install_prefix =

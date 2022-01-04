@@ -38,6 +38,7 @@ type spec = {
     pre_update : string option;
     pre_uninstall : string option;
     post_install : string option;
+    systemd_unit : string option;
     params : (string,string) Hashtbl.t;
     hooks : string option; (* атавизм со времён spec-v1*)
     version: pkg_ver;
@@ -52,7 +53,7 @@ let inc_rev (spec:spec) =
     
 let pkgname_of_platform_depend ((pkgname,_,_): platform_depend) = pkgname
 
-
+exception Multiple_systemd_units
 exception Dependency_not_found of pkg_name
 
 let find_dependency ?(use_builddeps=false) spec pkgname =
@@ -151,6 +152,7 @@ let system_pkg_spec ?os ?platform pkgname version =
     pre_update = None;
     pre_uninstall = None;
     post_install = None;
+    systemd_unit = None;
     params = (Hashtbl.create 0);
     hooks = None;
     version = version;
@@ -405,6 +407,11 @@ let load_v2 ?(snapshot=false) ?(short_composite=false) ~version ~revision specdi
 	Some pn
       else None
   in
+  let systemd_unit =
+    match List.filter (Strings.have_suffix ".service") (System.list_of_directory specdir) with
+      [] -> None
+    | [unit] -> Some (Filename.concat specdir unit)
+    | _ -> raise Multiple_systemd_units in
   {
     pkgname = pkgname;
     depends = depends;
@@ -418,6 +425,7 @@ let load_v2 ?(snapshot=false) ?(short_composite=false) ~version ~revision specdi
     pre_update = pre_update;
     pre_uninstall = pre_uninstall;
     post_install = post_install;
+    systemd_unit = systemd_unit;
     params = params;
     hooks = hooks;
     version = "";  (* старым кодом не используется *)
@@ -507,6 +515,11 @@ let load_v2_new ?(short_composite=false) ?(os=Platform.os ()) ?(platform=Platfor
     if Sys.file_exists "chroot"
     then List.hd (System.list_of_file "chroot")
     else "minimal" in
+  let systemd_unit =
+    match List.filter (Strings.have_suffix ".service") (System.list_of_directory ".") with
+      [] -> None
+    | [unit] -> Some (Filename.concat (Sys.getcwd ()) unit)
+    | _ -> raise Multiple_systemd_units in
   let (_,revision) = Specdir.ver_rev_by_specdir "." in
   {
     pkgname = pkgname;
@@ -521,6 +534,7 @@ let load_v2_new ?(short_composite=false) ?(os=Platform.os ()) ?(platform=Platfor
     pre_update = pre_update;
     pre_uninstall = pre_uninstall;
     post_install = post_install;
+    systemd_unit = systemd_unit;
     params = params;
     hooks = None; (* атавизм со времён load_v1 *)
     version = version;
