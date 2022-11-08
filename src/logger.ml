@@ -63,7 +63,7 @@ let log_message ?(low=false) ?key ?logger message =
   in
   let write p s =
     output_string p s; flush p in
-  write (Lazy.force session_port) s;
+  (*write (Lazy.force session_port) s;*)
   write port s;
   if not low then
     ( write stdout s );

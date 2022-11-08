@@ -11,11 +11,9 @@ type pkg_engine =
   | Deb_pkg
 
 type platform =
-  | Rhel8
-  | Rhel7
-  | Cent7
+  | Rhel
   | Alt
-  | Solaris10
+  | Solaris
   | Debian
   | Ubuntu
   | Astra
@@ -30,9 +28,7 @@ exception Permanent_error of string
 exception Pkg_engine_not_found
 
 let os_of_platform = function
-  | Rhel8          -> Linux
-  | Rhel7          -> Linux
-  | Cent7          -> Linux
+  | Rhel           -> Linux
   | Alt            -> Linux
   | Astra          -> Linux
   | Arch           -> Linux
@@ -40,15 +36,13 @@ let os_of_platform = function
   | Ubuntu         -> Linux
   | Gentoo         -> Linux
   | Unknown_linux  -> Linux
-  | Solaris10      -> SunOS
+  | Solaris        -> SunOS
 
 let engine_of_platform = function
-  | Rhel8     -> Rpm_build
-  | Rhel7     -> Rpm_build
-  | Cent7     -> Rpm_build
+  | Rhel      -> Rpm_build
   | Alt       -> Rpm_build
   | Arch      -> Rpm_build
-  | Solaris10 -> Pkg_trans
+  | Solaris   -> Pkg_trans
   | Debian    -> Deb_pkg
   | Ubuntu    -> Deb_pkg
   | Astra     -> Deb_pkg
@@ -56,12 +50,10 @@ let engine_of_platform = function
       -> raise Pkg_engine_not_found
 
 let string_of_platform = function
-  | Rhel8     -> "rhel8"
-  | Rhel7     -> "rhel7"
-  | Cent7     -> "cent7"
+  | Rhel      -> "rhel"
   | Alt       -> "alt"
   | Arch      -> "arch"
-  | Solaris10 -> "sol10"
+  | Solaris   -> "sol"
   | Debian    -> "deb"
   | Ubuntu    -> "ubuntu"
   | Astra     -> "astra"
@@ -69,12 +61,10 @@ let string_of_platform = function
   | Unknown_linux -> "linux"
 
 let platform_of_string = function
-  | "rhel8" -> Rhel8
-  | "rhel7" -> Rhel7
-  | "cent7" -> Cent7
+  | "rhel" -> Rhel
   | "alt"   -> Alt
   | "arch"  -> Arch
-  | "sol10" -> Solaris10
+  | "sol"   -> Solaris
   | "deb"   -> Debian
   | "astra" -> Astra
   | "gentoo" -> Gentoo
@@ -100,9 +90,7 @@ let linux_platform_mapping =
     "/etc/altlinux-release", [".*", Alt];
     "/etc/redhat-release",
     [
-      "^Red Hat Enterprise.*?release 8",Rhel8;
-      "^Red Hat Enterprise.*?release 7",Rhel7;
-      "^CentOS.*?release 7",Cent7;
+      "^Red Hat Enterprise.*?release",Rhel;
     ];
     "/etc/arch-release", ["^.*",Arch];
     "/usr/lib/os-release", ["Ubuntu",Ubuntu];
@@ -135,7 +123,7 @@ let current () =
 
 let sunos_platfrom () =
   match System.uname ~flag:'r' () with
-    | "5.10" -> Solaris10
+    | "5.10" -> Solaris
     |  s     -> log_error (sprintf "Unsupported SunOS (%s)" s)
 
 let with_platform (f : os -> platform -> 'a) =

@@ -492,7 +492,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 	      log_command "gzip" [pkg_file];
 	      call_after_build ?chroot:None ~snapshot
 		~location:(Sys.getcwd ())
-		~fullname:pkg_file_gz spec.hooks version release Solaris10
+		~fullname:pkg_file_gz spec.hooks version release Solaris
 
 	  (* DEB BUILD CODE ---------------------------------------- *)
 	  | Deb_pkg ->

@@ -17,7 +17,7 @@ let chroot_buildpkg () =
   Check.pack_component ();
 
   let os = Platform.Linux in
-  let platform = Platform.Cent7 in
+  let platform = Platform.Rhel in
   let pkgname = "jet-racket5" in
   let version = "14.0.0" in
   let pkgspec = Spectype.newload ~os ~platform pkgname version in
@@ -27,7 +27,7 @@ let chroot_buildpkg () =
     
 let test_packpkg () =
   let os = Platform.Linux in
-  let platform = Platform.Cent7 in
+  let platform = Platform.Rhel in
   let chroot_name = "centos--jet-racket5" in
   let pkgname = "jet-racket5" in
   let version = "14.0.0" in
@@ -74,7 +74,7 @@ let depload file =
 
 (* load-chroot-cfg *)
 let load_chroot_cfg () =
-  let chroot = Chroot.load_chroot_cfg "centos7-for-java" Platform.Cent7 in
+  let chroot = Chroot.load_chroot_cfg "rhel7-for-java" Platform.Rhel in
   print_endline (string_of_chroot chroot)
 		
 (* depgraph *)

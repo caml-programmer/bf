@@ -116,14 +116,14 @@ let chroot_cmd_exists =
   let chroot = Params.get "chroot-path" in
   Sys.file_exists chroot
 
-let centos7_base_repo_filename = "Centos7-Base.repo"
-let centos_base_repo_content () =
-  let centos_mirror = Params.get_param "centos-mirror" in
-  "[Centos$releasever-Base]
-name=Base Repo for Centos$releasever - $basearch
-baseurl="^centos_mirror^"$releasever/os/$basearch/
+let rhel7_base_repo_filename = "Rhel7-Base.repo"
+let rhel_base_repo_content () =
+  let rhel_mirror = Params.get_param "rhel-mirror" in
+  "[Rhel$releasever-Base]
+name=Base Repo for Rhel$releasever - $basearch
+baseurl="^rhel_mirror^"$releasever/os/$basearch/
 gpgcheck=1
-gpgkey="^centos_mirror^"$releasever/os/$basearch/RPM-GPG-KEY-CentOS-$releasever"
+gpgkey="^rhel_mirror^"$releasever/os/$basearch/RPM-GPG-KEY-Rhel-$releasever"
 
 let compose_home_path () =
   let err msg = err "Chroot.compose_home_path" msg in
@@ -173,21 +173,22 @@ let make chroot_name platform =
   Cmd.mkdir ~as_root:true chroot_dir;
   
   match platform with
-    | Cent7 ->
-	msg "always" ("Creating chroot environment for cent7 in "^chroot_dir);
-	let centos_mirror = Params.get_param "centos7-mirror" in
-	let centos_release_pkg_url = Repo.centos_release_pkg_url centos_mirror in
-	let centos_release_pkg = Repo.pkg_by_url centos_release_pkg_url in
-	let centos_release_pkg_path = Path.make [(chroots_dir ());centos_release_pkg] in
+    | Rhel ->
+        let rhel_number = 9 (* TODO: read /etc/os-release *)  in
+	msg "always" (Printf.sprintf "Creating chroot environment for rhel%d in %s" rhel_number chroot_dir);
+	let rhel_mirror = Params.get_param "rhel7-mirror" in
+	let rhel_release_pkg_url = Repo.rhel_release_pkg_url rhel_mirror in
+	let rhel_release_pkg = Repo.pkg_by_url rhel_release_pkg_url in
+	let rhel_release_pkg_path = Path.make [(chroots_dir ());rhel_release_pkg] in
 
 	(* разворачиваем базовое окружение *)
-	ignore (root_command ("wget "^centos_release_pkg_url^" -O "^centos_release_pkg_path));
+	ignore (root_command ("wget "^rhel_release_pkg_url^" -O "^rhel_release_pkg_path));
 	ignore (root_command ("rpm --root "^chroot_dir^" --initdb"));
-	ignore (root_command ("rpm --root "^chroot_dir^" --nodeps -ivh "^centos_release_pkg_path));
+	ignore (root_command ("rpm --root "^chroot_dir^" --nodeps -ivh "^rhel_release_pkg_path));
 
 	(* заменяем репы на нужные *)
 	ignore (root_command ("rm "^(Path.make [chroot_dir; "/etc/yum.repos.d/*.repo"])));
-	ignore (root_command ("cp /opt/dozor/bf/data/centos7-repos/*.repo "^
+	ignore (root_command ("cp /opt/dozor/bf/data/rhel7-repos/*.repo "^
 	(Path.make [chroot_dir; "/etc/yum.repos.d/"])));
 	(* ставим yum *)
 	ignore (Cmd.root_command ~loglevel:"low" ("yum --installroot="^chroot_dir^" install yum -y"));
