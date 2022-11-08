@@ -256,7 +256,6 @@ let build_component chroot_name component_name rules =
       let dest_dir = Params.get_param "dest-dir" in
       let install_dir = Params.make_install_dir () in
 
-      Params.update_param "orig-top-dir" top_dir;
       Cmd.mkdir_if_not_exists top_dir;
       Params.update_param "install-dir" install_dir;
       Cmd.mkdir_if_not_exists install_dir;
