@@ -163,9 +163,10 @@ let with_teleport mode f =
 	    | Some x -> Filename.dirname x)
   in
   let goto x =
-    Sys.chdir new_location;
-    Params.update_param "start-dir" new_location in
-  goto new_location; f (); goto location
+    Sys.chdir x;
+    Params.update_param "start-dir" x in
+  goto new_location; f ();
+  goto location
 
 let main () =
   let len = Array.length Sys.argv in
@@ -609,6 +610,7 @@ let print_current_state () =
   param "pkg-storage";
   param "pkg-branch";
   param "log-level";
+  param "log-dir";
   Printf.printf "**********************************\n%!"
    
 let string_of_exn = function
