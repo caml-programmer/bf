@@ -3,12 +3,14 @@
 
 (let* ((ocaml-dir (opam-ocaml-dir))
        (bindir (path-concat ocaml-dir "bin")))
-
+  
   (if (file-exists bindir)
       (add-path bindir))
 
   (define (build args)
-      (log-command "./configure")
+    (log-command "sudo" "apt-get" "install" "-y" "libstring-shellquote-perl")
+    (log-command "opam" "install" "-y" "camlp5")
+    (log-command "./configure")
     (log-command "make"))
 
   (define (install args)
