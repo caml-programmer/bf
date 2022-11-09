@@ -344,13 +344,15 @@ let install ?(snapshot=false) component =
 		    build_native ~snapshot component;
 		  let t0 = Unix.gettimeofday () in
 		  log_message ("install " ^ component.name ^ " started");
+                  let top_dir =
+                    Params.get_param "top-dir" in
 		  let install_dir =
 		    Params.make_install_dir () in
 		  let state =
 		    Scanner.create_top_state install_dir in
 		  Params.update_param "install-dir" install_dir;
 		  Rules.install_rules ~snapshot component.rules;
-		  Scanner.generate_changes component.rules install_dir
+		  Scanner.generate_changes component.rules top_dir
 		    state (Scanner.create_top_state install_dir);
 		  let t1 = Unix.gettimeofday () in
 		  log_message ("install " ^ component.name ^ (sprintf " finished (%f seconds)" (t1 -. t0)));
