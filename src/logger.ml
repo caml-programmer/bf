@@ -16,7 +16,9 @@ let need_truncate file =
   else false
     
 let prepare file =
-  create_directory_r (Filename.dirname file);
+  let dir = Filename.dirname file in
+  if dir <> "" && dir <> "." then
+    create_directory_r dir;
   if need_truncate file then
     open_out file
   else open_out_gen [Open_wronly; Open_append; Open_creat] 0o644 file
@@ -63,7 +65,7 @@ let log_message ?(low=false) ?key ?logger message =
   in
   let write p s =
     output_string p s; flush p in
-  (*write (Lazy.force session_port) s;*)
+  write (Lazy.force session_port) s;
   write port s;
   if not low then
     ( write stdout s );
