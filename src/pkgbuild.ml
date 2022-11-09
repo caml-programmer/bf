@@ -526,7 +526,7 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 			    add (sprintf "%s (%s %s)" pkgname (string_of_pkg_op op) ver)
 			  with Not_found ->
 			    (* Если отсутствует ревизия, считаем, что
-			       это "мягкая" зависомость и записываем
+			       это "мягкая" зависимость и записываем
 			       только название пакета, без указания
 			       версий - для соблюдения порядка
 			       установки пакетов *)
