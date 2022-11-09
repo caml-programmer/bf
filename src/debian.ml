@@ -12,11 +12,13 @@ let fullname pkgname version revision arch =
 let codename () =
   let ch = open_in "/etc/os-release" in
   let result = ref "" in
-  while true do
-    match Strings.split '=' (input_line ch) with
-      "VERSION_CODENAME"::value::_ ->
-       result := value
-    | _ -> ()
-  done;
-  close_in ch;
-  !result
+  begin
+    try
+      while true do
+        match Strings.split '=' (input_line ch) with
+          "VERSION_CODENAME"::value::_ ->
+           result := value
+        | _ -> ()
+      done
+    with End_of_file ->  close_in ch;
+  end; !result
