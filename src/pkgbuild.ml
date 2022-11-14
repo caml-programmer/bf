@@ -738,8 +738,8 @@ let build_package_impl ?(ready_spec=None) ?(snapshot=false) os platform (specdir
 		  log_command "fakeroot" ["dpkg-deb";"--build";"debian"]);
 	      
 	      let pkgfile =
-		sprintf "%s-%s-%s.%s.deb" 
-		  spec.pkgname version release (Debian.fix_arch (System.arch ())) in
+		sprintf "%s-%s-%s.%s_%s.deb"
+		  spec.pkgname version release (Debian.codename ()) (Debian.fix_arch (System.arch ())) in
 	      log_command
 		"mv" [(Filename.concat abs_specdir "debian.deb");pkgfile];
 
