@@ -118,6 +118,8 @@ let reread_params () =
   set_param ~default:"low" "log-level"; (* low,high *)
   set_param ~default:"" "make-opts";
 
+  set_param ~default:"release" "build-type"; (* debug or release *)
+
   set_param ~default:"localhost" "smtp-server";
   set_param ~default:"25" "smtp-port";
   set_param ~default:"bf message" "smtp-subject";
