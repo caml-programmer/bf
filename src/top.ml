@@ -100,7 +100,7 @@ let make ?(replace_composite=None) ?depends specdir =
 	  new_components;
 	acc @ new_components)
       [] depends in
-  Interactive.stop_delay 3;
+  Interactive.stop_delay (int_of_string (Params.get_param "stop-delay"));
   let buf = Buffer.create 32 in
   let add = Buffer.add_string buf in
   List.iter

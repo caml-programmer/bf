@@ -45,7 +45,7 @@ let make specdir upgrade_mode default_branch =
   log_message "depend list...";
   List.iter print_endline depends;
   
-  Interactive.stop_delay 5;
+  Interactive.stop_delay (int_of_string (Params.get_param "stop-delay"));
 
   let build_table = Hashtbl.create 32 in
   let (mark_channel, mark_table) = create_mark_table () in

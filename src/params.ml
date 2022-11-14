@@ -119,6 +119,7 @@ let reread_params () =
   set_param ~default:"" "make-opts";
 
   set_param ~default:"release" "build-type"; (* debug or release *)
+  set_param ~default:"stop-delay" "5";
 
   set_param ~default:"localhost" "smtp-server";
   set_param ~default:"25" "smtp-port";

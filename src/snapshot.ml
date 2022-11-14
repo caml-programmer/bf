@@ -31,7 +31,7 @@ let make ?(composite=None) specdir =
   let depends = list_of_deptree toptree in
   log_message "depend list...";
   List.iter (fun (specdir,_,_) -> print_endline specdir) depends;
-  Interactive.stop_delay 5;
+  Interactive.stop_delay (int_of_string (Params.get_param "stop-delay"));
   Top.make ~replace_composite:composite ~depends specdir;
   List.iter
     (fun (specdir,_,_) ->

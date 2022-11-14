@@ -78,7 +78,7 @@ let make ?(vr=None) ~recursive ~overwrite specdir =
 
   log_message "depend list...";
   List.iter (fun (pkg,ver,rev,spec) -> printf "%s %s %d\n%!" pkg ver rev) (with_rec depends);
-  Interactive.stop_delay 5;
+  Interactive.stop_delay (int_of_string (Params.get_param "stop-delay"));
   
   let pkg_exists specdir ver rev =
     let rex =
