@@ -603,6 +603,7 @@ let print_current_state () =
   param "top-dir";
   param "dev-dir";
   param "dest-dir";
+  param "build-type";
   param "component";
   param "label-type";
   param "label";
