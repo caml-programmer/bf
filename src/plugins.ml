@@ -62,4 +62,5 @@ let load () =
 	Scheme.eval_file
 	(System.with_prefix plugdir (System.list_of_directory plugdir));
       (if debug then print_endline "ok");
-    end
+    end;
+ if debug then Printf.printf "plugins-dir: %s\n" plugdir
