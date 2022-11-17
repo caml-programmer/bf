@@ -112,7 +112,7 @@ let reread_params () =
   set_param ~default:"bf" "component";
   set_param ~default:"branch" "label-type";
   set_param ~default:"master" "label";
-  set_param ~default:"." "plugins-dir";
+  set_param ~default:"pack" "plugins-dir";
   set_param ~default:"false" "composite-mode";
   set_param ~default:(Sys.getcwd()) "start-dir";
   set_param ~default:"low" "log-level"; (* low,high *)
